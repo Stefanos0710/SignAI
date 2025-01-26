@@ -1,7 +1,8 @@
+import tensorflow as tf
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.layers import Input
 import numpy as np
-
+import logging
 
 # Encoder-Decoder-Inferenzmodelle definieren
 def build_inference_models(seq2seq_model, hidden_dim):
@@ -31,13 +32,8 @@ def build_inference_models(seq2seq_model, hidden_dim):
     return encoder_model, decoder_model
 
 
-# Modell laden
-seq2seq_model = load_model("seq2seq_model.h5")
-encoder_model, decoder_model = build_inference_models(seq2seq_model, hidden_dim=512)
-
-
-# Übersetzung
-def translate_sequence(input_seq, encoder_model, decoder_model, input_tokenizer, target_tokenizer, max_len=10):
+# Übersetzung einer Eingabesequenz
+def translate_sequence(input_seq, encoder_model, decoder_model, gloss_tokenizer, target_tokenizer, max_len=10):
     # Eingabe encodieren
     states_value = encoder_model.predict(input_seq)
 
@@ -49,7 +45,8 @@ def translate_sequence(input_seq, encoder_model, decoder_model, input_tokenizer,
     while not stop_condition:
         output_tokens, h, c = decoder_model.predict([target_seq] + states_value)
         sampled_token_index = np.argmax(output_tokens[0, -1, :])
-        sampled_word = target_tokenizer.index_word[sampled_token_index]
+        sampled_word = target_tokenizer.index_word.get(sampled_token_index, "")
+
         decoded_sentence.append(sampled_word)
 
         if sampled_word == "<eos>" or len(decoded_sentence) >= max_len:
@@ -59,17 +56,31 @@ def translate_sequence(input_seq, encoder_model, decoder_model, input_tokenizer,
         target_seq = np.array([[sampled_token_index]])
         states_value = [h, c]
 
-    return " ".join(decoded_sentence)
+    return " ".join(decoded_sentence).replace("<sos>", "").replace("<eos>", "").strip()
 
 
-# Beispiel
 if __name__ == "__main__":
-    # Beispiel-Tokenizers
-    input_tokenizer = {"word_index": {"<sos>": 1, "hello": 2, "world": 3},
-                       "index_word": {1: "<sos>", 2: "hello", 3: "world"}}
-    target_tokenizer = {"word_index": {"<sos>": 1, "<eos>": 2, "hi": 3},
-                        "index_word": {1: "<sos>", 2: "<eos>", 3: "hi"}}
+    logging.basicConfig(level=logging.INFO)
 
-    input_seq = np.array([[2, 3, 0]])  # Beispiel-Eingabesequenz
-    translation = translate_sequence(input_seq, encoder_model, decoder_model, input_tokenizer, target_tokenizer)
-    print("Übersetzung:", translation)
+    # Modell und Tokenizer laden
+    model_path = r"C:\Users\stefa\PycharmProjects\SignAI\models\trained_model.h5"
+    seq2seq_model = load_model(model_path)
+
+    gloss_tokenizer_path = r"C:\Users\stefa\PycharmProjects\SignAI\models\gloss_tokenizer.json"
+    target_tokenizer_path = r"C:\Users\stefa\PycharmProjects\SignAI\models\target_tokenizer.json"
+
+    # Tokenizer laden (angepasst an dein Format)
+    with open(gloss_tokenizer_path, 'r') as file:
+        gloss_tokenizer = tf.keras.preprocessing.text.tokenizer_from_json(file.read())
+    with open(target_tokenizer_path, 'r') as file:
+        target_tokenizer = tf.keras.preprocessing.text.tokenizer_from_json(file.read())
+
+    # Inferenzmodelle erstellen
+    encoder_model, decoder_model = build_inference_models(seq2seq_model, hidden_dim=512)
+
+    # Beispiel für Eingabedaten (Keypoints)
+    input_seq = np.random.rand(1, 42)  # Beispiel-Dummy-Daten
+
+    # Übersetzung
+    translation = translate_sequence(input_seq, encoder_model, decoder_model, gloss_tokenizer, target_tokenizer)
+    logging.info(f"Übersetzung: {translation}")
