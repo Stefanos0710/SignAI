@@ -6,7 +6,8 @@ import numpy as np
 import tensorflow as tf
 from keras import preprocessing
 from keras._tf_keras.keras.preprocessing.text import Tokenizer
-#from tensorflow.keras.preprocesing.text import Tokenizer
+import json
+import keras
 from seq2seq_model import build_seq2seq_model
 
 
@@ -84,6 +85,7 @@ def prepare_data_for_training(processed_data, gloss_tokenizer):
 
     return np.array(input_data), np.array(target_data)
 
+
 def main():
     train_data_folder = r"C:\Users\stefa\PycharmProjects\SignAI\data\train_data"
 
@@ -107,16 +109,20 @@ def main():
         else:
             logging.warning(f"Keine gültigen Daten in Datei: {file}")
 
-    # Tokenizer für Gloss erstellen
+    # Tokenizer für Gloss erstellen und trainieren
     gloss_tokenizer = Tokenizer()
     gloss_tokenizer.fit_on_texts([entry["gloss"] for entry in all_data])
+
+    # Tokenizer als JSON speichern
+    with open('../tokenizers/gloss_tokenizer.json', 'w', encoding='utf-8') as f:
+        json.dump(gloss_tokenizer.to_json(), f)
 
     # Daten für das Modell vorbereiten
     logging.info(f"Bereite Trainingsdaten vor...")
     input_data, target_data = prepare_data_for_training(all_data, gloss_tokenizer)
 
     logging.info(f"Trainiere Modell...")
-    input_vocab_size = len(gloss_tokenizer.word_index) + 1  # Die +1 ist für das Padding-Token
+    input_vocab_size = len(gloss_tokenizer.word_index) + 1  # +1 für das Padding-Token
     target_vocab_size = len(gloss_tokenizer.word_index) + 1
     embedding_dim = 256
     hidden_dim = 512
@@ -125,7 +131,7 @@ def main():
 
     model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 
-    model.fit([input_data, target_data], target_data, epochs=5 )
+    model.fit([input_data, target_data], target_data, epochs=5)
 
     logging.info(f"Training abgeschlossen!")
 

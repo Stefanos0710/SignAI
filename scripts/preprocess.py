@@ -13,7 +13,7 @@ hands = mp_hands.Hands(static_image_mode=False,
 mp_draw = mp.solutions.drawing_utils  # Zum Zeichnen der Keypoints
 
 # Sicherstellen, dass der Ausgabeordner existiert
-output_folder = "\data\live_data"
+output_folder = r"C:\Users\stefa\PycharmProjects\SignAI\data\live_data"
 os.makedirs(output_folder, exist_ok=True)
 
 # CSV-Datei erstellen oder überschreiben

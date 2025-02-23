@@ -2,7 +2,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Embedding, LSTM, Dense
 
 def build_seq2seq_model(input_vocab_size, target_vocab_size, embedding_dim, hidden_dim):
-    # Encoder
+    # Encodere
     encoder_inputs = Input(shape=(None,), name="encoder_inputs")
     encoder_embedding = Embedding(input_vocab_size, embedding_dim, name="encoder_embedding")(encoder_inputs)
     encoder_lstm, state_h, state_c = LSTM(hidden_dim, return_state=True, name="encoder_lstm")(encoder_embedding)
