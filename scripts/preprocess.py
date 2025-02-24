@@ -49,9 +49,30 @@ with open(csv_file_path, mode='w', newline='') as file:
         # Hand-Keypoints erkennen
         result = hands.process(frame_rgb)
 
-        # Daten für beide Hände initialisieren
-        hand_1_keypoints = [""] * 42  # Platzhalter für 21 Keypoints (x, y) einer Hand
-        hand_2_keypoints = [""] * 42
+        # Daten für beide Hände initialisieren (42 Werte = 21 Keypoints x, y)
+        hand_1_keypoints = [0] * 42
+        hand_2_keypoints = [0] * 42
+
+        # Falls Hände erkannt wurden, fülle die Keypoints-Listen
+        if result.multi_hand_landmarks:
+            for hand_index, hand_landmarks in enumerate(result.multi_hand_landmarks):
+                h, w, _ = frame.shape
+                keypoints_data = [0] * 42  # Standardmäßig mit 0 initialisieren
+
+                for i, landmark in enumerate(hand_landmarks.landmark):
+                    if i < 21:  # Stelle sicher, dass nicht zu viele Keypoints eingetragen werden
+                        x, y = int(landmark.x * w), int(landmark.y * h)
+                        keypoints_data[i * 2] = x  # x-Koordinate speichern
+                        keypoints_data[i * 2 + 1] = y  # y-Koordinate speichern
+
+                # Speichere die Keypoints für Hand 1 oder Hand 2
+                if hand_index == 0:
+                    hand_1_keypoints = keypoints_data
+                elif hand_index == 1:
+                    hand_2_keypoints = keypoints_data
+
+                # Zeichne die Hand-Keypoints
+                mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
         # Überprüfen, ob Hände erkannt wurden
         if result.multi_hand_landmarks:
@@ -72,6 +93,9 @@ with open(csv_file_path, mode='w', newline='') as file:
 
                 # Zeichne die Hand-Keypoints
                 mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+        if hand_1_keypoints == None or hand_2_keypoints == None:
+            hand_1_keypoints, hand_2_keypoints = 0
 
         # Schreibe Frame-Nummer und Keypoints in die CSV
         writer.writerow([frame_counter] + hand_1_keypoints + hand_2_keypoints)
