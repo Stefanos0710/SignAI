@@ -60,7 +60,6 @@ def load_tokenizer(tokenizer_path):
 
 
 def predict_gloss(model, tokenizer, keypoints):
-    """Gibt die Vorhersage für das Gloss basierend auf den Keypoints zurück."""
     # Bereite die Eingabedaten für den Encoder vor
     encoder_input_data = keypoints  # Dein vorbereiteter Encoder-Input
 
@@ -91,9 +90,9 @@ def predict_gloss(model, tokenizer, keypoints):
 
 
 def main():
-    model_path = r"C:\Users\JugendForscht\PycharmProjects\SIgnAI_for_APP\models\trained_model_v2.h5"
-    tokenizer_path = r"C:\Users\JugendForscht\PycharmProjects\SIgnAI_for_APP\tokenizers\gloss_tokenizer.json"
-    keypoints_file = r"C:\Users\JugendForscht\PycharmProjects\SIgnAI_for_APP\data\live_data\live_keypoints.csv"
+    model_path = r"C:\Users\stefa\PycharmProjects\SignAI\models\trained_model_v2.h5"
+    tokenizer_path = r"C:\Users\stefa\PycharmProjects\SignAI\tokenizers\gloss_tokenizer.json"
+    keypoints_file = r"C:\Users\stefa\PycharmProjects\SignAI\data\live_data\live_keypoints.csv"
 
     if not os.path.exists(model_path):
         logging.error(f"Modelldatei nicht gefunden: {model_path}")
