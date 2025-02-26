@@ -9,9 +9,9 @@ Features
 
 Installation
 
-    Klone das Repository:
+Klone das Repository:
 
-git clone https://github.com/CodeProTech/SignAI
+    git clone https://github.com/CodeProTech/SignAI
 
 Installiere die erforderlichen Python-Pakete:
 
