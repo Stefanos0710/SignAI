@@ -1,33 +1,32 @@
-# SIGNAI - Gebärdensprache zu Audio & Audio zu Gebärdensprache
+<h1>SIGNAI - DGS zu Text & Audio zu Text</h1>
 
-SIGNAI ist ein innovatives Projekt, das mithilfe von Künstlicher Intelligenz (KI) Gebärdensprache in Audio und umgekehrt umwandelt. Ziel ist es, die Kommunikation zwischen Menschen mit und ohne Hörbeeinträchtigungen zu verbessern, indem die Barriere zwischen Gebärdensprache und gesprochener Sprache überwunden wird.
-Features
+SignAi ist ein innovatives Projekt, das mithilfe eines Seq2Seq-LSTM AI-Models Gebärdensprachen in text ausgibt und umgekehrt. Ziel ist es, die Kommunikation zwischen Menschen mit und ohne Hörbeeinträchtigungen zu verbessern, indem die Barriere zwischen Gebärdensprache und gesprochener Sprache überwunden wird.
 
-    Gebärdensprache zu Audio: Übersetzt Gebärdensprache in gesprochene Sprache (Audio).
-    Audio zu Gebärdensprache: Wandelt gesprochene Sprache (Audio) in Gebärdensprache um.
-    KI-unterstützt: Nutzt Künstliche Intelligenz zur präzisen und schnellen Übersetzung.
+<h2>Strucktur</h2>
 
-Installation
+<img src="https://github.com/user-attachments/assets/310acb63-8e82-44b9-8c5a-836c3cc04948" width="350">
 
-Klone das Repository:
+<h2>Installation</h2>
+
+<h3>Clone Projekt</h3>
 
     git clone https://github.com/CodeProTech/SignAI
 
-Installiere die erforderlichen Python-Pakete:
+<h3>Installiere die erforderlichen Python-Pakete:</h3>
 
     pip install -r requirements.txt
 
-Nutzung
+<h3>Nutzen</h3>
 
-    Starte das Projekt:
 
     python main.py
 
-    Wähle zwischen der Gebärdensprache-zu-Audio oder Audio-zu-Gebärdensprache Option.
 
-Lizenz
+
+<h2>Lizens</h2>
 
 Dieses Projekt ist unter der MIT-Lizenz lizenziert.
-Kontakt
 
-Stefanos (Projektentwickler)
+<h2>Kontakt</h2>
+Stefanos (Projektleiter & Entwickler): stefanoskoufogazos@outlook.com
+
