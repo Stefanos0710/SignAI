@@ -1,0 +1,125 @@
+/* Reset some default styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Arial', sans-serif;
+}
+
+/* Body styling */
+body {
+    background-color: #f5f5f5; /* Light background for a clean look */
+    color: #333; /* Dark text for good readability */
+    line-height: 1.6;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 16px;
+}
+
+/* Center the content */
+h1, h2 {
+    color: #2c3e50; /* Dark blue-grey color for headings */
+    margin-bottom: 20px;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-top: 40px;
+}
+
+/* Style for the video element */
+#video {
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+
+/* Button styling */
+button {
+    background-color: #3498db; /* Bright blue for buttons */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 12px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    margin: 10px;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+
+    /* Center the button within its container */
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+button:hover {
+    background-color: #2980b9; /* Darker blue on hover */
+    transform: scale(1.05); /* Slight zoom effect on hover */
+}
+
+button:active {
+    transform: scale(1); /* Reset zoom on click */
+}
+
+/* Links */
+a {
+    color: #3498db; /* Link color similar to the button */
+    text-decoration: none;
+    font-weight: bold;
+    margin: 5px;
+}
+
+a:hover {
+    text-decoration: underline; /* Underline on hover */
+}
+
+/* Section styling */
+section {
+    max-width: 800px;
+    width: 100%;
+    margin: 20px 0;
+}
+
+/* Paragraphs */
+p {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    color: #555; /* Slightly lighter text color */
+}
+
+/* Make instructions and information stand out */
+h2 {
+    margin-top: 40px;
+    font-size: 1.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+/* Add some responsive design */
+@media (max-width: 768px) {
+    body {
+        padding: 15px;
+    }
+    
+    h1 {
+        font-size: 2rem;
+    }
+
+    #video {
+        width: 100%;
+        height: auto;
+    }
+
+    button {
+        width: 100%;
+        margin: 10px 0;
+    }
+}

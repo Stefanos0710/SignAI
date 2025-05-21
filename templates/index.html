@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Use the Camera</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Camera Stream for SignAI</h1>
+  </header>
+
+  <section id="video-section">
+    <video id="video" width="640" height="480" autoplay></video>
+    <div class="buttons">
+      <button id="start-recording">Start Recording</button>
+    </div>
+  </section>
+
+  <section id="usage-instructions">
+    <h2>How to Use:</h2>
+    <ol>
+      <li>Allow SignAI to access your camera.</li>
+      <li>Press the "Start Recording" button and wait for 3 seconds, then begin signing.</li>
+      <li>When you're finished, wait another 3-4 seconds and press the "Stop Recording" button.</li>
+    </ol>
+  </section>
+
+  <section id="about-signai">
+    <h2>What is SignAI?</h2>
+    <p>SignAI is an innovative project that uses a Seq2Seq LSTM AI model to translate sign language into text and vice versa.</p>
+    <p>The goal is to enhance communication between people with and without hearing impairments by breaking down the barriers between sign language and spoken language.</p>
+  </section>
+
+  <section id="contact">
+    <h2>Contact:</h2>
+    <p>If you have any questions or suggestions, feel free to reach out via email or GitHub:</p>
+    <a href="mailto:stefanokoufogazos@outlook.com">Send an Email</a>
+    <a href="https://github.com/CodeProTech/SignAI" target="_blank">Visit SignAI on GitHub</a>
+  </section>
+
+  <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+</body>
+</html>
