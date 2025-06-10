@@ -1,20 +1,27 @@
 import os
-from flask import jsonify, request, Flask, render_template
+import time
 import shutil
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO
+
+# Import your custom modules
 import preprecessing_livedata_web as pre_data
 import inference
-from flask_socketio import SocketIO
-import time
 
+# Initialize Flask and SocketIO with threading mode (better for Windows)
 app = Flask(__name__)
-socketio = SocketIO(app, async_mode='threading')
+socketio = SocketIO(app, async_mode='threading', cors_allowed_origins='*')
 
-translated_word = ""
+translated_word = ""  # Global variable to store the translation result
 
+
+# Main page route
 @app.route('/')
 def index():
     return render_template("index.html", translated_word=translated_word)
 
+
+# API endpoint to clear uploaded video folder
 @app.route('/clear-folder', methods=['POST'])
 def clear_folder():
     folder_path = 'data/live/video'
@@ -22,36 +29,30 @@ def clear_folder():
         os.makedirs(folder_path, exist_ok=True)
         for filename in os.listdir(folder_path):
             file_path = os.path.join(folder_path, filename)
-            try:
-                if os.path.isfile(file_path):
-                    os.unlink(file_path)
-                elif os.path.isdir(file_path):
-                    shutil.rmtree(file_path)
-            except Exception as e:
-                print(f'Error: {e}')
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# API endpoint to save uploaded video file
 @app.route('/save-video', methods=['POST'])
 def save_video():
     try:
         video_file = request.files['video']
         if video_file:
-            # Ensure directory exists
             os.makedirs('data/live/video', exist_ok=True)
-
-            # Save the video file
             video_path = os.path.join('data/live/video', 'recorded_video.mp4')
             video_file.save(video_path)
 
-            # Verify the file was saved
             if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                print(f"Video saved successfully at: {video_path}")
-                print(f"Video size: {os.path.getsize(video_path)} bytes")
+                print(f"✅ Video saved: {video_path}")
+                print(f"📦 Size: {os.path.getsize(video_path)} Bytes")
 
-                # Start processing in background
+                # Start video processing in a background thread
                 socketio.start_background_task(process_video)
 
                 return jsonify({
@@ -60,77 +61,90 @@ def save_video():
                     'path': video_path
                 })
             else:
-                raise Exception("Video file was not saved properly")
+                raise Exception("File was not saved correctly")
     except Exception as e:
-        print(f"Error saving video: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        print(f"❌ Error while saving video: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# Background function to process the uploaded video
 def process_video():
+    global translated_word
     try:
-        global translated_word  # Wichtig: globale Variable verwenden
-
-        # Preprocessing phase
+        # Phase 1: Preprocessing
         socketio.emit('processing_update', {
             'phase': 'preprocessing',
             'status': 'started',
-            'message': 'Starting video preprocessing...'
+            'message': '🔧 Preprocessing started...'
         })
 
-        pre_data.main()
+        pre_data.main()  # Run preprocessing module
 
         socketio.emit('processing_update', {
             'phase': 'preprocessing',
             'status': 'completed',
-            'message': 'Preprocessing completed successfully!'
+            'message': '✅ Preprocessing completed'
         })
 
-        # Inference phase
+        # Phase 2: Inference
         socketio.emit('processing_update', {
             'phase': 'inference',
             'status': 'started',
-            'message': 'Starting sign language recognition...'
+            'message': '🧠 Running inference...'
         })
 
         result = inference.main_inference("models/trained_model_v19.keras")
-
-        # Speichern des übersetzten Wortes
         translated_word = result
 
         socketio.emit('processing_update', {
             'phase': 'inference',
             'status': 'completed',
-            'message': 'Recognition completed!',
+            'message': '✅ Inference completed',
             'result': result
         })
 
-        # Senden Sie ein zusätzliches Event für die Übersetzung
         socketio.emit('translation_update', {
             'translated_word': result
         })
 
     except Exception as e:
-        print(f"Processing error: {str(e)}")
+        print(f"⚠️ Error during processing: {str(e)}")
         socketio.emit('processing_update', {
             'phase': 'error',
             'status': 'error',
-            'message': f'Error during processing: {str(e)}'
+            'message': f'❌ Error: {str(e)}'
         })
 
 
+# WebSocket connection handlers
+@socketio.on('connect')
+def handle_connect():
+    print('👤 Client connected')
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('👋 Client disconnected')
+
+
+# Main entry point to run the server
 if __name__ == '__main__':
     # Create necessary directories
     os.makedirs('data/live/video', exist_ok=True)
     os.makedirs('data/live', exist_ok=True)
 
-    print(f"\nAufnahme gestartet von {os.getenv('USERNAME', 'Unknown')}")
-    print(f"Zeitstempel: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-    print("Steuerung:")
-    print("SPACE - Aufnahme starten/pausieren")
-    print("Q     - Aufnahme beenden\n")
+    print(f"\n🚀 Recording started by {os.getenv('USERNAME', 'Unknown')}")
+    print(f"🕒 Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print("🎮 Controls:\nSPACE - Start/Pause\nQ - Stop\n")
 
-    # Add allow_unsafe_werkzeug=True to fix the Werkzeug warning
-    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)
+    # Get port from environment variable or use default
+    port = int(os.environ.get('PORT', 8000))
+
+    # Run the app with threading mode (works better on Windows)
+    socketio.run(
+        app,
+        host='0.0.0.0',
+        port=port,
+        debug=False,
+        allow_unsafe_werkzeug=True
+    )
