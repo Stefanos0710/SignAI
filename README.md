@@ -5,7 +5,6 @@
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-2.12-orange.svg)](https://tensorflow.org/)
 [![License: MIT](https://img.shields.io/badge/License-Non%20Commercial-red.svg)](LICENSE)
-[![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Last Updated](https://img.shields.io/badge/last%20updated-2025--06--10-green.svg)](https://github.com/CodeProTech/SignAI/commits/main)
 
 <p align="center">
