@@ -1,0 +1,230 @@
+/* Settings Panel Styles */
+.settings-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    width: 320px;
+    max-width: 90vw;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.settings-panel.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.settings-content {
+    padding: 1rem;
+}
+
+/* Header Styles */
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+}
+
+.settings-header h2 {
+    font-size: 1.2rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.2rem;
+    color: var(--text-color);
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.close-button:hover {
+    opacity: 1;
+}
+
+/* Settings Sections */
+.settings-section {
+    margin-bottom: 1.2rem;
+}
+
+.settings-section h3 {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Setting Items */
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+}
+
+.setting-label {
+    font-size: 0.9rem;
+    color: var(--text-color);
+}
+
+/* Theme Toggle */
+.theme-toggle {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--bg-secondary);
+    padding: 0.3rem;
+    border-radius: 6px;
+}
+
+.theme-btn {
+    background: none;
+    border: none;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.theme-btn.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* Toggle Switch */
+.toggle-switch.small {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+}
+
+.toggle-switch.small .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-secondary);
+    transition: .3s;
+    border-radius: 20px;
+}
+
+.toggle-switch.small .toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+
+.toggle-switch.small input:checked + .toggle-slider {
+    background-color: var(--primary-color);
+}
+
+.toggle-switch.small input:checked + .toggle-slider:before {
+    transform: translateX(16px);
+}
+
+/* Select Styles */
+.compact-select {
+    padding: 0.4rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    width: 100px;
+}
+
+/* Footer Styles */
+.settings-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.settings-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    border: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.settings-btn.primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.settings-btn.secondary {
+    background: var(--bg-secondary);
+    color: var(--text-color);
+}
+
+.settings-btn:hover {
+    opacity: 0.9;
+}
+
+/* Backdrop */
+.settings-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.settings-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* CSS Variables */
+:root {
+    --primary-color: #0080FF;
+    --bg-color: #ffffff;
+    --bg-secondary: #f5f5f5;
+    --text-color: #333333;
+    --text-secondary: #666666;
+    --border-color: #e0e0e0;
+}
+
+/* Dark Theme Variables */
+[data-theme="dark"] {
+    --bg-color: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --text-color: #ffffff;
+    --text-secondary: #a0a0a0;
+    --border-color: #404040;
+}
