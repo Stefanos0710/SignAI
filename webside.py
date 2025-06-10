@@ -49,8 +49,8 @@ def save_video():
             video_file.save(video_path)
 
             if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-                print(f"✅ Video saved: {video_path}")
-                print(f"📦 Size: {os.path.getsize(video_path)} Bytes")
+                print(f"Video saved: {video_path}")
+                print(f"Size: {os.path.getsize(video_path)} Bytes")
 
                 # Start video processing in a background thread
                 socketio.start_background_task(process_video)
@@ -63,7 +63,7 @@ def save_video():
             else:
                 raise Exception("File was not saved correctly")
     except Exception as e:
-        print(f"❌ Error while saving video: {str(e)}")
+        print(f"Error while saving video: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -75,7 +75,7 @@ def process_video():
         socketio.emit('processing_update', {
             'phase': 'preprocessing',
             'status': 'started',
-            'message': '🔧 Preprocessing started...'
+            'message': 'Preprocessing started...'
         })
 
         pre_data.main()  # Run preprocessing module
@@ -90,10 +90,19 @@ def process_video():
         socketio.emit('processing_update', {
             'phase': 'inference',
             'status': 'started',
-            'message': '🧠 Running inference...'
+            'message': 'Running inference...'
         })
 
         result = inference.main_inference("models/trained_model_v19.keras")
+        if result == "haus":
+            result = "house"
+        elif result == "hund":
+            result = "dog"
+        elif result == "essen":
+            result = "food"
+        else:
+            result = "tree"
+            
         translated_word = result
 
         socketio.emit('processing_update', {
@@ -112,19 +121,19 @@ def process_video():
         socketio.emit('processing_update', {
             'phase': 'error',
             'status': 'error',
-            'message': f'❌ Error: {str(e)}'
+            'message': f' Error: {str(e)}'
         })
 
 
 # WebSocket connection handlers
 @socketio.on('connect')
 def handle_connect():
-    print('👤 Client connected')
+    print('Client connected')
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print('👋 Client disconnected')
+    print('Client disconnected')
 
 
 # Main entry point to run the server
@@ -133,9 +142,9 @@ if __name__ == '__main__':
     os.makedirs('data/live/video', exist_ok=True)
     os.makedirs('data/live', exist_ok=True)
 
-    print(f"\n🚀 Recording started by {os.getenv('USERNAME', 'Unknown')}")
-    print(f"🕒 Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print("🎮 Controls:\nSPACE - Start/Pause\nQ - Stop\n")
+    print(f"\nRecording started by {os.getenv('USERNAME', 'Unknown')}")
+    print(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print("Controls:\nSPACE - Start/Pause\nQ - Stop\n")
 
     # Get port from environment variable or use default
     port = int(os.environ.get('PORT', 8000))
