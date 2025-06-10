@@ -27,7 +27,7 @@ SignAI is an innovative sign language recognition system that uses artificial in
 
 <div align="center">
 
-### 🌐 [Try SignAI Live Demo](https://signai-demo.example.com)
+### 🌐 [Try SignAI Live Demo](https://signai-t2cx.onrender.com/)
 
 <img src="https://github.com/user-attachments/assets/bbab0286-0445-409d-8136-3643bbeaab94" alt="SignAI Screenshot Demo" width="800px">
 
