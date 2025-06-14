@@ -5,7 +5,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-2.12-orange.svg)](https://tensorflow.org/)
 [![License: MIT](https://img.shields.io/badge/License-Non%20Commercial-red.svg)](LICENSE)
-[![Last Updated](https://img.shields.io/badge/last%20updated-2025--06--10-green.svg)](https://github.com/CodeProTech/SignAI/commits/main)
+[![Last Updated](https://img.shields.io/badge/last%20updated-2025--06--14-green.svg)](https://github.com/CodeProTech/SignAI/commits/main)
 
 <p align="center">
   <a href="#-demo">Demo</a> •
@@ -30,7 +30,7 @@ SignAI is an innovative sign language recognition system that uses artificial in
 ### 🌐 [Try SignAI Live Demo](https://signai-t2cx.onrender.com/)
 
 <img src="https://github.com/user-attachments/assets/bbab0286-0445-409d-8136-3643bbeaab94" alt="SignAI Screenshot Demo" width="800px">
-
+<p>May be slow or unstable online due to Render’s free server tier.</p>
 </div>
 
 ## ✨ Features
@@ -188,12 +188,12 @@ pip install -r requirements.txt
 
 ## 🎯 Usage
 
-### Desktop Application (only console)
+### 🖥️ Local (offline version)
 ```bash
 python main.py
 ```
 
-### Web Interface
+### 🌐 Web Interface
 ```bash
 python webside.py
 ```
