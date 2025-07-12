@@ -106,12 +106,13 @@ class VideoProcessor:
         initial_shoulder_width: Reference shoulder width for scaling
     """
 
-    def __init__(self, accuracy=0.3):
+    def __init__(self, accuracy=0.3, show_windows=True):
         """
         Initialize the VideoProcessor with detection models and parameters.
 
         Args:
             accuracy (float): Base accuracy threshold for detections (0.0-1.0)
+            show_windows (bool): Whether to show cv2 windows for hands, face, etc.
         """
         # Hand detection with optimized settings
         self.hands = mp_hands.Hands(
@@ -146,12 +147,15 @@ class VideoProcessor:
         # Variables for scaling
         self.initial_scale_factor = None
         self.initial_shoulder_width = None
+        self.show_windows = show_windows
 
     def setup_windows(self):
         """
         Sets up all visualization windows with proper sizes and positions.
         Ensures consistent window layout across sessions.
         """
+        if not self.show_windows:
+            return
         for title, pos in WINDOW_POSITIONS.items():
             cv2.namedWindow(WINDOW_TITLES[title], cv2.WINDOW_NORMAL)
             cv2.moveWindow(WINDOW_TITLES[title], pos[0], pos[1])
@@ -606,7 +610,7 @@ class VideoProcessor:
 
             if face_roi is not None:
                 face_landmarks, face_viz = self.process_face_keypoints(face_roi)
-                if face_viz is not None:
+                if face_viz is not None and self.show_windows:
                     face_viz = self.add_window_styling(face_viz, "Face Analysis", frame_count)
                     cv2.imshow(WINDOW_TITLES["face"], face_viz)
 
@@ -618,7 +622,7 @@ class VideoProcessor:
             if hands_roi:
                 for (side, hand_roi), (_, coords) in zip(hands_roi, roi_coords):
                     hand_landmarks, hand_viz = self.process_hand_keypoints(hand_roi, side)
-                    if hand_viz is not None:
+                    if hand_viz is not None and self.show_windows:
                         hand_viz = self.add_window_styling(hand_viz, f"{side} Hand", frame_count)
                         cv2.imshow(WINDOW_TITLES[f"{side.lower()}_hand"], hand_viz)
                         hand_vizs.append(hand_viz)
@@ -1051,12 +1055,12 @@ def record_video():
     return video_path, frame_count
 
 
-def process_video_to_csv(video_path, output_csv, frame_count):
+def process_video_to_csv(video_path, output_csv, frame_count, progress_callback=None, show_windows=True):
     """
     Verarbeitet das aufgenommene Video und speichert die Keypoints im CSV.
     """
     # VideoProcessor erstellen
-    processor = VideoProcessor(accuracy=0.3)
+    processor = VideoProcessor(accuracy=0.3, show_windows=show_windows)
 
     print("\nStarte Keypoint-Analyse...")
 
@@ -1086,6 +1090,8 @@ def process_video_to_csv(video_path, output_csv, frame_count):
             # Fortschritt anzeigen
             progress = (frame_idx + 1) / frame_count * 100
             print(f"\rVerarbeite Frame {frame_idx + 1}/{frame_count} ({progress:.1f}%)", end="")
+            if progress_callback is not None:
+                progress_callback(progress)
 
             # Frame verarbeiten
             current_data, processed_frame = processor.process_frame(frame, frame_idx)
@@ -1095,15 +1101,16 @@ def process_video_to_csv(video_path, output_csv, frame_count):
                 writer.writerow(current_data)
 
                 # Verarbeitetes Frame anzeigen
-                cv2.imshow('Verarbeitung', processed_frame)
-
-                if cv2.waitKey(1) == ord('q'):
-                    break
+                if show_windows:
+                    cv2.imshow('Verarbeitung', processed_frame)
+                    if cv2.waitKey(1) == ord('q'):
+                        break
 
             frame_idx += 1
 
     cam.release()
-    cv2.destroyAllWindows()
+    if show_windows:
+        cv2.destroyAllWindows()
 
     print(f"\n\nVerarbeitung abgeschlossen:")
     print(f"CSV gespeichert: {output_csv}")
@@ -1112,7 +1119,7 @@ def process_video_to_csv(video_path, output_csv, frame_count):
     return True
 
 
-def main(video_path=None):
+def main(video_path=None, progress_callback=None, show_windows=True):
     """
     Hauptfunktion für Aufnahme und Verarbeitung.
     Optional kann ein video_path übergeben werden, um ein vorhandenes Video zu verarbeiten.
@@ -1131,7 +1138,7 @@ def main(video_path=None):
         if frame_count > 0:
             # Video verarbeiten und CSV erstellen
             csv_path = "data/live/live_dataset.csv"
-            if process_video_to_csv(video_path, csv_path, frame_count):
+            if process_video_to_csv(video_path, csv_path, frame_count, progress_callback=progress_callback, show_windows=show_windows):
                 print("\nProgramm erfolgreich beendet.")
             else:
                 print("\nFehler bei der Verarbeitung.")
@@ -1141,5 +1148,6 @@ def main(video_path=None):
     except Exception as e:
         print(f"\nEin Fehler ist aufgetreten: {str(e)}")
     finally:
-        cv2.destroyAllWindows()
+        if show_windows:
+            cv2.destroyAllWindows()
 
