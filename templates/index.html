@@ -80,22 +80,24 @@
 </head>
 <body>
     <nav class="navbar">
-        <div class="logo">SignAI</div>
+        <div class="logo gradient-text">SignAI</div>
         <div class="nav-links">
-            <a href="#features">Features</a>
-            <a href="#about">About</a>
-            <a href="#usage">How to Use</a>
-            <a href="#technology">Technology</a>
-            <a href="#contact">Contact</a>
+            <a href="#features" class="nav-link">Features</a>
+            <a href="#about" class="nav-link">About</a>
+            <a href="#usage" class="nav-link">How to Use</a>
+            <a href="#technology" class="nav-link">Technology</a>
+            <a href="#contact" class="nav-link">Contact</a>
             <button id="settings-btn" class="settings-button" aria-label="Settings">
                 <span class="button-icon">⚙️</span>
             </button>
         </div>
+        <button class="burger" id="burger-menu" aria-label="Open menu">
+            <span></span><span></span><span></span>
+        </button>
     </nav>
-
     <main>
         <header class="hero">
-            <h1>Sign Language Translation with AI</h1>
+            <h1 class="gradient-text">Sign Language Translation with AI</h1>
             <p class="subtitle">Breaking communication barriers through artificial intelligence</p>
             <div class="hero-buttons">
                 <button class="primary-button" id="try-it-now-btn">
@@ -108,8 +110,7 @@
                 </button>
             </div>
         </header>
-
-        <section id="features" class="card">
+        <section id="features" class="card features-section">
             <h2>Key Features</h2>
             <div class="features-grid">
                 <div class="feature-item">
@@ -129,8 +130,7 @@
                 </div>
             </div>
         </section>
-
-        <section id="video-section" class="card">
+        <section id="video-section" class="card video-section">
             <h2>Live Translation</h2>
             <div class="video-container">
                 <video id="video" autoplay playsinline></video>
@@ -373,7 +373,7 @@
     <footer>
         <div class="footer-content">
             <div class="footer-section">
-                <h3>SignAI</h3>
+                <h3 class="gradient-text">SignAI</h3>
                 <p>Breaking communication barriers through artificial intelligence</p>
                 <div class="social-links">
                     <a href="https://github.com/CodeProTech/SignAI" class="social-link">GitHub</a>

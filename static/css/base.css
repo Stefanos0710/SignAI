@@ -233,6 +233,118 @@ button {
     box-shadow: var(--shadow-lg);
 }
 
+.gradient-text {
+    background: linear-gradient(90deg, var(--primary-400), var(--secondary-500));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-fill-color: transparent;
+}
+
+.hero {
+    padding-top: 7rem;
+    padding-bottom: 4rem;
+    text-align: center;
+}
+
+.hero-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 2.5rem;
+}
+
+.features-section {
+    margin-top: 3rem;
+    margin-bottom: 3rem;
+}
+
+.video-section {
+    margin-bottom: 3rem;
+}
+
+.burger {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 40px;
+    height: 40px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    z-index: 1100;
+}
+.burger span {
+    display: block;
+    width: 28px;
+    height: 4px;
+    margin: 4px 0;
+    background: var(--primary-500);
+    border-radius: 2px;
+    transition: all 0.3s;
+}
+
+.primary-button, .secondary-button {
+    font-size: 1.15rem;
+    padding: 1rem 2.2rem;
+    border-radius: 14px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(33,150,243,0.08);
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.primary-button {
+    background: linear-gradient(90deg, var(--primary-400), var(--primary-600));
+    color: #fff;
+}
+.primary-button:hover {
+    background: linear-gradient(90deg, var(--primary-500), var(--secondary-500));
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 4px 16px rgba(33,150,243,0.15);
+}
+.secondary-button {
+    background: var(--bg-secondary);
+    color: var(--primary-500);
+    border: 1.5px solid var(--primary-100);
+}
+.secondary-button:hover {
+    background: var(--primary-50);
+    color: var(--primary-600);
+}
+
+.footer-content {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: 3rem 0 1rem 0;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.footer-section {
+    flex: 1 1 200px;
+    min-width: 180px;
+}
+.footer-bottom {
+    text-align: center;
+    color: var(--text-tertiary);
+    padding: 1rem 0 2rem 0;
+    font-size: 0.95rem;
+}
+.social-links {
+    display: flex;
+    gap: 1.2rem;
+    margin-top: 1rem;
+}
+.social-link {
+    color: var(--primary-500);
+    font-size: 1.3rem;
+    transition: color 0.2s;
+}
+.social-link:hover {
+    color: var(--secondary-500);
+}
+
 /* Utility Classes */
 .container {
     width: 100%;
@@ -261,6 +373,12 @@ button {
     border: 0;
 }
 
+/* Utility: Mehr Weißraum */
+.mt-4 { margin-top: 2rem; }
+.mb-4 { margin-bottom: 2rem; }
+.pt-4 { padding-top: 2rem; }
+.pb-4 { padding-bottom: 2rem; }
+
 /* Responsive Design */
 @media (max-width: 768px) {
     :root {
@@ -271,5 +389,27 @@ button {
 
     .container {
         padding: 0 var(--space-4);
+    }
+}
+
+@media (max-width: 900px) {
+    .nav-links {
+        display: none;
+        position: absolute;
+        top: 70px;
+        right: 0;
+        background: var(--bg-primary);
+        flex-direction: column;
+        width: 220px;
+        box-shadow: var(--shadow-lg);
+        border-radius: var(--border-radius-lg);
+        padding: 2rem 1rem;
+        z-index: 1001;
+    }
+    .nav-links.active {
+        display: flex;
+    }
+    .burger {
+        display: flex;
     }
 }

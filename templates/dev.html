@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignAI Developer View</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+    <style>
+        .dev-section { margin-bottom: 3rem; }
+        .dev-card { background: var(--bg-secondary); border-radius: 1rem; padding: 2rem; box-shadow: var(--shadow-md); margin-bottom: 2rem; }
+        .dev-title { font-size: 2rem; margin-bottom: 1rem; }
+        .dev-subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+        .dev-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+        .dev-table th, .dev-table td { border: 1px solid var(--neutral-200); padding: 0.5rem 1rem; }
+        .dev-table th { background: var(--primary-50); }
+        .keypoint-img { max-width: 100%; border-radius: 8px; box-shadow: var(--shadow-sm); }
+        .file-list { margin: 0.5rem 0 1.5rem 0; }
+        .file-list li { margin-bottom: 0.5rem; }
+        .code-block { background: var(--neutral-100); color: var(--neutral-900); padding: 1rem; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo gradient-text">SignAI</div>
+        <div class="nav-links">
+            <a href="/" class="nav-link">Home</a>
+            <a href="/dev" class="nav-link active">Dev</a>
+        </div>
+    </nav>
+    <main class="container mt-4">
+        <section class="dev-section dev-card">
+            <div class="dev-title">AI Pipeline Übersicht</div>
+            <div class="dev-subtitle">So läuft die Verarbeitung in SignAI ab:</div>
+            <div id="pipeline-diagram" style="margin-bottom:2rem;"></div>
+            <script type="module">
+                import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                mermaid.initialize({ startOnLoad: true });
+                document.getElementById('pipeline-diagram').innerHTML = `<pre class='mermaid'>graph TD;
+    A[Video Upload/Live] --> B[Keypoint Extraction];
+    B --> C[Preprocessing];
+    C --> D[Model Inference];
+    D --> E[Output/Translation];
+</pre>`;
+                mermaid.run();
+            </script>
+        </section>
+        <section class="dev-section dev-card">
+            <div class="dev-title">Live Prozess-Status</div>
+            <div class="dev-subtitle">Hier siehst du, wie weit die aktuelle Verarbeitung ist:</div>
+            <div id="dev-processing-section" class="processing-container">
+                <div class="session-info">
+                    <div class="timestamp">
+                        <span class="info-icon">🕒</span>
+                        <span class="info-text" id="dev-current-time">-</span>
+                    </div>
+                </div>
+                <div class="processing-status">
+                    <div class="status-header">
+                        <div class="status-icon">
+                            <div class="circle-loader" id="dev-circle-loader">
+                                <div class="checkmark draw"></div>
+                            </div>
+                        </div>
+                        <div class="status-text" id="dev-status-text">Warte auf Start...</div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="dev-progress-fill"></div>
+                    </div>
+                    <div class="processing-steps">
+                        <div class="step-item" data-step="keypoints">
+                            <span class="step-icon">🖼️</span>
+                            <span class="step-label">Keypoint Extraction</span>
+                            <span class="step-status" id="dev-step-status-keypoints"></span>
+                            <span class="step-time" id="dev-step-time-keypoints">0.00s</span>
+                        </div>
+                        <div class="step-item" data-step="preprocessing">
+                            <span class="step-icon">⚙️</span>
+                            <span class="step-label">Preprocessing</span>
+                            <span class="step-status" id="dev-step-status-preprocessing"></span>
+                            <span class="step-time" id="dev-step-time-preprocessing">0.00s</span>
+                        </div>
+                        <div class="step-item" data-step="inference">
+                            <span class="step-icon">🤖</span>
+                            <span class="step-label">Model Inference</span>
+                            <span class="step-status" id="dev-step-status-inference"></span>
+                            <span class="step-time" id="dev-step-time-inference">0.00s</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="result-container" id="dev-result-container" style="display: none;">
+                    <h3><span class="result-icon">🎯</span> Translation Result</h3>
+                    <div class="result-text" id="dev-result-text"></div>
+                    <div class="result-metadata">
+                        <div class="total-time" id="dev-total-time">Total Processing Time: 0.00s</div>
+                        <div class="completion-time" id="dev-completion-time"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="dev-section dev-card">
+            <div class="dev-title">Aktuelles Video</div>
+            <div class="dev-subtitle">Das aktuell verarbeitete Video:</div>
+            <video id="dev-video" controls style="max-width:100%;border-radius:12px;box-shadow:var(--shadow-md);background:#000;" src="{{ url_for('static', filename='data/live/video/recorded_video.mp4') }}"></video>
+        </section>
+        <section class="dev-section dev-card">
+            <div class="dev-title">Keypoint-Visualisierung (Beispiel)</div>
+            <div class="dev-subtitle">Hier könnten Keypoints live oder als Bild angezeigt werden:</div>
+            <canvas id="dev-keypoint-canvas" width="640" height="360" style="background:#222;border-radius:8px;box-shadow:var(--shadow-sm);"></canvas>
+            <div style="margin-top:1rem;color:var(--text-secondary);font-size:0.95rem;">(Demo: Keypoints können hier per JS oder als Bild angezeigt werden)</div>
+        </section>
+        <section class="dev-section dev-card">
+            <div class="dev-title">Modellarchitektur</div>
+            <div class="dev-subtitle">Überblick über das verwendete Deep-Learning-Modell (Seq2Seq, LSTM, Attention):</div>
+            <div class="code-block">
+Encoder:
+- Input: (1, 1086) Keypoints
+- Dense(512, relu) → BatchNorm → Dropout(0.3) → Bidirectional LSTM
+
+Decoder:
+- Embedding → LSTM (mit Attention) → Dense (Softmax)
+            </div>
+        </section>
+        <section class="dev-section dev-card">
+            <div class="dev-title">Datenfluss & Verarbeitung</div>
+            <div class="dev-subtitle">Wie die Daten durch das System laufen:</div>
+            <ol>
+                <li>Video-Input (Webcam oder Upload)</li>
+                <li>Feature Extraction (Face, Hand, Body Keypoints, insgesamt 1086 Werte pro Frame)</li>
+                <li>Preprocessing & Normalisierung (CSV-Export)</li>
+                <li>Modell-Inferenz (Vorhersage)</li>
+            </ol>
+            <div class="code-block">
+# Beispiel: Keypoint-Array (pro Frame)
+[0.123, 0.456, ..., 0.789]  # 1086 Werte
+            </div>
+        </section>
+        <section class="dev-section dev-card">
+            <div class="dev-title">Keypoint-Visualisierung</div>
+            <div class="dev-subtitle">So sehen die extrahierten Keypoints aus (Face, Hands, Body):</div>
+            <img src="{{ url_for('static', filename='images/keypoints_example.png') }}" alt="Keypoints Example" class="keypoint-img">
+        </section>
+        <section class="dev-section dev-card">
+            <div class="dev-title">Beispiel-Datensätze & Downloads</div>
+            <ul class="file-list">
+                <li><a href="{{ url_for('static', filename='data/live/video/recorded_video.mp4') }}" download>Beispielvideo (MP4)</a></li>
+                <li><a href="{{ url_for('static', filename='data/live/live_dataset.csv') }}" download>Live-Datensatz (CSV)</a></li>
+                <li><a href="{{ url_for('static', filename='data/train_data/example_for_train_data.csv') }}" download>Trainingsdatensatz (CSV)</a></li>
+            </ul>
+        </section>
+        <section class="dev-section dev-card">
+            <div class="dev-title">Modell-Dateien</div>
+            <ul class="file-list">
+                <li>models/trained_model_v18.keras</li>
+                <li>models/trained_model_v19.keras</li>
+                <li>models/trained_model_v20.keras</li>
+                <li>models/trained_model_v21.keras</li>
+            </ul>
+        </section>
+        <section class="dev-section dev-card">
+            <div class="dev-title">Preprocessing & Trainingsdaten</div>
+            <div class="dev-subtitle">Kurze Hinweise zu den wichtigsten Skripten:</div>
+            <ul>
+                <li><b>preprocessing_live_data.py</b>: Extrahiert Keypoints aus Videos, normalisiert und speichert als CSV.</li>
+                <li><b>preprecessing_livedata_web.py</b>: Web-Variante für Live-Input.</li>
+                <li><b>train.py</b>: Training des Modells mit den CSV-Daten.</li>
+                <li><b>model.py</b>: Definition der Modellarchitektur.</li>
+            </ul>
+        </section>
+    </main>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+    // Live-Status-Logik für Entwicklerseite
+    const socket = io();
+    const statusText = document.getElementById('dev-status-text');
+    const progressFill = document.getElementById('dev-progress-fill');
+    const stepStatus = {
+        keypoints: document.getElementById('dev-step-status-keypoints'),
+        preprocessing: document.getElementById('dev-step-status-preprocessing'),
+        inference: document.getElementById('dev-step-status-inference')
+    };
+    const stepTime = {
+        keypoints: document.getElementById('dev-step-time-keypoints'),
+        preprocessing: document.getElementById('dev-step-time-preprocessing'),
+        inference: document.getElementById('dev-step-time-inference')
+    };
+    const resultContainer = document.getElementById('dev-result-container');
+    const resultText = document.getElementById('dev-result-text');
+    const totalTime = document.getElementById('dev-total-time');
+    const completionTime = document.getElementById('dev-completion-time');
+    const circleLoader = document.getElementById('dev-circle-loader');
+    let processingStart = 0;
+    let stepStarts = {};
+    let stepEnds = {};
+    function updateTime() {
+        document.getElementById('dev-current-time').textContent = new Date().toLocaleString();
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+    socket.on('processing_update', data => {
+        if (!processingStart && data.status === 'started') {
+            processingStart = Date.now();
+        }
+        if (data.phase && stepStatus[data.phase]) {
+            if (data.status === 'started') {
+                stepStatus[data.phase].textContent = '⏳';
+                stepStarts[data.phase] = Date.now();
+            }
+            if (data.status === 'completed') {
+                stepStatus[data.phase].textContent = '✓';
+                stepEnds[data.phase] = Date.now();
+                if (stepStarts[data.phase]) {
+                    const duration = ((stepEnds[data.phase] - stepStarts[data.phase]) / 1000).toFixed(2);
+                    stepTime[data.phase].textContent = duration + 's';
+                }
+            }
+        }
+        // Fortschritt
+        if (data.phase === 'keypoints') progressFill.style.width = '30%';
+        if (data.phase === 'preprocessing') progressFill.style.width = '60%';
+        if (data.phase === 'inference') progressFill.style.width = '100%';
+        // Status-Text
+        statusText.textContent = data.message || '';
+        // Ergebnis
+        if (data.phase === 'inference' && data.status === 'completed') {
+            resultContainer.style.display = 'block';
+            resultText.textContent = data.result || '';
+            if (processingStart) {
+                const total = ((Date.now() - processingStart) / 1000).toFixed(2);
+                totalTime.textContent = 'Total Processing Time: ' + total + 's';
+                completionTime.textContent = 'Completed at: ' + new Date().toLocaleString();
+            }
+            circleLoader.classList.add('load-complete');
+        }
+    });
+    </script>
+</body>
+</html> 

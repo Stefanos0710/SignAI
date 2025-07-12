@@ -136,6 +136,11 @@ def handle_disconnect():
     print('Client disconnected')
 
 
+@app.route('/dev')
+def dev():
+    return render_template("dev.html")
+
+
 # Main entry point to run the server
 if __name__ == '__main__':
     # Create necessary directories

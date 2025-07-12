@@ -1112,13 +1112,21 @@ def process_video_to_csv(video_path, output_csv, frame_count):
     return True
 
 
-def main():
+def main(video_path=None):
     """
     Hauptfunktion für Aufnahme und Verarbeitung.
+    Optional kann ein video_path übergeben werden, um ein vorhandenes Video zu verarbeiten.
     """
     try:
-        # Video aufnehmen
-        video_path, frame_count = record_video()
+        if video_path is not None:
+            # Video wurde übergeben, keine Aufnahme nötig
+            if not os.path.exists(video_path):
+                print(f"Fehler: Video nicht gefunden: {video_path}")
+                return
+            frame_count = int(cv2.VideoCapture(video_path).get(cv2.CAP_PROP_FRAME_COUNT))
+        else:
+            # Video aufnehmen
+            video_path, frame_count = record_video()
 
         if frame_count > 0:
             # Video verarbeiten und CSV erstellen
