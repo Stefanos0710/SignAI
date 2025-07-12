@@ -20,6 +20,7 @@ translated_word = ""  # Global variable to store the translation result
 def index():
     return render_template("index.html", translated_word=translated_word)
 
+<<<<<<< HEAD
 @app.route('/states')
 def states():
     return render_template("states.html")
@@ -27,6 +28,8 @@ def states():
 @app.route('/dev')
 def dev():
     return render_template("dev.html")
+=======
+>>>>>>> 46526324babe9991165ecfc8f90fbb16c8e2f872
 
 # API endpoint to clear uploaded videos
 @app.route('/clear-folder', methods=['POST'])
