@@ -28,7 +28,6 @@ def states():
 def dev():
     return render_template("dev.html")
 
-
 # API endpoint to clear uploaded videos
 @app.route('/clear-folder', methods=['POST'])
 def clear_folder():
