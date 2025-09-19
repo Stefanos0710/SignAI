@@ -6,7 +6,7 @@ from flask_socketio import SocketIO
 
 # Import your custom modules
 import preprecessing_livedata_web as pre_data
-import inference
+from api import inference
 
 # Initialize Flask and SocketIO for local testing with threading
 app = Flask(__name__)
