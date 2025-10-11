@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QWidget" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>200</width>
+    <height>100</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>SignAI - Desktop</string>
+  </property>
+     <!-- Layout  -->
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <!-- QLabel for OpenCV live-feed -->
+    <item>
+      <widget class="QLabel" name="videofeedlabel">
+        <property name="text">
+          <string>Here is the live-feed</string>
+        </property>
+        <property name="alignment">
+          <set>Qt::AlignCenter</set>
+        </property>
+        <property name="minimumSize">
+          <size>
+            <width>320</width>
+            <height>240</height>
+          </size>
+        </property>
+      </widget>
+    </item>
+  <!-- Buttons: Record/...  -->
+    <item>
+      <widget class="QPushButton" name="recordButton">
+        <property name="text">
+          <string>Record</string>
+        </property>
+      </widget>
+    </item>
+  </layout>
+ </widget>
+</ui>
