@@ -68,16 +68,18 @@ logs/**/*.tfevents.*
 data/raw_data/**
 !data/raw_data/read.txt
 data/live/**
+!data/live/.gitkeep
 data/train_data/**
 !data/train_data/example_for_train_data.csv
 
-# Video files
+# Video files - recorded videos
 *.mp4
 *.avi
 *.mov
 *.mkv
 *.flv
 *.wmv
+data/live/video/
 
 # Large datasets
 *.csv
@@ -102,33 +104,22 @@ desktop.ini
 *.tmp
 *.temp
 *.log
-*.bak
 *.swp
+*.swo
 *~
 
 # Environment variables
 .env
 .env.local
-.env.*.local
 
-# Testing
-.pytest_cache/
-.coverage
+# Test coverage
 htmlcov/
 .tox/
-.nox/
-
-# Documentation
-docs/_build/
-site/
-
-# Compiled files
-*.pyc
-*.pyo
-*.pyd
-
-# Distribution / packaging
-*.whl
-*.tar.gz
-*.zip
-
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/

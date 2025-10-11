@@ -21,6 +21,7 @@ from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer
 from camera import Camera, CameraFeed, findcams
 import sys
+import time
 
 app = QApplication(sys.argv)
 loader = QUiLoader()
@@ -64,7 +65,7 @@ with open("style.qss", "r") as f:
 
 # click function
 def recordfunc():
-    global pressed, camera, camerafeed
+    global pressed, camerafeed
     pressed += 1
 
     # change buttons text
@@ -72,25 +73,20 @@ def recordfunc():
         recordButton.setText("Start Recording")
         print("Start Recording", pressed)
 
-        # Stop the camera feed to free the camera
-        if camerafeed:
-            camerafeed.stop()
-
-        # Create and start recording
-        camera = Camera(camera_id=available_cams[camera_number], resolution=(640, 480), fps=30)
-        camera.start_recording()
+        # Start recording while keeping preview active
+        if camerafeed and camerafeed.is_running:
+            camerafeed.start_recording()
+        else:
+            print("Error: Camera feed not running")
+            pressed = 1
 
     elif pressed == 1:
         recordButton.setText("Stop Recording")
         print("Stop Recording", pressed)
 
-        # Stop recording and release camera
-        if camera:
-            camera.stop_recording()
-            camera.close()
-
-        # Restart camera feed for preview
-        camerafeed = CameraFeed(videofeedlabel, cam_number=available_cams[camera_number])
+        # Stop recording but keep preview active
+        if camerafeed:
+            camerafeed.stop_recording()
 
     elif pressed == 2:
         recordButton.setText("AI is Thinking...")
