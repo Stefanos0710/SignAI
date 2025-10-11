@@ -14,6 +14,7 @@ here comes the description of the app
 - **Original Creation Date**: 2025/10/11
 - **Last Update**: 2025/10/11
 """
+
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow
 from PySide6.QtUiTools import QUiLoader
@@ -57,6 +58,9 @@ camera = None
 
 # var for clicks
 pressed = 0
+
+with open("style.qss", "r") as f:
+    app.setStyleSheet(f.read())
 
 # click function
 def recordfunc():

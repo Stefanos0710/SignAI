@@ -1,0 +1,65 @@
+/*
+### SignAI - Sign Language translater ###
+
+## style ##
+
+-------------------------------------------------------------
+
+here comes the description of the app
+
+-------------------------------------------------------------
+
+## Metadata
+- **Author**: Stefanos Koufogazos Loukianov
+- **Original Creation Date**: 2025/10/11
+- **Last Update**: 2025/10/11
+*/
+
+
+
+/* Main window */
+QWidget#MainWindow {
+    background-color: #2E3440; /* Dark minimal background */
+}
+
+/* Live-feed label */
+QLabel#videofeedlabel {
+    background-color: #3B4252;   /* Slightly lighter dark tone */
+    border: 2px solid #81A1C1;  /* subtle border */
+    border-radius: 8px;          /* rounded corners */
+    color: #ECEFF4;              /* light text */
+    font: bold 14px Arial;
+    qproperty-alignment: 'AlignCenter';
+    padding: 5px;
+}
+
+/* General buttons */
+QPushButton {
+    background-color: #5E81AC;   /* solid color, minimal */
+    color: white;
+    font: bold 12px Arial;
+    border-radius: 6px;
+    padding: 6px 10px;
+    border: none;                /* clean look */
+}
+
+/* Hover effect */
+QPushButton:hover {
+    background-color: #81A1C1;   /* slightly lighter on hover */
+    color: #2E3440;              /* optional contrast */
+}
+
+/* Pressed effect */
+QPushButton:pressed {
+    background-color: #4C566A;
+}
+
+/* Switch-Cam button distinct color */
+QPushButton#switchcam {
+    background-color: #A3BE8C;
+}
+
+QPushButton#switchcam:hover {
+    background-color: #B48EAD;
+    color: white;
+}
