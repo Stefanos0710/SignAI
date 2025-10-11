@@ -14,9 +14,8 @@ here comes the description of the app
 - **Original Creation Date**: 2025/10/11
 - **Last Update**: 2025/10/11
 """
-
-
-from PySide6.QtWidgets import QApplication, QPushButton, QLabel
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer
 from camera import Camera, CameraFeed
@@ -30,6 +29,10 @@ ui_file = QFile("ui/main_window.ui")
 ui_file.open(QFile.ReadOnly)
 window = loader.load(ui_file)
 ui_file.close()
+
+# setup icons
+window.setWindowIcon(QIcon("icons/icon.png"))
+
 
 # get buttons from UI
 recordButton = window.findChild(QPushButton, "recordButton")
