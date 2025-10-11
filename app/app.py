@@ -18,7 +18,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer
-from camera import Camera, CameraFeed
+from camera import Camera, CameraFeed, findcams
 import sys
 
 app = QApplication(sys.argv)
@@ -36,12 +36,22 @@ window.setWindowIcon(QIcon("icons/icon.png"))
 
 # get buttons from UI
 recordButton = window.findChild(QPushButton, "recordButton")
+switchButton = window.findChild(QPushButton, "switchcam")
 
 # get camera feed label
 videofeedlabel = window.findChild(QLabel, "videofeedlabel")
 
-# start camera feed
-camerafeed = CameraFeed(videofeedlabel, cam_number=0)
+# find all available cameras
+available_cams = findcams()
+camera_number = available_cams[0]
+print(f"Available Cameras: {available_cams}")
+
+# start camera feed (use first working camera)
+if available_cams:
+    camerafeed = CameraFeed(videofeedlabel, cam_number=available_cams[camera_number])
+else:
+    videofeedlabel.setText("No working cameras found!")
+    camerafeed = None
 
 # var for clicks
 pressed = 0
@@ -67,9 +77,33 @@ def recordfunc():
 
         # Here comes the AI API call
 
+# switch cam button function
+def switchcamfunc():
+    global lenght, camera_number, camerafeed
+
+    # switch to next camera in list
+    if camera_number < len(available_cams) - 1:
+        camera_number += 1
+    else:
+        camera_number = 0
+
+    # stop current camera feed
+    if camerafeed:
+        camerafeed.stop()
+
+    # start new camera feed
+    camerafeed = CameraFeed(videofeedlabel, cam_number=available_cams[camera_number])
+    print(f"Change to camera {camera_number}: {available_cams[camera_number]}")
+
 recordButton.clicked.connect(recordfunc)
+switchButton.clicked.connect(switchcamfunc)
+
+# Cleanup on exit
+def cleanup():
+    if camerafeed:
+        camerafeed.stop()
+
+app.aboutToQuit.connect(cleanup)
 
 window.show()
-app.exec()
-
-camerafeed.start()
+sys.exit(app.exec())

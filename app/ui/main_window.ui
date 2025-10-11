@@ -40,6 +40,14 @@
         </property>
       </widget>
     </item>
+  <!-- Buttons: Switch cam -->
+    <item>
+      <widget class="QPushButton" name="switchcam">
+        <property name="text">
+          <string>Switch Camera</string>
+        </property>
+      </widget>
+    </item>
   </layout>
  </widget>
 </ui>
