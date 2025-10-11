@@ -1,5 +1,18 @@
-"""Camera module for handling camera operations.
+"""
+### SignAI - Sign Language translater ###
 
+## main.py for desktop app ##
+
+-------------------------------------------------------------
+
+Camera module for handling camera operations.
+
+-------------------------------------------------------------
+
+## Metadata
+- **Author**: Stefanos Koufogazos Loukianov
+- **Original Creation Date**: 2025/10/11
+- **Last Update**: 2025/10/11
 
 """
 
@@ -7,23 +20,134 @@ import cv2
 import os
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QImage, QPixmap
+import threading
 
 # Suppress OpenCV warnings about camera indices
 os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
 os.environ["OPENCV_LOG_LEVEL"] = "OFF"
 
 class Camera:
-    def __init__(self, camera_id):
+    def __init__(self, camera_id=0, resolution=(640, 480), fps=30):
         self.camera_id = camera_id
+        self.resolution = resolution
+        self.fps = fps
+        self.filepath = os.path.join(os.path.dirname(__file__), "..", "data", "live", "video", "recorded_video.mp4")
 
-    def camera_feed(self):
-        pass
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
 
-    def record_video(self):
-        pass
+        # setup camera
+        self.cap = cv2.VideoCapture(self.camera_id, cv2.CAP_DSHOW)
+        if not self.cap.isOpened():
+            raise RuntimeError(f"Cannot open camera {self.camera_id}")
+
+        # Set camera properties
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
+        self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+
+        self.out = None
+        self.recording = False
+        self.thread = None
+
+    def start_recording(self):
+        if self.recording:
+            return  # Already recording
+
+        # Delete old video if exists
+        if os.path.exists(self.filepath):
+            try:
+                os.remove(self.filepath)
+            except:
+                pass
+
+        # Use H264 codec for better compatibility on Windows
+        fourcc = cv2.VideoWriter_fourcc(*'H264')
+        self.out = cv2.VideoWriter(self.filepath, fourcc, self.fps, self.resolution)
+
+        if not self.out or not self.out.isOpened():
+            print(f"Error: Could not open VideoWriter with H264, trying XVID")
+            # Fallback to XVID
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            self.out = cv2.VideoWriter(self.filepath, fourcc, self.fps, self.resolution)
+
+            if not self.out or not self.out.isOpened():
+                print(f"Error: Could not open VideoWriter")
+                return
+
+        self.recording = True
+        self.thread = threading.Thread(target=self._record_loop, daemon=True)
+        self.thread.start()
+        print(f"Recording started, saving to: {self.filepath}")
+
+    def _record_loop(self):
+        import time
+        frame_delay = 1.0 / self.fps
+
+        while self.recording:
+            start_time = time.time()
+
+            ret, frame = self.cap.read()
+            if not ret:
+                print("Failed to grab frame")
+                time.sleep(0.01)
+                continue
+
+            # Resize frame to match resolution
+            frame = cv2.resize(frame, self.resolution)
+            self.out.write(frame)
+
+            # Maintain proper frame rate
+            elapsed = time.time() - start_time
+            if elapsed < frame_delay:
+                time.sleep(frame_delay - elapsed)
 
     def stop_recording(self):
-        pass
+        if not self.recording:
+            return
+        self.recording = False
+
+        # Wait for thread to finish
+        if self.thread:
+            self.thread.join(timeout=2.0)
+
+        # Properly release the video writer
+        if self.out:
+            self.out.release()
+            self.out = None
+
+        print(f"Recording stopped and saved to: {self.filepath}")
+
+        # Verify file was created and has size
+        if os.path.exists(self.filepath):
+            file_size = os.path.getsize(self.filepath)
+            print(f"Video file size: {file_size} bytes")
+            if file_size == 0:
+                print("WARNING: Video file is empty!")
+        else:
+            print("WARNING: Video file was not created!")
+
+    def save_video(self, filepath=None):
+        # This method is now just for compatibility
+        # The video is already saved when stop_recording() is called
+        if filepath and filepath != self.filepath:
+            # If a new filepath is specified, rename the file
+            import shutil
+            old_path = self.filepath
+            new_path = os.path.join(os.path.dirname(old_path), filepath)
+            if os.path.exists(old_path):
+                try:
+                    shutil.move(old_path, new_path)
+                    self.filepath = new_path
+                    print(f"Video moved to: {new_path}")
+                except Exception as e:
+                    print(f"Error moving video: {e}")
+
+    def close(self):
+        self.stop_recording()
+        if self.cap and self.cap.isOpened():
+            self.cap.release()
+        cv2.destroyAllWindows()
 
 class CameraFeed:
     def __init__(self, label, cam_number=0):
@@ -47,7 +171,7 @@ class CameraFeed:
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
-        self.timer.start(20)  # 20 ms = 50 fps: 1000ms/FPS = ms per second
+        self.timer.start(16)  # 16 ms = ~60 fps: 1000ms/FPS = ms per second
         self.is_running = True
 
     def update_frame(self):

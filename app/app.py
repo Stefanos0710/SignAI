@@ -1,7 +1,7 @@
 """
 ### SignAI - Sign Language translater ###
 
-## PC-APP ##
+## main.py for desktop app ##
 
 -------------------------------------------------------------
 
@@ -33,7 +33,6 @@ ui_file.close()
 # setup icons
 window.setWindowIcon(QIcon("icons/icon.png"))
 
-
 # get buttons from UI
 recordButton = window.findChild(QPushButton, "recordButton")
 switchButton = window.findChild(QPushButton, "switchcam")
@@ -43,7 +42,7 @@ videofeedlabel = window.findChild(QLabel, "videofeedlabel")
 
 # find all available cameras
 available_cams = findcams()
-camera_number = available_cams[0]
+camera_number = 0
 print(f"Available Cameras: {available_cams}")
 
 # start camera feed (use first working camera)
@@ -53,12 +52,15 @@ else:
     videofeedlabel.setText("No working cameras found!")
     camerafeed = None
 
+# Camera object will be created only when recording starts
+camera = None
+
 # var for clicks
 pressed = 0
 
 # click function
 def recordfunc():
-    global pressed # use gloabal var
+    global pressed, camera, camerafeed
     pressed += 1
 
     # change buttons text
@@ -66,9 +68,25 @@ def recordfunc():
         recordButton.setText("Start Recording")
         print("Start Recording", pressed)
 
+        # Stop the camera feed to free the camera
+        if camerafeed:
+            camerafeed.stop()
+
+        # Create and start recording
+        camera = Camera(camera_id=available_cams[camera_number], resolution=(640, 480), fps=30)
+        camera.start_recording()
+
     elif pressed == 1:
         recordButton.setText("Stop Recording")
         print("Stop Recording", pressed)
+
+        # Stop recording and release camera
+        if camera:
+            camera.stop_recording()
+            camera.close()
+
+        # Restart camera feed for preview
+        camerafeed = CameraFeed(videofeedlabel, cam_number=available_cams[camera_number])
 
     elif pressed == 2:
         recordButton.setText("AI is Thinking...")
@@ -79,7 +97,7 @@ def recordfunc():
 
 # switch cam button function
 def switchcamfunc():
-    global lenght, camera_number, camerafeed
+    global camera_number, camerafeed
 
     # switch to next camera in list
     if camera_number < len(available_cams) - 1:
@@ -102,6 +120,8 @@ switchButton.clicked.connect(switchcamfunc)
 def cleanup():
     if camerafeed:
         camerafeed.stop()
+    if camera:
+        camera.close()
 
 app.aboutToQuit.connect(cleanup)
 
