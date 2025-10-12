@@ -23,11 +23,15 @@ from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QW
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer, Qt, QEvent
 from camera import Camera, CameraFeed, findcams
+from settings import Settings
 import sys
-import time
 
+#setup application
 app = QApplication(sys.argv)
 loader = QUiLoader()
+
+# setup settings
+settings = Settings()
 
 # load UI
 ui_file = QFile("ui/main_window.ui")
@@ -44,12 +48,18 @@ switchButton = window.findChild(QPushButton, "switchcam")
 settingsButton = window.findChild(QPushButton, "settingsButton")
 settingspanel = window.findChild(QWidget, "settingsPanel")
 saveSettingsButton = window.findChild(QPushButton, "saveSettingsButton")
+chekDebugMode = window.findChild(QCheckBox, "CheckDebugMode")
+checkHistory = window.findChild(QCheckBox, "checkHistory")
 
 # get camera feed label
 videofeedlabel = window.findChild(QLabel, "videofeedlabel")
 
 # hide settings panel by default
 settingspanel.setVisible(False)
+
+# load settings and set checkboxes accordingly
+checkHistory.setChecked(settings.history)
+chekDebugMode.setChecked(settings.debug)
 
 # find all available cameras
 available_cams = findcams()
@@ -127,6 +137,26 @@ def switchcamfunc():
 def togglesettings():
     settingspanel.setVisible(not settingspanel.isVisible())
 
+def checksettings():
+    # check history settings
+    if checkHistory.isChecked():
+        settings.history = True
+        print("History Enabled")
+    elif not checkHistory.isChecked():
+        settings.history = False
+        print("History Disabled")
+
+    # check debug mode settings
+    if chekDebugMode.isChecked():
+        settings.debug = True
+        print("Debug Mode Enabled")
+    elif not chekDebugMode.isChecked():
+        settings.debug = False
+        print("Debug Mode Disabled")
+
+    # Save settings to file
+    settings.save()
+
 # Cleanup on exit
 def cleanup():
     if camerafeed:
@@ -138,6 +168,8 @@ def cleanup():
 recordButton.clicked.connect(recordfunc)
 switchButton.clicked.connect(switchcamfunc)
 settingsButton.clicked.connect(togglesettings)
+checkHistory.clicked.connect(checksettings)
+chekDebugMode.clicked.connect(checksettings)
 
 app.aboutToQuit.connect(cleanup)
 
