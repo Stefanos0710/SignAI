@@ -6,48 +6,46 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>200</width>
-    <height>100</height>
+    <width>478</width>
+    <height>421</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>SignAI - Desktop</string>
   </property>
-     <!-- Layout  -->
   <layout class="QVBoxLayout" name="verticalLayout">
-   <!-- QLabel for OpenCV live-feed -->
-    <item>
-      <widget class="QLabel" name="videofeedlabel">
-        <property name="text">
-          <string>Here is the live-feed</string>
-        </property>
-        <property name="alignment">
-          <set>Qt::AlignCenter</set>
-        </property>
-        <property name="minimumSize">
-          <size>
-            <width>320</width>
-            <height>240</height>
-          </size>
-        </property>
-      </widget>
-    </item>
-  <!-- Buttons: Record/...  -->
-    <item>
-      <widget class="QPushButton" name="recordButton">
-        <property name="text">
-          <string>Record</string>
-        </property>
-      </widget>
-    </item>
-  <!-- Buttons: Switch cam -->
-    <item>
-      <widget class="QPushButton" name="switchcam">
-        <property name="text">
-          <string>Switch Camera</string>
-        </property>
-      </widget>
-    </item>
+   <item>
+    <widget class="QLabel" name="videofeedlabel">
+     <property name="minimumSize">
+      <size>
+       <width>320</width>
+       <height>240</height>
+      </size>
+     </property>
+     <property name="text">
+      <string>Here is the live-feed</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignmentFlag::AlignCenter</set>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="recordButton">
+     <property name="text">
+      <string>Start Recording</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="switchcam">
+     <property name="text">
+      <string>Switch Camera</string>
+     </property>
+    </widget>
+   </item>
   </layout>
  </widget>
+ <resources/>
+ <connections/>
 </ui>

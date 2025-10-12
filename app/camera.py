@@ -31,7 +31,7 @@ class Camera:
         self.camera_id = camera_id
         self.resolution = resolution
         self.fps = fps
-        self.filepath = os.path.join(os.path.dirname(__file__), "..", "data", "live", "video", "recorded_video.mp4")
+        self.filepath = os.path.join(os.path.dirname(__file__), "videos", "current_video.mp4")
 
         # Ensure directory exists
         os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
@@ -172,10 +172,7 @@ class CameraFeed:
         self.timer = None
         self.is_running = False
 
-        # Recording attributes
-        self.recording = False
-        self.out = None
-        self.filepath = os.path.join(os.path.dirname(__file__), "..", "data", "live", "video", "recorded_video.mp4")
+        # Remove recording attributes - CameraFeed is only for display
         self.fps = 30
         self.resolution = (640, 480)
 
@@ -199,7 +196,7 @@ class CameraFeed:
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
-        self.timer.start(33)  # 33 ms = ~30 fps to match recording
+        self.timer.start(33)  # 33 ms = ~30 fps
         self.is_running = True
 
     def update_frame(self):
@@ -214,10 +211,6 @@ class CameraFeed:
         if frame.shape[:2][::-1] != self.resolution:
             frame = cv2.resize(frame, self.resolution)
 
-        # If recording, write frame to video file
-        if self.recording and self.out:
-            self.out.write(frame)
-
         # Convert and display frame
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # convert BGR to RGB
         height, width, channel = frame_rgb.shape
@@ -226,73 +219,8 @@ class CameraFeed:
         pixmap = QPixmap.fromImage(qImg)  # convert QImage to QPixmap
         self.label.setPixmap(pixmap.scaled(self.label.size(), Qt.AspectRatioMode.KeepAspectRatio))
 
-    def start_recording(self):
-        """Start recording while keeping the preview active"""
-        if self.recording:
-            return  # Already recording
-
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
-
-        # Delete old video if exists
-        if os.path.exists(self.filepath):
-            try:
-                os.remove(self.filepath)
-            except Exception as e:
-                print(f"Could not delete old video: {e}")
-
-        # Use MP4V codec for better compatibility
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        self.out = cv2.VideoWriter(self.filepath, fourcc, self.fps, self.resolution)
-
-        if not self.out or not self.out.isOpened():
-            print(f"Error: Could not open VideoWriter with mp4v, trying MJPG")
-            # Fallback to MJPG
-            fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-            self.filepath = self.filepath.replace('.mp4', '.avi')
-            self.out = cv2.VideoWriter(self.filepath, fourcc, self.fps, self.resolution)
-
-            if not self.out or not self.out.isOpened():
-                print(f"Error: Could not open VideoWriter")
-                return False
-
-        self.recording = True
-        print(f"Recording started, saving to: {self.filepath}")
-        return True
-
-    def stop_recording(self):
-        """Stop recording while keeping the preview active"""
-        if not self.recording:
-            return
-
-        print("Stopping recording...")
-        self.recording = False
-
-        # Properly release the video writer
-        if self.out:
-            self.out.release()
-            self.out = None
-            # Give the system time to finalize the file
-            import time
-            time.sleep(0.5)
-
-        print(f"Recording stopped and saved to: {self.filepath}")
-
-        # Verify file was created and has size
-        if os.path.exists(self.filepath):
-            file_size = os.path.getsize(self.filepath)
-            print(f"Video file size: {file_size} bytes")
-            if file_size == 0:
-                print("WARNING: Video file is empty!")
-        else:
-            print("WARNING: Video file was not created!")
-
     def stop(self):
         """Stop the camera feed and release resources"""
-        # Stop recording if active
-        if self.recording:
-            self.stop_recording()
-
         if self.timer:
             self.timer.stop()
         if self.cam and self.cam.isOpened():

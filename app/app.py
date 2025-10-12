@@ -4,10 +4,13 @@
 ## main.py for desktop app ##
 
 -------------------------------------------------------------
-
-here comes the description of the app
-
+current video will be saved in app/videos/current_video.mp4
+recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 -------------------------------------------------------------
+
+Todos:
+- [ ] create settings
+- [ ] Integrate AI API for sign language translation
 
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
@@ -47,14 +50,14 @@ available_cams = findcams()
 camera_number = 0
 print(f"Available Cameras: {available_cams}")
 
-# start camera feed (use first working camera)
+# start camera feed (use first working camera) - only for display
 if available_cams:
     camerafeed = CameraFeed(videofeedlabel, cam_number=available_cams[camera_number])
 else:
     videofeedlabel.setText("No working cameras found!")
     camerafeed = None
 
-# Camera object will be created only when recording starts
+# Camera object for recording (separate from display)
 camera = None
 
 # var for clicks
@@ -65,39 +68,40 @@ with open("style.qss", "r") as f:
 
 # click function
 def recordfunc():
-    global pressed, camerafeed
+    global pressed, camera, available_cams, camera_number
     pressed += 1
+    print(f"PRESSED COUNT: {pressed} --------------------------------------------------------------------")
 
     # change buttons text
-    if pressed == 0:
-        recordButton.setText("Start Recording")
+    if pressed == 1:
+        recordButton.setText("Stop Recording")
         print("Start Recording", pressed)
 
-        # Start recording while keeping preview active
-        if camerafeed and camerafeed.is_running:
-            camerafeed.start_recording()
+        if available_cams:
+            camera = Camera(camera_id=available_cams[camera_number])
+            camera.start_recording()
         else:
-            print("Error: Camera feed not running")
+            print("Error: No cameras available")
             pressed = 1
 
-    elif pressed == 1:
-        recordButton.setText("Stop Recording")
-        print("Stop Recording", pressed)
-
-        # Stop recording but keep preview active
-        if camerafeed:
-            camerafeed.stop_recording()
 
     elif pressed == 2:
-        recordButton.setText("AI is Thinking...")
-        print("AI is Thinking...", pressed)
-        pressed = -1
+        recordButton.setText("Start Recording")
+        print("Stop Recording", pressed)
 
-        # Here comes the AI API call
+        camera.stop_recording()
+        pressed = 0
+
 
 # switch cam button function
 def switchcamfunc():
-    global camera_number, camerafeed
+    global camera_number, camerafeed, camera
+
+    # Stop recording if active
+    if camera and camera.recording:
+        camera.stop_recording()
+        camera.close()
+        camera = None
 
     # switch to next camera in list
     if camera_number < len(available_cams) - 1:
