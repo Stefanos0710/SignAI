@@ -19,9 +19,9 @@ Todos:
 """
 
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow
+from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QWidget, QVBoxLayout, QCheckBox, QSpinBox, QFormLayout
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtCore import QFile, QTimer
+from PySide6.QtCore import QFile, QTimer, Qt, QEvent
 from camera import Camera, CameraFeed, findcams
 import sys
 import time
@@ -41,9 +41,15 @@ window.setWindowIcon(QIcon("icons/icon.png"))
 # get buttons from UI
 recordButton = window.findChild(QPushButton, "recordButton")
 switchButton = window.findChild(QPushButton, "switchcam")
+settingsButton = window.findChild(QPushButton, "settingsButton")
+settingspanel = window.findChild(QWidget, "settingsPanel")
+saveSettingsButton = window.findChild(QPushButton, "saveSettingsButton")
 
 # get camera feed label
 videofeedlabel = window.findChild(QLabel, "videofeedlabel")
+
+# hide settings panel by default
+settingspanel.setVisible(False)
 
 # find all available cameras
 available_cams = findcams()
@@ -63,6 +69,7 @@ camera = None
 # var for clicks
 pressed = 0
 
+# open style sheet
 with open("style.qss", "r") as f:
     app.setStyleSheet(f.read())
 
@@ -92,7 +99,6 @@ def recordfunc():
         camera.stop_recording()
         pressed = 0
 
-
 # switch cam button function
 def switchcamfunc():
     global camera_number, camerafeed, camera
@@ -117,8 +123,9 @@ def switchcamfunc():
     camerafeed = CameraFeed(videofeedlabel, cam_number=available_cams[camera_number])
     print(f"Change to camera {camera_number}: {available_cams[camera_number]}")
 
-recordButton.clicked.connect(recordfunc)
-switchButton.clicked.connect(switchcamfunc)
+# toggle settings panel
+def togglesettings():
+    settingspanel.setVisible(not settingspanel.isVisible())
 
 # Cleanup on exit
 def cleanup():
@@ -126,6 +133,11 @@ def cleanup():
         camerafeed.stop()
     if camera:
         camera.close()
+
+# buttons connections/ events
+recordButton.clicked.connect(recordfunc)
+switchButton.clicked.connect(switchcamfunc)
+settingsButton.clicked.connect(togglesettings)
 
 app.aboutToQuit.connect(cleanup)
 
