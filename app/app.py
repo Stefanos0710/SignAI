@@ -8,9 +8,6 @@ current video will be saved in app/videos/current_video.mp4
 recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 -------------------------------------------------------------
 
-Todos:
-- [ ] Integrate AI API for sign language translation
-
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
 - **Original Creation Date**: 2025/10/11
@@ -62,6 +59,8 @@ videofeedlabel = window.findChild(QLabel, "videofeedlabel")
 resultDisplay = window.findChild(QWidget, "plainTextEdit")
 resultDisplay.setReadOnly(True)
 resultDisplay.setPlainText("Translation results will appear here...")
+resultDisplay.setVisible(False)
+resultDisplay.
 
 # hide settings panel by default
 settingspanel.setVisible(False)
@@ -98,11 +97,14 @@ def recordfunc():
     pressed += 1
     print(f"PRESSED COUNT: {pressed}")
 
+    resultDisplay.setVisible(False)
+
     if pressed >= 3:
         pressed = 0
 
     # change buttons text
     if pressed == 1:
+        resultDisplay.setVisible(False)
         recordButton.setText("Stop Recording")
         print("Start Recording", pressed)
 
@@ -121,7 +123,8 @@ def recordfunc():
 
         camera.stop_recording()
 
-        # Show processing message
+        # Show result display and processing message
+        resultDisplay.setVisible(True)
         resultDisplay.setPlainText("Processing video... Please wait...")
 
         # Call API

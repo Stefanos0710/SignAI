@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>527</width>
-    <height>505</height>
+    <width>523</width>
+    <height>497</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -31,7 +31,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QPlainTextEdit" name="plainTextEdit"/>
+    <widget class="QTextEdit" name="plainTextEdit"/>
    </item>
    <item>
     <widget class="QPushButton" name="recordButton">
