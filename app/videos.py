@@ -36,9 +36,10 @@ class HistoryVideos:
             print(f"Warning: No video to save at {self.source_path}")
             return False
 
-        # Check if source video has content
-        if os.path.getsize(self.source_path) == 0:
-            print(f"Warning: Video file is empty")
+        # Check if source video has content (minimum 1KB to ensure it has actual frames)
+        file_size = os.path.getsize(self.source_path)
+        if file_size < 1024:  # Less than 1KB is likely empty or corrupted
+            print(f"Warning: Video file is too small ({file_size} bytes), not saving to history")
             return False
 
         # create a new name for the video

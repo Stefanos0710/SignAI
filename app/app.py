@@ -10,7 +10,6 @@ recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 
 Todos:
 - [ ] Integrate AI API for sign language translation
-- [ ] Intigrate settings in app
 
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
