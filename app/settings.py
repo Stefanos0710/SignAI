@@ -42,5 +42,4 @@ class Settings:
             print("Settings initialized with defaults")
 
     def setup(self):
-        """Create directory if not exists"""
         os.makedirs(self.folder, exist_ok=True)

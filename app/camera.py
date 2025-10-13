@@ -21,41 +21,73 @@ import os
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QImage, QPixmap
 import threading
+from videos import HistoryVideos
 
 # Suppress OpenCV warnings about camera indices
 os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
 os.environ["OPENCV_LOG_LEVEL"] = "OFF"
 
 class Camera:
-    def __init__(self, camera_id=0, resolution=(640, 480), fps=30):
+    def __init__(self, camera_id=0, resolution=(640, 480), fps=30, camera_feed=None):
         self.camera_id = camera_id
         self.resolution = resolution
         self.fps = fps
         self.filepath = os.path.join(os.path.dirname(__file__), "videos", "current_video.mp4")
+        self.camera_feed = camera_feed  # Reference to CameraFeed to share frames
 
         # Ensure directory exists
         os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
 
-        # setup camera
+        # Don't open camera in __init__, wait for start_recording
+        self.cap = None
+        self.out = None
+        self.recording = False
+        self.thread = None
+        self.latest_frame = None  # Store latest frame for sharing
+
+    def start_recording(self):
+        import time
+
+        if self.recording:
+            return  # Already recording
+
+        # Pause the camera feed if it exists
+        if self.camera_feed:
+            self.camera_feed.pause()
+
+        # Wait a bit to ensure previous camera release is complete
+        time.sleep(0.3)
+
+        # Setup camera
         self.cap = cv2.VideoCapture(self.camera_id, cv2.CAP_DSHOW)
+
         if not self.cap.isOpened():
-            raise RuntimeError(f"Cannot open camera {self.camera_id}")
+            print(f"Error: Cannot open camera {self.camera_id}")
+            if self.camera_feed:
+                self.camera_feed.resume()
+            return
 
         # Set camera properties
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
         self.cap.set(cv2.CAP_PROP_FPS, self.fps)
-
-        # Set buffer size to reduce lag
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-        self.out = None
-        self.recording = False
-        self.thread = None
+        # Test if we can grab frames
+        for attempt in range(5):
+            ret, test_frame = self.cap.read()
+            if ret:
+                break
+            print(f"Warming up camera, attempt {attempt + 1}/5...")
+            time.sleep(0.2)
 
-    def start_recording(self):
-        if self.recording:
-            return  # Already recording
+        if not ret:
+            print("Error: Camera cannot grab frames after warmup")
+            self.cap.release()
+            self.cap = None
+            if self.camera_feed:
+                self.camera_feed.resume()
+            return
 
         # Delete old video if exists
         if os.path.exists(self.filepath):
@@ -77,6 +109,11 @@ class Camera:
 
             if not self.out or not self.out.isOpened():
                 print(f"Error: Could not open VideoWriter")
+                if self.cap:
+                    self.cap.release()
+                    self.cap = None
+                if self.camera_feed:
+                    self.camera_feed.resume()
                 return
 
         self.recording = True
@@ -88,19 +125,36 @@ class Camera:
         import time
         frame_delay = 1.0 / self.fps
         frame_count = 0
+        consecutive_failures = 0
+        max_consecutive_failures = 30  # Stop after 30 consecutive failures
 
         while self.recording:
             start_time = time.time()
 
             ret, frame = self.cap.read()
             if not ret:
-                print("Failed to grab frame")
-                time.sleep(0.01)
+                consecutive_failures += 1
+                if consecutive_failures >= max_consecutive_failures:
+                    print(f"Too many consecutive failures ({consecutive_failures}), stopping recording")
+                    self.recording = False
+                    break
+                print(f"Failed to grab frame (failure {consecutive_failures}/{max_consecutive_failures})")
+                time.sleep(0.05)
                 continue
+
+            # Reset failure counter on success
+            consecutive_failures = 0
 
             # Resize frame to match resolution
             if frame.shape[:2][::-1] != self.resolution:
                 frame = cv2.resize(frame, self.resolution)
+
+            # Store latest frame for camera feed
+            self.latest_frame = frame.copy()
+
+            # Update camera feed if available
+            if self.camera_feed:
+                self.camera_feed.update_from_recording(frame)
 
             self.out.write(frame)
             frame_count += 1
@@ -127,11 +181,21 @@ class Camera:
         if self.out:
             self.out.release()
             self.out = None
-            # Give the system time to finalize the file
-            import time
-            time.sleep(0.5)
+
+        # Release camera
+        if self.cap and self.cap.isOpened():
+            self.cap.release()
+            self.cap = None
+
+        # Give the system time to finalize the file
+        import time
+        time.sleep(0.5)
 
         print(f"Recording stopped and saved to: {self.filepath}")
+
+        # Resume camera feed
+        if self.camera_feed:
+            self.camera_feed.resume()
 
         # Verify file was created and has size
         if os.path.exists(self.filepath):
@@ -162,6 +226,7 @@ class Camera:
         self.stop_recording()
         if self.cap and self.cap.isOpened():
             self.cap.release()
+            self.cap = None
         cv2.destroyAllWindows()
 
 class CameraFeed:
@@ -171,6 +236,7 @@ class CameraFeed:
         self.cam = cv2.VideoCapture(self.cam_number, cv2.CAP_DSHOW)  # Use DirectShow on Windows
         self.timer = None
         self.is_running = False
+        self.is_paused = False
 
         # Remove recording attributes - CameraFeed is only for display
         self.fps = 30
@@ -200,13 +266,21 @@ class CameraFeed:
         self.is_running = True
 
     def update_frame(self):
-        if not self.cam or not self.cam.isOpened():
+        if not self.cam or not self.cam.isOpened() or self.is_paused:
             return
 
         ret, frame = self.cam.read()  # ret is boolean if frame is read correctly and frame is the image
         if not ret:
             return
 
+        self._display_frame(frame)
+
+    def update_from_recording(self, frame):
+        """Update display from recording frame (called from Camera class)"""
+        self._display_frame(frame)
+
+    def _display_frame(self, frame):
+        """Internal method to display a frame"""
         # Resize frame to match resolution
         if frame.shape[:2][::-1] != self.resolution:
             frame = cv2.resize(frame, self.resolution)
@@ -219,6 +293,41 @@ class CameraFeed:
         pixmap = QPixmap.fromImage(qImg)  # convert QImage to QPixmap
         self.label.setPixmap(pixmap.scaled(self.label.size(), Qt.AspectRatioMode.KeepAspectRatio))
 
+    def pause(self):
+        """Pause the camera feed without releasing the camera"""
+        self.is_paused = True
+        if self.timer:
+            self.timer.stop()
+        if self.cam and self.cam.isOpened():
+            self.cam.release()
+        print(f"Camera feed paused for camera {self.cam_number}")
+
+    def resume(self):
+        """Resume the camera feed"""
+        import time
+
+        self.is_paused = False
+
+        # Wait a bit before reopening
+        time.sleep(0.3)
+
+        # Reopen camera
+        self.cam = cv2.VideoCapture(self.cam_number, cv2.CAP_DSHOW)
+        if not self.cam.isOpened():
+            self.label.setText(f"Error: Cannot reopen camera {self.cam_number}")
+            return
+
+        # Set camera properties
+        self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
+        self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
+        self.cam.set(cv2.CAP_PROP_FPS, self.fps)
+        self.cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+        # Restart timer
+        if self.timer:
+            self.timer.start(33)
+        print(f"Camera feed resumed for camera {self.cam_number}")
+
     def stop(self):
         """Stop the camera feed and release resources"""
         if self.timer:
@@ -226,6 +335,7 @@ class CameraFeed:
         if self.cam and self.cam.isOpened():
             self.cam.release()
         self.is_running = False
+        self.is_paused = False
 
 def findcams(max_cams=3):
     """Find available cameras. Reduced default to 3 to avoid unnecessary scanning."""

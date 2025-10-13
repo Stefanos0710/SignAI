@@ -9,13 +9,13 @@ recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 -------------------------------------------------------------
 
 Todos:
-- [ ] create settings
 - [ ] Integrate AI API for sign language translation
+- [ ] Intigrate settings in app
 
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
 - **Original Creation Date**: 2025/10/11
-- **Last Update**: 2025/10/11
+- **Last Update**: 2025/10/13
 """
 
 from PySide6.QtGui import QIcon
@@ -24,6 +24,7 @@ from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer, Qt, QEvent
 from camera import Camera, CameraFeed, findcams
 from settings import Settings
+from videos import HistoryVideos
 import sys
 
 #setup application
@@ -32,6 +33,9 @@ loader = QUiLoader()
 
 # setup settings
 settings = Settings()
+
+# setup history videos
+history_videos = HistoryVideos()
 
 # load UI
 ui_file = QFile("ui/main_window.ui")
@@ -87,7 +91,10 @@ with open("style.qss", "r") as f:
 def recordfunc():
     global pressed, camera, available_cams, camera_number
     pressed += 1
-    print(f"PRESSED COUNT: {pressed} --------------------------------------------------------------------")
+    print(f"PRESSED COUNT: {pressed}")
+
+    if pressed >= 3:
+        pressed = 0
 
     # change buttons text
     if pressed == 1:
@@ -95,7 +102,8 @@ def recordfunc():
         print("Start Recording", pressed)
 
         if available_cams:
-            camera = Camera(camera_id=available_cams[camera_number])
+            # Pass camera_feed reference to Camera so it can update display during recording
+            camera = Camera(camera_id=available_cams[camera_number], camera_feed=camerafeed)
             camera.start_recording()
         else:
             print("Error: No cameras available")
@@ -107,6 +115,18 @@ def recordfunc():
         print("Stop Recording", pressed)
 
         camera.stop_recording()
+
+        # Save video to history if history setting is enabled
+        if settings.history:
+            print("Saving video to history...")
+            success = history_videos.save_video()
+            if success:
+                print("Video successfully saved to history")
+            else:
+                print("Failed to save video to history")
+        else:
+            print("History is disabled, video not saved to history")
+
         pressed = 0
 
 # switch cam button function
