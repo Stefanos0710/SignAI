@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>531</width>
-    <height>513</height>
+    <width>527</width>
+    <height>505</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -29,6 +29,9 @@
       <set>Qt::AlignmentFlag::AlignCenter</set>
      </property>
     </widget>
+   </item>
+   <item>
+    <widget class="QPlainTextEdit" name="plainTextEdit"/>
    </item>
    <item>
     <widget class="QPushButton" name="recordButton">

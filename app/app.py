@@ -58,6 +58,11 @@ checkHistory = window.findChild(QCheckBox, "checkHistory")
 # get camera feed label
 videofeedlabel = window.findChild(QLabel, "videofeedlabel")
 
+# get result display text area
+resultDisplay = window.findChild(QWidget, "plainTextEdit")
+resultDisplay.setReadOnly(True)
+resultDisplay.setPlainText("Translation results will appear here...")
+
 # hide settings panel by default
 settingspanel.setVisible(False)
 
@@ -116,9 +121,31 @@ def recordfunc():
 
         camera.stop_recording()
 
+        # Show processing message
+        resultDisplay.setPlainText("Processing video... Please wait...")
+
+        # Call API
         api = API()
-        result = API().start()
-        print(result)
+        result = api.api_translation("videos/current_video.mp4")
+
+        # Display results in the text area
+        if result.get("success"):
+            translation = result.get("translation", "N/A").upper()
+            confidence = result.get("confidence", 0)
+            timing = result.get("timing", {})
+            total_time = timing.get("total_processing_time", 0)
+
+            # Simple 3-line display
+            result_text = f"Translation: {translation}\n"
+            result_text += f"Confidence: {confidence}%\n"
+            result_text += f"Time: {total_time}s"
+
+            resultDisplay.setPlainText(result_text)
+            print("Translation successful:", translation)
+        else:
+            error_msg = result.get("error", "Unknown error")
+            resultDisplay.setPlainText(f"Translation failed\nError: {error_msg}")
+            print("Translation failed:", error_msg)
 
         # Save video to history if history setting is enabled
         if settings.history:
