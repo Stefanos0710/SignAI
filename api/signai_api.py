@@ -1,6 +1,6 @@
 """
 SignAI - Sign Language Translator
-api Module
+API Module
 
 This module implements the SignAI API server that accepts video uploads, preprocesses them,
 and performs sign language translation using a trained model. It provides endpoints for health checks
@@ -15,10 +15,11 @@ from flask import Flask, request, jsonify
 import os
 import traceback
 from werkzeug.utils import secure_filename
+import time
 
 # Import pipeline modules
-import preprocessing_live_data as pre
-import inference
+from . import preprocessing_live_data as pre
+from . import inference
 
 # Flask app instance (referenced by request.py)
 app = Flask(__name__)
@@ -44,15 +45,18 @@ def health():
 @app.route('/api/upload', methods=['POST'])
 def upload_and_translate():
     try:
+        request_start_time = time.time()
+
         # Validate file in request
         if 'raw_video' not in request.files:
-            return jsonify({'success': False, 'error': 'Kein Video im Feld "raw_video" gefunden.'}), 400
+            return jsonify({'success': False, 'error': 'No video found in field "raw_video".'}), 400
 
         file = request.files['raw_video']
         if file.filename == '':
-            return jsonify({'success': False, 'error': 'Leerer Dateiname.'}), 400
+            return jsonify({'success': False, 'error': 'Empty filename.'}), 400
 
         # Save uploaded video
+        upload_start = time.time()
         filename = secure_filename(file.filename) or 'uploaded_video.mp4'
         # Force mp4 extension to keep VideoWriter/codec expectations simple
         if not filename.lower().endswith('.mp4'):
@@ -60,20 +64,47 @@ def upload_and_translate():
 
         saved_video_path = os.path.join(UPLOAD_DIR, 'recorded_video.mp4')
         file.save(saved_video_path)
+        upload_time = time.time() - upload_start
+
+        # Get video file size
+        video_size_bytes = os.path.getsize(saved_video_path)
+        video_size_mb = round(video_size_bytes / (1024 * 1024), 2)
 
         # Preprocess video to CSV (no UI windows for server mode)
+        preprocessing_start = time.time()
         pre.main(video_path=saved_video_path, show_windows=False)
+        preprocessing_time = time.time() - preprocessing_start
 
         # Run inference using the latest model
-        predicted_word = inference.main_inference(MODEL_PATH)
-        if not predicted_word:
-            return jsonify({'success': False, 'error': 'Keine Vorhersage möglich.'}), 500
+        inference_result = inference.main_inference(MODEL_PATH)
 
-        # Build response (keep behavior close to normal AI translation)
+        if not inference_result or not inference_result.get('predicted_word'):
+            return jsonify({'success': False, 'error': 'No prediction possible.'}), 500
+
+        # Calculate total processing time
+        total_processing_time = time.time() - request_start_time
+
+        # Build detailed response
         return jsonify({
             'success': True,
-            'translation': predicted_word,
-            'model': os.path.basename(MODEL_PATH)
+            'translation': inference_result['predicted_word'],
+            'confidence': inference_result['confidence'],
+            'top_predictions': inference_result['top_predictions'],
+            'model': os.path.basename(MODEL_PATH),
+            'timing': {
+                'total_processing_time': round(total_processing_time, 3),
+                'upload_time': round(upload_time, 3),
+                'preprocessing_time': round(preprocessing_time, 3),
+                'model_load_time': inference_result['timing']['model_load_time'],
+                'build_time': inference_result['timing']['build_time'],
+                'data_load_time': inference_result['timing']['data_load_time'],
+                'inference_time': inference_result['timing']['inference_time']
+            },
+            'video_info': {
+                'filename': filename,
+                'size_bytes': video_size_bytes,
+                'size_mb': video_size_mb
+            }
         })
 
     except Exception as e:
