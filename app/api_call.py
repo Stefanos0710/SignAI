@@ -211,7 +211,4 @@ class API:
             print(f"Test video not found: {test_video}")
             print("Please record a video first using the desktop app")
 
-
-if __name__ == "__main__":
-    api = API()
-    api.start()
+        return result

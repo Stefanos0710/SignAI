@@ -24,6 +24,7 @@ from PySide6.QtCore import QFile, QTimer, Qt, QEvent
 from camera import Camera, CameraFeed, findcams
 from settings import Settings
 from videos import HistoryVideos
+from api_call import API
 import sys
 
 #setup application
@@ -114,6 +115,10 @@ def recordfunc():
         print("Stop Recording", pressed)
 
         camera.stop_recording()
+
+        api = API()
+        result = API().start()
+        print(result)
 
         # Save video to history if history setting is enabled
         if settings.history:
