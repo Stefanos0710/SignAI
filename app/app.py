@@ -197,6 +197,11 @@ def switchcamfunc():
 def togglesettings():
     settingspanel.setVisible(not settingspanel.isVisible())
 
+    if settingspanel.isVisible():
+        settingsButton.setText("Close Settings")
+    else:
+        settingsButton.setText("Settings")
+
 def checksettings():
     # check history settings
     if checkHistory.isChecked():
@@ -224,7 +229,7 @@ def cleanup():
     if camera:
         camera.close()
 
-# buttons connections/ events
+# buttons connections/ events  hallo again
 recordButton.clicked.connect(recordfunc)
 switchButton.clicked.connect(switchcamfunc)
 settingsButton.clicked.connect(togglesettings)

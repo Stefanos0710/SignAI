@@ -32,6 +32,16 @@ QLabel#videofeedlabel {
     padding: 5px;
 }
 
+/* Settings Panel */
+QFrame#settingsPanel {
+    background-color: #3B4252;   /* dark background */
+    color: #ECEFF4;              /* light text */
+    font: 14px Arial;
+    border: 2px solid #81A1C1;  /* subtle border */
+    border-radius: 8px;          /* rounded corners */
+    padding: 8px;
+}
+
 /* General buttons */
 QPushButton {
     background-color: #5E81AC;   /* solid color, minimal */
@@ -71,4 +81,56 @@ QTextEdit#plainTextEdit {
     border: 2px solid #81A1C1;  /* subtle border */
     border-radius: 8px;          /* rounded corners */
     padding: 8px;
+}
+
+/* ## QCheckBox ## */
+QCheckBox {
+    color: #ECEFF4;              /* light text */
+    font: 14px Arial;
+    spacing: 7px;
+    padding: 5px;
+}
+
+QCheckBox::indicator {
+    width: 13px;
+    height: 13px;
+    border: 1px solid #81A1C1;  /* subtle border */
+    border-radius: 5px;          /* rounded corners */
+    background-color: #3B4252;   /* dark background */
+}
+
+QCheckBox::indicator:hover {
+    border: 2px solid #88C0D0;  /* lighter blue on hover */
+    background-color: #434C5E;   /* slightly lighter background */
+}
+
+QCheckBox::indicator:checked {
+    background-color: #A3BE8C;   /* green checked state */
+    border: 2px solid #8FBCBB;   /* matching border */
+}
+
+QCheckBox::indicator:checked:hover {
+    background-color: #8FBCBB;   /* lighter green on hover */
+}
+
+QCheckBox::indicator:unchecked {
+    background-color: #3B4252;   /* dark unchecked state */
+}
+
+/* QGroupBox Styling for Settings Panel */
+QGroupBox {
+    color: #ECEFF4;
+    font-size: 14px;
+    font-weight: bold;
+    border: 2px solid #81A1C1;
+    border-radius: 8px;
+    margin-top: 10px;
+    padding-top: 15px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 15px;
+    padding: 0 5px;
+    color: #88C0D0;
 }
