@@ -48,6 +48,7 @@ packaging==25.0
 pandas==2.2.3
 pillow==11.2.1
 protobuf==4.25.8
+psutil==6.1.1
 pycparser==2.22
 Pygments==2.19.1
 pyparsing==3.2.3

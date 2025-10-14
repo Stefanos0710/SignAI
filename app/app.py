@@ -8,6 +8,10 @@ current video will be saved in app/videos/current_video.mp4
 recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 -------------------------------------------------------------
 
+ToDo List:
+- [ ] Better styling for settings panel
+- [ ] implement loading var ect
+
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
 - **Original Creation Date**: 2025/10/11
@@ -60,7 +64,6 @@ resultDisplay = window.findChild(QWidget, "plainTextEdit")
 resultDisplay.setReadOnly(True)
 resultDisplay.setPlainText("Translation results will appear here...")
 resultDisplay.setVisible(False)
-resultDisplay.
 
 # hide settings panel by default
 settingspanel.setVisible(False)

@@ -8,6 +8,9 @@ import os
 import threading
 import time
 import requests
+import socket
+import psutil
+import signal
 
 # Add API folder to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -26,16 +29,120 @@ class API:
         self._server_thread = None
 
 
+    def is_port_in_use(self, port=5000):
+        """Check if a port is already in use"""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(('127.0.0.1', port))
+                return False
+            except socket.error:
+                return True
+
+
+    def get_process_using_port(self, port=5000):
+        """Find the process that is using a specific port"""
+        try:
+            for conn in psutil.net_connections():
+                if conn.laddr.port == port and conn.status == 'LISTEN':
+                    try:
+                        process = psutil.Process(conn.pid)
+                        return {
+                            'pid': conn.pid,
+                            'name': process.name(),
+                            'cmdline': ' '.join(process.cmdline())
+                        }
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        return None
+        except Exception as e:
+            print(f"⚠ Error finding process on port {port}: {e}")
+        return None
+
+
+    def kill_process_on_port(self, port=5000):
+        """Kill the process using the specified port"""
+        process_info = self.get_process_using_port(port)
+
+        if not process_info:
+            print(f"✗ Could not find process using port {port}")
+            return False
+
+        try:
+            pid = process_info['pid']
+            name = process_info['name']
+
+            print(f"→ Found process '{name}' (PID: {pid}) using port {port}")
+            print(f"→ Killing process...")
+
+            process = psutil.Process(pid)
+            process.terminate()  # Try graceful termination first
+
+            # Wait up to 3 seconds for process to terminate
+            try:
+                process.wait(timeout=3)
+                print(f"✓ Process {pid} terminated successfully")
+                time.sleep(0.5)  # Give OS time to release the port
+                return True
+            except psutil.TimeoutExpired:
+                # Force kill if graceful termination didn't work
+                print(f"→ Force killing process {pid}...")
+                process.kill()
+                process.wait(timeout=2)
+                print(f"✓ Process {pid} killed")
+                time.sleep(0.5)
+                return True
+
+        except psutil.NoSuchProcess:
+            print(f"✓ Process already terminated")
+            return True
+        except psutil.AccessDenied:
+            print(f"✗ Access denied - cannot kill process {pid}")
+            print(f"  Run the application as administrator to kill this process")
+            return False
+        except Exception as e:
+            print(f"✗ Error killing process: {e}")
+            return False
+
+
     def start_api_server(self):
         if self._server_running:
             print("API server already running")
             return True
 
-        def run_server():
-            self._server_running = True
+        # Check if port is already in use
+        if self.is_port_in_use(5000):
+            print("⚠ Port 5000 is already in use!")
+            print("Checking if it's our API server...")
 
-            # Start Flask server
-            signai_api.app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
+            # Check if it's actually our API responding
+            if self.check_api_health():
+                print("✓ API server is already running on port 5000")
+                self._server_running = True
+                return True
+            else:
+                print("✗ Port 5000 is occupied by another application")
+                print("→ Attempting to free port 5000...")
+
+                if self.kill_process_on_port(5000):
+                    print("✓ Port 5000 freed successfully")
+                    # Verify port is now free
+                    if not self.is_port_in_use(5000):
+                        print("✓ Port is now available, starting API server...")
+                    else:
+                        print("✗ Port is still in use, cannot start API server")
+                        return False
+                else:
+                    print("✗ Failed to free port 5000")
+                    print("  Please close the application using port 5000 manually")
+                    return False
+
+        def run_server():
+            try:
+                self._server_running = True
+                # Start Flask server
+                signai_api.app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
+            except Exception as e:
+                print(f"✗ Error starting Flask server: {e}")
+                self._server_running = False
 
         # Start server in daemon thread
         self._server_thread = threading.Thread(target=run_server, daemon=True)
@@ -50,10 +157,14 @@ class API:
                 if response.status_code == 200:
                     print("✓ API server is ready")
                     return True
-            except:
+            except requests.exceptions.ConnectionError:
+                continue
+            except Exception as e:
+                print(f"⚠ Error checking API health: {e}")
                 continue
 
-        print("Failed to start API server")
+        print("✗ Failed to start API server - timeout after 5 seconds")
+        self._server_running = False
         return False
 
 
@@ -210,5 +321,6 @@ class API:
         else:
             print(f"Test video not found: {test_video}")
             print("Please record a video first using the desktop app")
+            result = {"success": False, "error": "Test video not found"}
 
         return result
