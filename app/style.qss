@@ -16,7 +16,6 @@ here comes the description of the app
 */
 
 
-
 /* Main window */
 QWidget#MainWindow {
     background-color: #2E3440; /* Dark minimal background */
@@ -62,4 +61,14 @@ QPushButton#switchcam {
 QPushButton#switchcam:hover {
     background-color: #B48EAD;
     color: white;
+}
+
+/* Translation box */
+QTextEdit#plainTextEdit {
+    background-color: #3B4252;   /* dark background */
+    color: #ECEFF4;              /* light text */
+    font: 14px Arial;
+    border: 2px solid #81A1C1;  /* subtle border */
+    border-radius: 8px;          /* rounded corners */
+    padding: 8px;
 }
