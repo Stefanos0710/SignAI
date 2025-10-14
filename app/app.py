@@ -18,6 +18,8 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QWidget, QVBoxLayout, QCheckBox, QSpinBox, QFormLayout
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer, Qt, QEvent
+from networkx.algorithms.distance_measures import center
+
 from camera import Camera, CameraFeed, findcams
 from settings import Settings
 from videos import HistoryVideos
@@ -60,7 +62,6 @@ resultDisplay = window.findChild(QWidget, "plainTextEdit")
 resultDisplay.setReadOnly(True)
 resultDisplay.setPlainText("Translation results will appear here...")
 resultDisplay.setVisible(False)
-resultDisplay.
 
 # hide settings panel by default
 settingspanel.setVisible(False)
@@ -126,6 +127,7 @@ def recordfunc():
         # Show result display and processing message
         resultDisplay.setVisible(True)
         resultDisplay.setPlainText("Processing video... Please wait...")
+        resultDisplay.setMaximumHeight(120)
 
         # Call API
         api = API()
@@ -139,11 +141,11 @@ def recordfunc():
             total_time = timing.get("total_processing_time", 0)
 
             # Simple 3-line display
-            result_text = f"Translation: {translation}\n"
-            result_text += f"Confidence: {confidence}%\n"
-            result_text += f"Time: {total_time}s"
+            result_text = f"<p align='center'>Translation: {translation}</p>\n"
+            result_text += f"<p align='center'>Confidence: {confidence}%</p>\n"
+            result_text += f"<p align='center'>Time: {total_time}s</p>"
 
-            resultDisplay.setPlainText(result_text)
+            resultDisplay.setHtml(result_text)
             print("Translation successful:", translation)
         else:
             error_msg = result.get("error", "Unknown error")
