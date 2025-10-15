@@ -9,19 +9,21 @@ recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 -------------------------------------------------------------
 
 ToDo List:
-- [ ] Better styling for settings panel
 - [ ] implement loading var ect
+- [ ] History icon to se into history videos
+- [ ] more settings options
+- [ ] error handling for no camera found or for used port
 
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
 - **Original Creation Date**: 2025/10/11
-- **Last Update**: 2025/10/13
+- **Last Update**: 2025/10/15
 """
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QWidget, QVBoxLayout, QCheckBox, QSpinBox, QFormLayout
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtCore import QFile, QTimer, Qt, QEvent
+from PySide6.QtCore import QFile, QTimer, Qt, QEvent, QThread, Signal
 from networkx.algorithms.distance_measures import center
 
 from camera import Camera, CameraFeed, findcams
@@ -96,9 +98,74 @@ pressed = 0
 with open("style.qss", "r") as f:
     app.setStyleSheet(f.read())
 
+# thread for video processing and AI translation
+class VideoProcessingThread(QThread):
+    finished = Signal(dict)  # Signal mit Result
+    progress = Signal(str)   # Signal für Status-Updates
+
+    def __init__(self, video_path):
+        super().__init__()
+        self.video_path = video_path
+
+    def run(self):
+        self.progress.emit("Initializing API...")
+        api = API()
+
+        self.progress.emit("Uploading video...")
+        result = api.api_translation(self.video_path)
+
+        self.finished.emit(result)
+
+# Global var for worker
+processing_worker = None
+loading_timer = None
+loading_dots = 0
+
+
+# animation for loading
+def update_loading_animation():
+    global loading_dots
+    loading_dots = (loading_dots + 1) % 4
+    dots = "." * loading_dots
+    resultDisplay.setPlainText(f"Processing video{dots}")
+
+# function that generates message wehen succses is ture otherwise error message
+def on_processing_finished(result):
+    global loading_timer
+
+    # Stop loading animation
+    if loading_timer:
+        loading_timer.stop()
+
+    # Display results
+    if result.get("success"):
+        translation = result.get("translation", "N/A").upper()
+        confidence = result.get("confidence", 0)
+        timing = result.get("timing", {})
+        total_time = timing.get("total_processing_time", 0)
+
+        result_text = f"<p align='center'><b>Translation:</b> {translation}</p>\n"
+        result_text += f"<p align='center'><b>Confidence:</b> {confidence}%</p>\n"
+        result_text += f"<p align='center'><b>Time:</b> {total_time}s</p>"
+
+        resultDisplay.setHtml(result_text)
+        print("Translation successful:", translation)
+    else:
+        error_msg = result.get("error", "Unknown error")
+        resultDisplay.setPlainText(f"Translation failed\nError: {error_msg}")
+        print("Translation failed:", error_msg)
+
+    # Enable record button again and reset text
+    recordButton.setEnabled(True)
+    recordButton.setText("Start Recording")
+
+# function to update progress messages
+def on_progress_update(message):
+    resultDisplay.setPlainText(message)
+
 # click function
 def recordfunc():
-    global pressed, camera, available_cams, camera_number
+    global pressed, camera, available_cams, camera_number, camerafeed, processing_worker, loading_timer
     pressed += 1
     print(f"PRESSED COUNT: {pressed}")
 
@@ -107,7 +174,7 @@ def recordfunc():
     if pressed >= 3:
         pressed = 0
 
-    # change buttons text
+    # check if to start or stop a recording
     if pressed == 1:
         resultDisplay.setVisible(False)
         recordButton.setText("Stop Recording")
@@ -121,40 +188,29 @@ def recordfunc():
             print("Error: No cameras available")
             pressed = 1
 
-
     elif pressed == 2:
-        recordButton.setText("Start Recording")
+        # her was the start buttons text
+        recordButton.setText("AI is thinking...")
+        recordButton.setEnabled(False)
         print("Stop Recording", pressed)
 
         camera.stop_recording()
 
-        # Show result display and processing message
+        # show and set max height for result display
         resultDisplay.setVisible(True)
-        resultDisplay.setPlainText("Processing video... Please wait...")
         resultDisplay.setMaximumHeight(120)
 
-        # Call API
-        api = API()
-        result = api.api_translation("videos/current_video.mp4")
+        # starting the dot animation
+        loading_dots = 0
+        loading_timer = QTimer()
+        loading_timer.timeout.connect(update_loading_animation)
+        loading_timer.start(500)  # Update every 0.5 sec
 
-        # Display results in the text area
-        if result.get("success"):
-            translation = result.get("translation", "N/A").upper()
-            confidence = result.get("confidence", 0)
-            timing = result.get("timing", {})
-            total_time = timing.get("total_processing_time", 0)
-
-            # Simple 3-line display
-            result_text = f"<p align='center'>Translation: {translation}</p>\n"
-            result_text += f"<p align='center'>Confidence: {confidence}%</p>\n"
-            result_text += f"<p align='center'>Time: {total_time}s</p>"
-
-            resultDisplay.setHtml(result_text)
-            print("Translation successful:", translation)
-        else:
-            error_msg = result.get("error", "Unknown error")
-            resultDisplay.setPlainText(f"Translation failed\nError: {error_msg}")
-            print("Translation failed:", error_msg)
+        # start video processing thread
+        processing_worker = VideoProcessingThread("videos/current_video.mp4")
+        processing_worker.finished.connect(on_processing_finished)
+        processing_worker.progress.connect(on_progress_update)
+        processing_worker.start()
 
         # Save video to history if history setting is enabled
         if settings.history:
@@ -202,6 +258,7 @@ def togglesettings():
     else:
         settingsButton.setText("Settings")
 
+# check settings and save
 def checksettings():
     # check history settings
     if checkHistory.isChecked():
