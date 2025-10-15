@@ -9,8 +9,7 @@ recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 -------------------------------------------------------------
 
 ToDo List:
-- [ ] implement loading var ect
-- [ ] History icon to se into history videos
+- [ ] History icon to see into history videos
 - [ ] more settings options
 - [ ] error handling for no camera found or for used port
 
@@ -21,7 +20,7 @@ ToDo List:
 """
 
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QWidget, QVBoxLayout, QCheckBox, QSpinBox, QFormLayout
+from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QWidget, QVBoxLayout, QCheckBox, QSpinBox, QFormLayout, QToolButton
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer, Qt, QEvent, QThread, Signal
 from networkx.algorithms.distance_measures import center
@@ -31,6 +30,9 @@ from settings import Settings
 from videos import HistoryVideos
 from api_call import API
 import sys
+import os
+import subprocess
+import platform
 
 #setup application
 app = QApplication(sys.argv)
@@ -59,6 +61,10 @@ settingspanel = window.findChild(QWidget, "settingsPanel")
 saveSettingsButton = window.findChild(QPushButton, "saveSettingsButton")
 chekDebugMode = window.findChild(QCheckBox, "CheckDebugMode")
 checkHistory = window.findChild(QCheckBox, "checkHistory")
+historybutton = window.findChild(QToolButton, "historybutton")
+
+# set icon to buttons
+historybutton.setIcon(QIcon("icons/history.png"))
 
 # get camera feed label
 videofeedlabel = window.findChild(QLabel, "videofeedlabel")
@@ -286,12 +292,24 @@ def cleanup():
     if camera:
         camera.close()
 
+def historyfunc():
+    system = platform.system()
+
+    path = os.path.abspath("videos/history")
+    if system == "Windows": # Windows
+        os.startfile(path)
+    elif system == "Darwin":  # macOS
+        subprocess.Popen(["open", path])
+    else:  # Linux
+        subprocess.Popen(["xdg-open", path])
+
 # buttons connections/ events  hallo again
 recordButton.clicked.connect(recordfunc)
 switchButton.clicked.connect(switchcamfunc)
 settingsButton.clicked.connect(togglesettings)
 checkHistory.clicked.connect(checksettings)
 chekDebugMode.clicked.connect(checksettings)
+historybutton.clicked.connect(historyfunc)
 
 app.aboutToQuit.connect(cleanup)
 

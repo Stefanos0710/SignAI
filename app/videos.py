@@ -1,7 +1,7 @@
 """
 
 here comes the history from videos and other functions
-sdasdasasdasdasdsad
+
 """
 
 from datetime import datetime
