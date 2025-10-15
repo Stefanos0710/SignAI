@@ -1,0 +1,24 @@
+body {
+    background-color: #ccefee;
+    font-family: Arial, sans-serif;
+    margin: 20px;
+}
+
+h1 {
+    color : #5d5dee;
+}
+
+h2 {
+    color: #5d5dee;
+}
+
+p {
+    font-size: 17px;
+    line-height: 1.5;
+    color: #373737;
+}
+
+a {
+    color: #5d5dee;
+    text-decoration: none;
+}
