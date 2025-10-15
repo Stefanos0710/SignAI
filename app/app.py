@@ -9,9 +9,7 @@ recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 -------------------------------------------------------------
 
 ToDo List:
-- [ ] History icon to see into history videos
 - [ ] more settings options
-- [ ] error handling for no camera found or for used port
 
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
@@ -20,7 +18,8 @@ ToDo List:
 """
 
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QWidget, QVBoxLayout, QCheckBox, QSpinBox, QFormLayout, QToolButton
+from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QHBoxLayout, QWidget, QVBoxLayout, QCheckBox, QSpinBox, \
+    QFormLayout, QToolButton, QBoxLayout
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer, Qt, QEvent, QThread, Signal
 from networkx.algorithms.distance_measures import center
@@ -62,9 +61,11 @@ saveSettingsButton = window.findChild(QPushButton, "saveSettingsButton")
 chekDebugMode = window.findChild(QCheckBox, "CheckDebugMode")
 checkHistory = window.findChild(QCheckBox, "checkHistory")
 historybutton = window.findChild(QToolButton, "historybutton")
+githubbutton = window.findChild(QToolButton, "githubButton")
 
 # set icon to buttons
 historybutton.setIcon(QIcon("icons/history.png"))
+githubbutton.setIcon(QIcon("icons/github.png"))
 
 # get camera feed label
 videofeedlabel = window.findChild(QLabel, "videofeedlabel")
@@ -81,6 +82,13 @@ settingspanel.setVisible(False)
 # load settings and set checkboxes accordingly
 checkHistory.setChecked(settings.history)
 chekDebugMode.setChecked(settings.debug)
+
+# # set header layount with History buttons, Heading and github link
+# header_layout = QHBoxLayout()
+# header_layout.addWidget(githubbutton)
+# header_layout.addStretch()  # macht den Abstand flexibel
+# header_layout.addWidget(historybutton)
+
 
 # find all available cameras
 available_cams = findcams()
@@ -303,13 +311,18 @@ def historyfunc():
     else:  # Linux
         subprocess.Popen(["xdg-open", path])
 
-# buttons connections/ events  hallo again
+def githubfunc():
+    import webbrowser
+    webbrowser.open("https://github.com/Stefanos0710/SignAI/")
+
+# buttons connections/ events
 recordButton.clicked.connect(recordfunc)
 switchButton.clicked.connect(switchcamfunc)
 settingsButton.clicked.connect(togglesettings)
 checkHistory.clicked.connect(checksettings)
 chekDebugMode.clicked.connect(checksettings)
 historybutton.clicked.connect(historyfunc)
+githubbutton.clicked.connect(githubfunc)
 
 app.aboutToQuit.connect(cleanup)
 

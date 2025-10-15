@@ -134,3 +134,7 @@ QGroupBox::title {
     padding: 0 5px;
     color: #88C0D0;
 }
+QLabel#titleLabel {
+    color: #D8DEE9;
+    font: 14px Arial;
+}
