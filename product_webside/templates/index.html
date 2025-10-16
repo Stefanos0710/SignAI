@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>SignAI - Sign Language Translator</title>
+    {# Stylesheets #}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 </head>
 <body>
@@ -40,8 +41,35 @@
         and analyzing sign language. It allows users to record custom videos
         and instantly receive accurate translations.
     </p>
-    <p><strong>Download here:</strong></p>
-    <a href="download.html">Download</a>
+
+    <div class="platform-switch" role="tablist" aria-label="Platform switch">
+        <button class="platform active" data-os="win" role="tab" aria-selected="true">Windows</button>
+        <button class="platform" data-os="mac" role="tab" aria-selected="false">macOS</button>
+        <button class="platform" data-os="linux" role="tab" aria-selected="false">Linux</button>
+    </div>
+
+    <div class="device-container">
+        <figure class="device desktop-app-windows" data-os="win">
+            <img src="{{ url_for('static', filename='images/desktop-app3.png') }}" alt="Desktop App Screenshot">
+            <figcaption>Windows Desktop Application</figcaption>
+        </figure>
+
+        <figure class="device desktop-app-macos hidden" data-os="mac">
+            <img src="{{ url_for('static', filename='images/desktop-app3.png') }}" alt="Desktop App Screenshot">
+            <figcaption>macOS Desktop Application</figcaption>
+        </figure>
+
+        <figure class="device desktop-app-linux hidden" data-os="linux">
+            <img src="{{ url_for('static', filename='images/desktop-app3.png') }}" alt="Desktop App Screenshot">
+            <figcaption>Linux Desktop Application</figcaption>
+        </figure>
+    </div>
+
+    <div class="download-row">
+        <a class="btn btn-download" href="download.html#macos" download>Download macOS</a>
+        <a class="btn btn-download" href="download.html#windows" download>Download Windows</a>
+        <a class="btn btn-download" href="download.html#linux" download>Download Linux</a>
+    </div>
 </section>
 
 <section id="mobile">
@@ -76,6 +104,9 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+
+{# JavaScript #}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
 </body>
 </html>
