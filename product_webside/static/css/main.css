@@ -36,6 +36,7 @@ a:hover {
     text-decoration: underline;
 }
 
+/* nav settings */
 nav {
     background-color: #f8f9fc;
     border-radius: 12px;
@@ -43,7 +44,20 @@ nav {
     box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     display: flex;
     gap: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
+
+.nav-links {
+    display: flex;
+    gap: 30px;
+}
+
+.nav-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #4b5cfb;}
 
 footer {
     margin-top: 40px;
