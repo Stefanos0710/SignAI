@@ -82,6 +82,27 @@
     <p>
         <strong>Note:</strong> The app is currently under development for both Android and iOS.
     </p>
+    <div class="platform-switch" role="tablist" aria-label="Platform switch">
+        <button class="platform active" data-os="android" role="tab" aria-selected="true">android</button>
+        <button class="platform" data-os="ios" role="tab" aria-selected="false">ios</button>
+    </div>
+
+    <div class="device-container">
+        <figure class="device mobile-app-android" data-os="android">
+            <img src="{{ url_for('static', filename='images/mobile-app-android.png') }}" alt="Android App Screenshot">
+            <figcaption>Android mobile Application</figcaption>
+        </figure>
+
+        <figure class="device mobile-app-ios hidden" data-os="ios">
+            <img src="{{ url_for('static', filename='images/mobile-app.png') }}" alt="iOS App Screenshot">
+            <figcaption>iOS mobile Application</figcaption>
+        </figure>
+    </div>
+
+    <div class="download-row">
+        <a class="btn btn-download" href="download.html#android" download>Download Andoid</a>
+        <a class="btn btn-download" href="download.html#ios" download>Download iOS</a>
+    </div>
 </section>
 
 <section id="contact">
