@@ -47,6 +47,11 @@ nav {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    top: 10px;
+    z-index: 1000;
+    position: sticky;
+    transition: background 0.4s ease;
+    background: rgba(248, 249, 252, 1);
 }
 
 .nav-links {
@@ -69,6 +74,12 @@ nav:hover {
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
+nav.scrolled {
+    background: rgba(248, 249, 252, 0.7);
+}
+
+.nav-links { display: flex; gap: 30px; }
+.nav-links a { color: #4b5cfb; text-decoration: none; }
 /* Platform Switch Buttons */
 .platform-switch {
     display: flex;
