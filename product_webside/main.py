@@ -9,7 +9,6 @@ app.config.update(
     DEBUG=True,
     TEMPLATES_AUTO_RELOAD=True
 )
-
 # main route
 @app.route("/")
 def index():
@@ -19,6 +18,7 @@ def index():
 def download():
     return render_template("download.html")
 
+
 # start the server
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
