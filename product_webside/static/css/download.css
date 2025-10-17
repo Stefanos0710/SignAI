@@ -263,7 +263,7 @@ section p {
     text-decoration: none;
 }
 
-/* Footer - fotter*/
+/* Footer */
 footer {
     background: linear-gradient(135deg, #4b5cfb, #3749d8);
     color: white;
@@ -273,6 +273,7 @@ footer {
     box-sizing: border-box;
     position: relative;
     text-align: left;
+    overflow-x: hidden;
 }
 
 footer::before {
@@ -287,15 +288,15 @@ footer::before {
 
 .footer-container {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr;
-    gap: 40px;
-    max-width: 1300px;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    gap: 30px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 0 40px 60px 40px;
     text-align: left;
 }
 
-@media (max-width: 968px) {
+@media (max-width: 1200px) {
     .footer-container {
         grid-template-columns: 1fr 1fr;
         gap: 40px;
@@ -309,15 +310,15 @@ footer::before {
     }
 }
 
-
 .footer-section {
     text-align: left;
     max-width: 100%;
+    min-width: 0;
 }
 
 .footer-section h2 {
     color: #fff;
-    font-size: 32px;
+    font-size: 28px;
     margin-bottom: 15px;
     text-align: left;
     font-weight: 800;
@@ -326,8 +327,8 @@ footer::before {
 
 .footer-section h3 {
     color: #fff;
-    margin-bottom: 25px;
-    font-size: 18px;
+    margin-bottom: 20px;
+    font-size: 16px;
     font-weight: 700;
     letter-spacing: 0.5px;
     text-align: left;
@@ -337,7 +338,7 @@ footer::before {
 
 .footer-section p {
     color: rgba(255, 255, 255, 0.85);
-    font-size: 16px;
+    font-size: 15px;
     line-height: 1.8;
     max-width: none;
     width: 100%;
@@ -347,19 +348,19 @@ footer::before {
     margin-bottom: 20px;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    hyphens: auto;
 }
 
 .footer-section a {
     display: block;
     color: rgba(255, 255, 255, 0.8);
     text-decoration: none;
-    margin-bottom: 14px;
-    font-size: 16px;
+    margin-bottom: 12px;
+    font-size: 15px;
     transition: all 0.3s ease;
-    padding-left: 0;
+    padding-left: 20px;
     text-align: left;
     position: relative;
-    padding-left: 20px;
 }
 
 .footer-section a::before {
