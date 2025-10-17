@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Download SignAI - Sign Language Translator</title>
     {# Stylesheets #}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/download.css') }}">
 </head>
 <body>
 <nav id="navbar" class="navbar">
@@ -39,21 +39,45 @@
     <div class="download-window" id="download-window">
         <h3>Windows</h3>
         <p>Download the latest version of SignAI for Windows.</p>
-        <a href="{{ url_for('static', filename='downloads/SignAI-Setup.exe') }}" class="btn btn-primary" download>Download for Windows</a>
+        <div class="version-selector">
+            <label for="windows-version">Version:</label>
+            <select id="windows-version" class="version-dropdown">
+                <option value="v1.0.0" data-file="SignAI-Setup-v1.0.0.exe">v1.0.0 (Latest)</option>
+                <option value="v0.9.5" data-file="SignAI-Setup-v0.9.5.exe">v0.9.5</option>
+                <option value="v0.9.0" data-file="SignAI-Setup-v0.9.0.exe">v0.9.0</option>
+            </select>
+        </div>
+        <a href="#" class="btn btn-primary download-btn" data-platform="windows" download>Download for Windows</a>
     </div>
 
     {#  macOS  #}
     <div class="download-mac" id="download-mac">
         <h3>macOS</h3>
         <p>Download the latest version of SignAI for macOS.</p>
-        <a href="{{ url_for('static', filename='downloads/SignAI.dmg') }}" class="btn btn-primary" download>Download for macOS</a>
+        <div class="version-selector">
+            <label for="macos-version">Version:</label>
+            <select id="macos-version" class="version-dropdown">
+                <option value="v1.0.0" data-file="SignAI-v1.0.0.dmg">v1.0.0 (Latest)</option>
+                <option value="v0.9.5" data-file="SignAI-v0.9.5.dmg">v0.9.5</option>
+                <option value="v0.9.0" data-file="SignAI-v0.9.0.dmg">v0.9.0</option>
+            </select>
+        </div>
+        <a href="#" class="btn btn-primary download-btn" data-platform="macos" download>Download for macOS</a>
     </div>
 
     {#  Linux  #}
     <div class="download-linux" id="download-linux">
         <h3>Linux</h3>
         <p>Download the latest version of SignAI for Linux.</p>
-        <a href="{{ url_for('static', filename='downloads/SignAI.AppImage') }}" class="btn btn-primary" download>Download for Linux</a>
+        <div class="version-selector">
+            <label for="linux-version">Version:</label>
+            <select id="linux-version" class="version-dropdown">
+                <option value="v1.0.0" data-file="SignAI-v1.0.0.AppImage">v1.0.0 (Latest)</option>
+                <option value="v0.9.5" data-file="SignAI-v0.9.5.AppImage">v0.9.5</option>
+                <option value="v0.9.0" data-file="SignAI-v0.9.0.AppImage">v0.9.0</option>
+            </select>
+        </div>
+        <a href="#" class="btn btn-primary download-btn" data-platform="linux" download>Download for Linux</a>
     </div>
 </section>
 
@@ -66,14 +90,30 @@
     <div class="download-android" id="download-android">
         <h3>Android</h3>
         <p>Download the latest version of SignAI for Android.</p>
-        <a href="{{ url_for('static', filename='downloads/SignAI.apk') }}" class="btn btn-primary" download>Download for Android</a>
+        <div class="version-selector">
+            <label for="android-version">Version:</label>
+            <select id="android-version" class="version-dropdown">
+                <option value="v1.0.0" data-file="SignAI-v1.0.0.apk">v1.0.0 (Latest)</option>
+                <option value="v0.9.5" data-file="SignAI-v0.9.5.apk">v0.9.5</option>
+                <option value="v0.9.0" data-file="SignAI-v0.9.0.apk">v0.9.0</option>
+            </select>
+        </div>
+        <a href="#" class="btn btn-primary download-btn" data-platform="android" download>Download for Android</a>
     </div>
 
     {#  iOS  #}
     <div class="download-ios" id="download-ios">
         <h3>iOS</h3>
         <p>Download the latest version of SignAI for iOS.</p>
-        <a href="{{ url_for('static', filename='downloads/SignAI.ipa') }}" class="btn btn-primary" download>Download for iOS</a>
+        <div class="version-selector">
+            <label for="ios-version">Version:</label>
+            <select id="ios-version" class="version-dropdown">
+                <option value="v1.0.0" data-file="SignAI-v1.0.0.ipa">v1.0.0 (Latest)</option>
+                <option value="v0.9.5" data-file="SignAI-v0.9.5.ipa">v0.9.5</option>
+                <option value="v0.9.0" data-file="SignAI-v0.9.0.ipa">v0.9.0</option>
+            </select>
+        </div>
+        <a href="#" class="btn btn-primary download-btn" data-platform="ios" download>Download for iOS</a>
     </div>
 </section>
 
@@ -92,6 +132,14 @@
             <a href="/#contact">Contact</a>
         </div>
         <div class="footer-section">
+            <h3>Download</h3>
+            <a href="/download#download-windows">Windows</a>
+            <a href="/download#download-macos">MacOS</a>
+            <a href="/download#download-linux">Linux</a>
+            <a href="/download#download-android">Android</a>
+            <a href="/download#download-ios">iOS</a>
+        </div>
+        <div class="footer-section">
             <h3>Follow Us</h3>
             <a href="https://github.com/Stefanos0710/SignAI" target="_blank">GitHub</a>
         </div>
@@ -107,7 +155,7 @@
 <meta http-equiv="Expires" content="0">
 
 {# JavaScript #}
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/download.js') }}"></script>
 
 </body>
 </html>
