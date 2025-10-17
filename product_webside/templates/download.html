@@ -2,9 +2,112 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Downlaod</title>
+    <title>Download SignAI - Sign Language Translator</title>
+    {# Stylesheets #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 </head>
 <body>
+<nav id="navbar" class="navbar">
+    <div class="nav-title">SignAI</div>
+    <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="download/#about">About</a>
+        <a href="download/#desktop">Desktop</a>
+        <a href="download/#mobile">Mobile</a>
+        <a href="/#contact">Contact</a>
+    </div>
+</nav>
+
+<!-- Hero Section -->
+<section class="download-hero">
+    <h1>Download SignAI</h1>
+    <p>Choose your platform and start translating sign language in real-time</p>
+</section>
+
+<section class="about" id="about">
+    <h2>About SignAI</h2>
+    <p>SignAI is an innovative AI-based application that bridges the communication gap between the hearing and the deaf communities. By using advanced machine learning models, SignAI can recognize sign language in real time – transforming gestures into spoken words and vice versa.</p>
+    <p>Our mission is to make communication accessible to everyone. SignAI is trained on tens of thousands of video samples from diverse, large-scale datasets. Through continuous development, the system is able to detect subtle differences in hand movements, facial expressions, and context to provide accurate translations.</p>
+</section>
+
+<!-- Download Section -->
+<section class="desktop-app-download" id="desktop">
+    <h2>Desktop Application</h2>
+    <p>The desktop version of SignAI provides a powerful environment for testing, recording, and analyzing sign language. It allows users to record custom videos and instantly receive accurate translations.</p>
+
+    {#  Windows  #}
+    <div class="download-window" id="download-window">
+        <h3>Windows</h3>
+        <p>Download the latest version of SignAI for Windows.</p>
+        <a href="{{ url_for('static', filename='downloads/SignAI-Setup.exe') }}" class="btn btn-primary" download>Download for Windows</a>
+    </div>
+
+    {#  macOS  #}
+    <div class="download-mac" id="download-mac">
+        <h3>macOS</h3>
+        <p>Download the latest version of SignAI for macOS.</p>
+        <a href="{{ url_for('static', filename='downloads/SignAI.dmg') }}" class="btn btn-primary" download>Download for macOS</a>
+    </div>
+
+    {#  Linux  #}
+    <div class="download-linux" id="download-linux">
+        <h3>Linux</h3>
+        <p>Download the latest version of SignAI for Linux.</p>
+        <a href="{{ url_for('static', filename='downloads/SignAI.AppImage') }}" class="btn btn-primary" download>Download for Linux</a>
+    </div>
+</section>
+
+<!-- Mobile App Section -->
+<section class="mobile-app-download" id="mobile">
+    <h2>Mobile Application</h2>
+    <p>The mobile version of SignAI is designed for on-the-go translation of sign language. It leverages the device's camera to provide real-time translations, making it perfect for everyday use.</p>
+
+    {#  Android  #}
+    <div class="download-android" id="download-android">
+        <h3>Android</h3>
+        <p>Download the latest version of SignAI for Android.</p>
+        <a href="{{ url_for('static', filename='downloads/SignAI.apk') }}" class="btn btn-primary" download>Download for Android</a>
+    </div>
+
+    {#  iOS  #}
+    <div class="download-ios" id="download-ios">
+        <h3>iOS</h3>
+        <p>Download the latest version of SignAI for iOS.</p>
+        <a href="{{ url_for('static', filename='downloads/SignAI.ipa') }}" class="btn btn-primary" download>Download for iOS</a>
+    </div>
+</section>
+
+<footer>
+    <div class="footer-container">
+        <div class="footer-section">
+            <h2>SignAI</h2>
+            <p>Bridging the communication gap with AI-powered sign language translation.</p>
+        </div>
+        <div class="footer-section">
+            <h3>Quick Links</h3>
+            <a href="/">Home</a>
+            <a href="/#about">About</a>
+            <a href="/#desktop">Desktop</a>
+            <a href="/#mobile">Mobile</a>
+            <a href="/#contact">Contact</a>
+        </div>
+        <div class="footer-section">
+            <h3>Follow Us</h3>
+            <a href="https://github.com/Stefanos0710/SignAI" target="_blank">GitHub</a>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        <p>© 2025 SignAI. All rights reserved.</p>
+    </div>
+</footer>
+
+{# Delete this in Produktion #}
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
+{# JavaScript #}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
 </body>
 </html>

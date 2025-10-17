@@ -11,9 +11,13 @@ app.config.update(
 )
 
 # main route
-@app.route('/')
+@app.route("/")
 def index():
     return render_template('index.html')
+
+@app.route("/download")
+def download():
+    return render_template("download.html")
 
 # start the server
 if __name__ == '__main__':
