@@ -18,10 +18,6 @@ def index():
 def download():
     return render_template("download.html")
 
-<<<<<<< Updated upstream
-
-=======
->>>>>>> Stashed changes
 # start the server
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
