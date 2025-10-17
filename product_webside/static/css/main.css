@@ -34,6 +34,7 @@ body {
     line-height: 1.6;
     color: var(--text-primary);
     background: var(--background);
+    overflow-x: hidden;
 }
 
 .hidden {
@@ -134,12 +135,65 @@ nav.scrolled {
     z-index: 0;
 }
 
+/* Floating shapes animation */
+#home::after {
+    content: "";
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: linear-gradient(135deg, rgba(75, 92, 251, 0.1), rgba(108, 127, 242, 0.1));
+    border-radius: 50%;
+    bottom: -100px;
+    right: -100px;
+    animation: float 8s infinite ease-in-out;
+    z-index: 0;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 0.3;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(1.1);
+    }
+}
+
 @keyframes float {
     0%, 100% {
         transform: translateY(0) rotate(0deg);
     }
     50% {
         transform: translateY(-30px) rotate(5deg);
+    }
+}
+
+/* Hero Badge */
+.hero-badge {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    padding: 0.75rem 1.5rem;
+    border-radius: 50px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--primary);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 2rem;
+    position: relative;
+    z-index: 1;
+    animation: slideDown 0.6s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 
@@ -150,6 +204,18 @@ nav.scrolled {
     letter-spacing: -2px;
     position: relative;
     z-index: 1;
+    animation: fadeIn 0.8s ease-out 0.2s both;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 #home p {
@@ -159,11 +225,63 @@ nav.scrolled {
     line-height: 1.7;
     position: relative;
     z-index: 1;
+    margin-bottom: 2.5rem;
+    animation: fadeIn 0.8s ease-out 0.4s both;
+}
+
+/* Hero Buttons */
+.hero-buttons {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 4rem;
+    position: relative;
+    z-index: 1;
+    animation: fadeIn 0.8s ease-out 0.6s both;
+}
+
+.btn {
+    padding: 1rem 2.5rem;
+    border-radius: 50px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1.05rem;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+    text-decoration: none;
+}
+
+.btn-secondary {
+    background: white;
+    color: var(--primary);
+    border: 2px solid var(--primary);
+}
+
+.btn-secondary:hover {
+    background: var(--primary);
+    color: white;
+    transform: translateY(-3px);
+    text-decoration: none;
 }
 
 /* Sections */
 section {
-    padding: 6rem 10%;
+    padding: 4rem 10%;
+    scroll-margin-top: 70px
 }
 
 section h2 {
@@ -264,9 +382,8 @@ section p {
 footer {
   background: linear-gradient(135deg, #4b5cfb, #3749d8);
   color: white;
-  width: 100vw;
+  width: 100%;
   margin: 0;
-  margin-left: -20px;
   padding: 60px 0 0 0;
   box-sizing: border-box;
   position: relative;
@@ -278,7 +395,7 @@ footer {
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 50px;
-  max-width: 1200px;
+  max-width: 1300px;
   margin: 0 auto;
   padding: 0 40px 40px 40px;
 }
