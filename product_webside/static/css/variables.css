@@ -1,0 +1,18 @@
+/* CSS Variables */
+:root {
+    --primary: #4b5cfb;
+    --primary-dark: #3749ff;
+    --secondary: #32478e;
+    --accent:#6c7ff2;
+    --background: #f8f9fc;
+    --surface: #ffffff;
+    --text-primary: #1a1d2e;
+    --text-secondary: #6b7280;
+    --border: #e5e7eb;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+    --radius: 16px;
+    --transition: all 0.3s cubic-bezier(.4, 0,.2,1);
+}
+

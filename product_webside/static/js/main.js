@@ -9,6 +9,10 @@ document.querySelectorAll(".platform").forEach(btn => {
         document.querySelectorAll(".device").forEach(d => {
             d.classList.toggle("hidden", d.dataset.os !== os);
         });
+        // Switch instruction links based on OS
+        document.querySelectorAll(".instruction-link").forEach(link => {
+            link.classList.toggle("hidden", link.dataset.osLink !== os);
+        });
     });
 });
 

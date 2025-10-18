@@ -1,0 +1,44 @@
+/* Navigation Styles */
+nav {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow-sm);
+    padding: 1.2rem 5%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: var(--transition);
+}
+
+.nav-links {
+    display: flex;
+    gap: 30px;
+}
+
+.nav-title {
+    font-size: 1.8rem;
+    font-weight: 760;
+    color: var(--primary);
+}
+
+.nav-links a {
+    color: #4b5cfb;
+    text-decoration: none;
+}
+
+.nav-links a:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+nav:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+nav.scrolled {
+    background: rgba(248, 249, 252, 0.7);
+}
+

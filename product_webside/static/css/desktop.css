@@ -1,0 +1,153 @@
+/* Desktop Section */
+#desktop {
+    background: linear-gradient(135deg, #f8f9fd 0%, #e9ecf1 100%);
+}
+
+#desktop .hero-content {
+    display: flex;
+    align-items: center;
+    gap: 3rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+#desktop .hero-text {
+    flex: 1.2;
+    max-width: 600px;
+}
+
+#desktop .hero-text p {
+    font-size: 1.05rem;
+    line-height: 1.9;
+    margin-bottom: 2.5rem;
+    color: var(--text-secondary);
+}
+
+#desktop .hero-text p:last-of-type {
+    font-size: 0.95rem;
+    margin-bottom: 0;
+}
+
+#desktop .instruction-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    border-bottom: 2px solid var(--primary);
+    transition: all 0.3s ease;
+}
+
+#desktop .instruction-link:hover {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    text-decoration: none;
+}
+
+#desktop .platform-switch {
+    justify-content: flex-start;
+    margin: 2.5rem 0 1.5rem 0;
+}
+
+#desktop .platform {
+    padding: 12px 28px;
+    font-size: 17px;
+}
+
+#desktop .download-row {
+    justify-content: flex-start;
+    margin-top: 2rem;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+}
+
+#desktop .btn-download {
+    padding: 14px 28px;
+    font-size: 16px;
+}
+
+#desktop .device-container {
+    flex: 0.8;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#desktop .device {
+    width: 100%;
+    max-width: 500px;
+}
+
+#desktop .device img {
+    width: 100%;
+    max-width: 500px;
+    height: auto;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+#desktop .device img:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2);
+}
+
+#desktop .device figcaption {
+    margin-top: 1.5rem;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Responsive Design für Desktop Section */
+@media (max-width: 1024px) {
+    #desktop .hero-content {
+        flex-direction: column;
+        gap: 3rem;
+    }
+
+    #desktop .hero-text {
+        max-width: 100%;
+        text-align: left;
+    }
+
+    #desktop .platform-switch {
+        justify-content: flex-start;
+    }
+
+    #desktop .download-row {
+        justify-content: flex-start;
+    }
+
+    #desktop .device {
+        max-width: 600px;
+    }
+}
+
+@media (max-width: 768px) {
+    #desktop .hero-content {
+        gap: 2rem;
+    }
+
+    #desktop .hero-text {
+        text-align: left;
+    }
+
+    #desktop .hero-text p {
+        font-size: 1rem;
+    }
+
+    #desktop .platform-switch {
+        justify-content: flex-start;
+    }
+
+    #desktop .download-row {
+        flex-direction: row;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    #desktop .btn-download {
+        width: auto;
+        text-align: center;
+    }
+}
+
