@@ -111,7 +111,7 @@ nav.scrolled {
 
 /* Home section - #home */
 #home {
-    min-height: 90vh;
+    min-height: 91vh;
     display: flex;
     flex-direction: column;
     justify-content: center;
