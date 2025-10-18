@@ -114,9 +114,8 @@ nav {
 }
 
 nav:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
-
 /* Download Hero Section */
 .download-hero {
     min-height: 40vh;
@@ -144,7 +143,7 @@ nav:hover {
 /* Sections */
 section {
     padding: 4rem 10%;
-    scroll-margin-top: 70px;
+    scroll-margin-top: 150px;
     text-align: center;
 }
 
@@ -171,9 +170,24 @@ section p {
 }
 
 /* Download Sections */
-.desktop-app-download,
+.desktop-app-download {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.desktop-app-container {
+    display: flex;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
 .mobile-app-download {
     background: var(--background);
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
 }
 
 .download-window,
@@ -182,12 +196,13 @@ section p {
 .download-android,
 .download-ios {
     background: white;
-    padding: 2rem;
+    padding: 1.5rem;
     border-radius: var(--radius);
-    margin: 2rem auto;
-    max-width: 600px;
+    margin: 0;
+    max-width: 400px;
     box-shadow: var(--shadow-sm);
     text-align: center;
+    scroll-margin-top: 350px;
 }
 
 .download-window p,
@@ -199,6 +214,36 @@ section p {
     text-align: center;
     margin-left: auto;
     margin-right: auto;
+}
+
+/* Container for desk downloads - side by side */
+.desktop-downloads-container {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+}
+.mobile-downloads-container {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+}
+
+/* Responsive stacked on smaller screens */
+@media (max-width: 1024px) {
+    .desktop-downloads-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .desktop-downloads-container,
+    .mobile-downloads-container {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Version Selector */
