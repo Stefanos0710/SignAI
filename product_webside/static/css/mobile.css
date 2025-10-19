@@ -7,8 +7,6 @@
     display: flex;
     align-items: center;
     gap: 3rem;
-    max-width: 1400px;
-    margin: 0 auto;
 }
 
 #mobile .hero-text {
@@ -150,4 +148,3 @@
         text-align: center;
     }
 }
-

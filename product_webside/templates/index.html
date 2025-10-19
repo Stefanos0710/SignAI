@@ -52,130 +52,138 @@
 </section>
 
 <section id="about">
-    <h2>About</h2>
-    <p>
-        Our mission is to make communication accessible to everyone.
-        SignAI is trained on tens of thousands of video samples from diverse, large-scale datasets.
-        Through continuous development, the system is able to detect subtle differences in hand movements,
-        facial expressions, and context to provide accurate translations.
-    </p>
+    <div class="container">
+        <h2>About</h2>
+        <p>
+            Our mission is to make communication accessible to everyone.
+            SignAI is trained on tens of thousands of video samples from diverse, large-scale datasets.
+            Through continuous development, the system is able to detect subtle differences in hand movements,
+            facial expressions, and context to provide accurate translations.
+        </p>
+    </div>
 </section>
 
 <section id="desktop">
-    <h2>Desktop</h2>
-    <div class="hero-content">
-        <div class="hero-text">
-            <p>
-                The desktop version of SignAI provides a powerful environment for testing, recording,
-                and analyzing sign language. It allows users to record custom videos
-                and instantly receive accurate translations.
-            </p>
-            <p>
-                With our desktop application, you get access to advanced features including real-time processing,
-                detailed analytics, and the ability to save and review your translation history. 
-                The intuitive interface makes it easy for both beginners and professionals to communicate effectively.
-            </p>
-            <div class="platform-switch" role="tablist" aria-label="Platform switch">
-                <button class="platform active" data-os="win" role="tab" aria-selected="true">Windows</button>
-                <button class="platform" data-os="mac" role="tab" aria-selected="false">macOS</button>
-                <button class="platform" data-os="linux" role="tab" aria-selected="false">Linux</button>
+    <div class="container">
+        <h2>Desktop</h2>
+        <div class="hero-content">
+            <div class="hero-text">
+                <p>
+                    The desktop version of SignAI provides a powerful environment for testing, recording,
+                    and analyzing sign language. It allows users to record custom videos
+                    and instantly receive accurate translations.
+                </p>
+                <p>
+                    With our desktop application, you get access to advanced features including real-time processing,
+                    detailed analytics, and the ability to save and review your translation history.
+                    The intuitive interface makes it easy for both beginners and professionals to communicate effectively.
+                </p>
+                <div class="platform-switch" role="tablist" aria-label="Platform switch">
+                    <button class="platform active" data-os="win" role="tab" aria-selected="true">Windows</button>
+                    <button class="platform" data-os="mac" role="tab" aria-selected="false">macOS</button>
+                    <button class="platform" data-os="linux" role="tab" aria-selected="false">Linux</button>
+                </div>
+
+                <div class="download-row">
+                    <a class="btn btn-download" href="/download#download-windows">Download Windows</a>
+                    <a class="btn btn-download" href="/download#download-mac">Download macOS</a>
+                    <a class="btn btn-download" href="/download#download-linux">Download Linux</a>
+                </div>
+
+                <p style="margin-top: 1.5rem; font-size: 1rem;">
+                    <strong>Need help getting started?</strong>
+                    Check out our detailed
+                    <a href="/download/instructions#windows" data-os-link="win" class="instruction-link">installation guide for Windows</a>
+                    <a href="/download/instructions#macos" data-os-link="mac" class="instruction-link hidden">installation guide for macOS</a>
+                    <a href="/download/instructions#linux" data-os-link="linux" class="instruction-link hidden">installation guide for Linux</a>
+                    for step-by-step instructions.
+                </p>
             </div>
-        
-            <div class="download-row">
-                <a class="btn btn-download" href="/download#download-windows">Download Windows</a>
-                <a class="btn btn-download" href="/download#download-mac">Download macOS</a>
-                <a class="btn btn-download" href="/download#download-linux">Download Linux</a>
+
+            <div class="device-container">
+                <figure class="device desktop-app-windows" data-os="win">
+                    <img src="{{ url_for('static', filename='images/desktop-app3.png') }}" alt="Desktop App Screenshot">
+                    <figcaption>Windows Desktop Application</figcaption>
+                </figure>
+
+                <figure class="device desktop-app-macos hidden" data-os="mac">
+                    <img src="{{ url_for('static', filename='images/desktop-app3.png') }}" alt="Desktop App Screenshot">
+                    <figcaption>macOS Desktop Application</figcaption>
+                </figure>
+
+                <figure class="device desktop-app-linux hidden" data-os="linux">
+                    <img src="{{ url_for('static', filename='images/desktop-app3.png') }}" alt="Desktop App Screenshot">
+                    <figcaption>Linux Desktop Application</figcaption>
+                </figure>
             </div>
-            
-            <p style="margin-top: 1.5rem; font-size: 1rem;">
-                <strong>Need help getting started?</strong> 
-                Check out our detailed 
-                <a href="/download/instructions#windows" data-os-link="win" class="instruction-link">installation guide for Windows</a>
-                <a href="/download/instructions#macos" data-os-link="mac" class="instruction-link hidden">installation guide for macOS</a>
-                <a href="/download/instructions#linux" data-os-link="linux" class="instruction-link hidden">installation guide for Linux</a>
-                for step-by-step instructions.
-            </p>
-        </div>
-
-        <div class="device-container">
-            <figure class="device desktop-app-windows" data-os="win">
-                <img src="{{ url_for('static', filename='images/desktop-app3.png') }}" alt="Desktop App Screenshot">
-                <figcaption>Windows Desktop Application</figcaption>
-            </figure>
-
-            <figure class="device desktop-app-macos hidden" data-os="mac">
-                <img src="{{ url_for('static', filename='images/desktop-app3.png') }}" alt="Desktop App Screenshot">
-                <figcaption>macOS Desktop Application</figcaption>
-            </figure>
-
-            <figure class="device desktop-app-linux hidden" data-os="linux">
-                <img src="{{ url_for('static', filename='images/desktop-app3.png') }}" alt="Desktop App Screenshot">
-                <figcaption>Linux Desktop Application</figcaption>
-            </figure>
         </div>
     </div>
 </section>
 
 <section id="mobile">
-    <h2>Mobile</h2>
-    <div class="hero-content">
-        <div class="hero-text">
-            <p>
-                Our mobile version of SignAI brings the power of real-time translation directly to your pocket.
-                Using your smartphone's camera and flash, the app delivers incredible results and enables
-                seamless communication anywhere.
-            </p>
-            <p>
-                The mobile app is designed with accessibility in mind, offering a clean and simple interface
-                that works in any lighting condition. Whether you're at home, at work, or on the go,
-                SignAI Mobile ensures you can communicate effectively without barriers.
-            </p>
-            <p>
-                <strong>Note:</strong> The app is currently under development for both Android and iOS.
-            </p>
-            <div class="platform-switch" role="tablist" aria-label="Platform switch">
-                <button class="platform active" data-os="android" role="tab" aria-selected="true">Android</button>
-                <button class="platform" data-os="ios" role="tab" aria-selected="false">iOS</button>
+    <div class="container">
+        <h2>Mobile</h2>
+        <div class="hero-content">
+            <div class="hero-text">
+                <p>
+                    Our mobile version of SignAI brings the power of real-time translation directly to your pocket.
+                    Using your smartphone's camera and flash, the app delivers incredible results and enables
+                    seamless communication anywhere.
+                </p>
+                <p>
+                    The mobile app is designed with accessibility in mind, offering a clean and simple interface
+                    that works in any lighting condition. Whether you're at home, at work, or on the go,
+                    SignAI Mobile ensures you can communicate effectively without barriers.
+                </p>
+                <p>
+                    <strong>Note:</strong> The app is currently under development for both Android and iOS.
+                </p>
+                <div class="platform-switch" role="tablist" aria-label="Platform switch">
+                    <button class="platform active" data-os="android" role="tab" aria-selected="true">Android</button>
+                    <button class="platform" data-os="ios" role="tab" aria-selected="false">iOS</button>
+                </div>
+
+                <div class="download-row">
+                    <a class="btn btn-download" href="/download#download-android">Download Android</a>
+                    <a class="btn btn-download" href="/download#download-ios">Download iOS</a>
+                </div>
+
+                <p style="margin-top: 1.5rem; font-size: 1rem;">
+                    <strong>Ready to install?</strong>
+                    Follow our
+                    <a href="/download/instructions#android" data-os-link="android" class="instruction-link">installation guide for Android</a>
+                    <a href="/download/instructions#ios" data-os-link="ios" class="instruction-link hidden">installation guide for iOS</a>
+                    for a smooth setup process.
+                </p>
             </div>
 
-            <div class="download-row">
-                <a class="btn btn-download" href="/download#download-android">Download Android</a>
-                <a class="btn btn-download" href="/download#download-ios">Download iOS</a>
+            <div class="device-container">
+                <figure class="device mobile-app-android" data-os="android">
+                    <img src="{{ url_for('static', filename='images/mobile-app-android.png') }}" alt="Android App Screenshot">
+                    <figcaption>Android mobile Application</figcaption>
+                </figure>
+
+                <figure class="device mobile-app-ios hidden" data-os="ios">
+                    <img src="{{ url_for('static', filename='images/mobile-app.png') }}" alt="iOS App Screenshot">
+                    <figcaption>iOS mobile Application</figcaption>
+                </figure>
             </div>
-            
-            <p style="margin-top: 1.5rem; font-size: 1rem;">
-                <strong>Ready to install?</strong> 
-                Follow our 
-                <a href="/download/instructions#android" data-os-link="android" class="instruction-link">installation guide for Android</a>
-                <a href="/download/instructions#ios" data-os-link="ios" class="instruction-link hidden">installation guide for iOS</a>
-                for a smooth setup process.
-            </p>
-        </div>
-
-        <div class="device-container">
-            <figure class="device mobile-app-android" data-os="android">
-                <img src="{{ url_for('static', filename='images/mobile-app-android.png') }}" alt="Android App Screenshot">
-                <figcaption>Android mobile Application</figcaption>
-            </figure>
-
-            <figure class="device mobile-app-ios hidden" data-os="ios">
-                <img src="{{ url_for('static', filename='images/mobile-app.png') }}" alt="iOS App Screenshot">
-                <figcaption>iOS mobile Application</figcaption>
-            </figure>
         </div>
     </div>
 </section>
 
 <section id="contact">
-    <h2>Contact</h2>
-    <p>Have questions, suggestions, or collaboration ideas?</p>
-    <p>We’d love to hear from you!</p>
-    <p>
-        Contact us at <a href="mailto:text@test.dev">we don´t actually have an email yet</a>
-        or follow us on
-        <a href="https://github.com/Stefanos0710/SignAI/">GitHub</a>
-        for the latest updates.
-    </p>
+    <div class="container">
+        <h2>Contact</h2>
+        <p>Have questions, suggestions, or collaboration ideas?</p>
+        <p>We'd love to hear from you!</p>
+        <p>
+            Contact us at <a href="mailto:text@test.dev">we don´t actually have an email yet</a>
+            or follow us on
+            <a href="https://github.com/Stefanos0710/SignAI/">GitHub</a>
+            for the latest updates.
+        </p>
+    </div>
 </section>
 
 <footer>

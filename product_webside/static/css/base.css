@@ -54,8 +54,15 @@ a:hover {
 
 /* Sections */
 section {
-    padding: 4rem 10%;
-    scroll-margin-top: 70px
+    padding: 4rem 0;
+    scroll-margin-top: 70px;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 5%;
+    box-sizing: border-box;
 }
 
 section h2 {
@@ -70,4 +77,3 @@ section p {
     max-width: 700px;
     line-height: 1.7;
 }
-

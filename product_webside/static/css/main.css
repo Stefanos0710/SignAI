@@ -481,23 +481,69 @@ nav.scrolled {
     text-decoration: none;
 }
 
-/* Sections */
-section {
-    padding: 4rem 10%;
-    scroll-margin-top: 70px
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 5%;
+    box-sizing: border-box;
 }
 
-section h2 {
+section {
+    padding: 4rem 0;
+    scroll-margin-top: 70px;
+}
+
+section .container h2 {
     font-size: 2.5rem;
     font-weight: 800;
     margin-bottom: 1.5rem;
 }
 
-section p {
+section .container p {
     font-size: 1.1rem;
     color: var(--text-secondary);
     max-width: 700px;
     line-height: 1.7;
+    margin: 0;
+}
+
+section .container h2,
+section .container p {
+    padding: 0;
+    margin-left: 0;
+}
+
+@media (max-width: 768px) {
+    .hero-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.25rem;
+    }
+
+    .hero-buttons,
+    .platform-switch,
+    .download-row {
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .download-row {
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-download {
+        align-self: flex-start;
+    }
+    
+    section .container {
+        text-align: left;
+    }
+}
+
+@media (max-width: 640px) {
+    .container { padding: 0 6%; }
+    .hero-content { gap: 1rem; }
 }
 
 /* Platform Switch Buttons */
