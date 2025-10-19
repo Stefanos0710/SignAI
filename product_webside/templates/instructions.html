@@ -42,30 +42,297 @@
     during installation, please refer to our troubleshooting tips or contact our support team.</p>
 </section>
 
+{# choose platform#}
+<div class="platform-selection">
+    <h2>Select Your Platform</h2>
+    <a href="#window" class="btn">Windows</a>
+    <a href="#macos" class="btn">MacOS</a>
+    <a href="#linux" class="btn">Linux</a>
+    <a href="#android" class="btn">Android</a>
+    <a href="#ios" class="btn">iOS</a>
+</div>
+
 <!-- Download Section -->
 <section id="window">
-    <h2>Windows</h2>
-    <p>Here comes the instruction from windows</p>
+    <div class="container">
+        <h2>Windows Installation</h2>
+        <p>Here comes the instruction from windows</p>
+
+        {#    installing steps    #}
+        <div class="instruction-steps">
+            <div class="step">
+                <h3>Step 1: Download the Installer</h3>
+                <p>Go to the <a href="/download#download-window">Download Page</a> and click on the Windows installer link to download the SignAI file.</p>
+            </div>
+            <div class="step">
+                <h3>Step 2: Run the Installer</h3>
+                <p>Locate the downloaded installer file (usually in your "Downloads" folder) and double-click it to run the installation wizard.</p>
+            </div>
+            <div class="step">
+                <h3>Step 3: Follow the Installation Wizard</h3>
+                <p>Follow the on-screen instructions provided by the installation wizard. You may need to agree to the terms and conditions and choose an installation location.</p>
+            </div>
+
+            <div class="step">
+                <h3>System requirements</h3>
+                <ul>
+                    <li>Windows 10/11 (64-bit)</li>
+                    <li>At least 8 GB RAM</li>
+                    <li>500 MB free space</li>
+                    <li>Webcam for translation or uploading</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="appstore-section">
+            <h4>Also available on:</h4>
+            <div class="appstore-buttons">
+                <a href="https://www.microsoft.com/store" class="btn-appstore" target="_blank">
+                    <img src="{{ url_for('static', filename='images/icons8-microsoft-store-96.png') }}" alt="Microsoft Store">
+                    <span>Microsoft Store</span>
+                </a>
+            </div>
+        </div>
+    </div>
 </section>
 
+
+
 <section id="macos">
-    <h2>MacOS</h2>
-    <p>Here comes the instruction from MacOS</p>
+    <div class="container">
+        <h2>macOS Installation</h2>
+        <p>Here comes the instruction from macOS</p>
+
+        {#    installing steps    #}
+        <div class="instruction-steps">
+            <div class="step">
+              <h3>Step 1: Download the Installer</h3>
+              <p>Go to the <a href="/download#download-macos">Download Page</a> and click on the macOS download link to get the <code>SignAI.dmg</code> file.</p>
+            </div>
+
+            <div class="step">
+              <h3>Step 2: Open the DMG File</h3>
+              <p>Locate the downloaded <code>SignAI.dmg</code> file in your <strong>Downloads</strong> folder and double-click it to open the installation window.</p>
+            </div>
+
+            <div class="step">
+              <h3>Step 3: Install SignAI</h3>
+              <p>In the window that appears, drag the <strong>SignAI</strong> icon into your <strong>Applications</strong> folder to install the app.</p>
+            </div>
+
+            <div class="step">
+              <h3>Step 4: Launch SignAI</h3>
+              <p>Open <strong>Launchpad</strong> or go to your <strong>Applications</strong> folder and double-click <strong>SignAI</strong> to start the app.</p>
+            </div>
+
+            <div class="step">
+              <h3>Step 5: Allow Permissions (if needed)</h3>
+              <p>If you see a security message saying the app is from an unidentified developer, go to <strong>System Settings → Privacy & Security</strong> and click <strong>“Open Anyway”</strong>.</p>
+            </div>
+
+            <div class="step">
+              <h3>System Requirements</h3>
+              <ul>
+                <li>macOS 12 (Monterey) or later</li>
+                <li>At least 8 GB RAM</li>
+                <li>500 MB of free disk space</li>
+                <li>Camera or webcam for live sign translation or uploads</li>
+              </ul>
+            </div>
+        </div>
+
+        <div class="appstore-section">
+            <h4>Also available on:</h4>
+            <div class="appstore-buttons">
+                <a href="https://apps.apple.com/app" class="btn-appstore" target="_blank">
+                    <img src="{{ url_for('static', filename='images/Download_on_the_Mac_App_Store_Badge_US-UK_RGB_wht_092917.svg') }}" alt="Mac App Store" style="height: 40px; width: auto;">
+                </a>
+            </div>
+        </div>
+    </div>
 </section>
 
 <section id="linux">
-    <h2>Linux</h2>
-    <p>Here comes the instruction from Linux</p>
+    <div class="container">
+        <h2>Linux Installation</h2>
+        <p>Here comes the instruction from Linux</p>
+
+        {#    installing steps    #}
+        <div class="instruction-steps">
+            <div class="step">
+                <h3>Step 1: Download the Package</h3>
+                <p>Go to the <a href="/download#download-linux">Download Page</a> and download the appropriate package for your distribution:</p>
+                <ul>
+                    <li><strong>Debian/Ubuntu:</strong> <code>SignAI.deb</code></li>
+                    <li><strong>Fedora/RHEL:</strong> <code>SignAI.rpm</code></li>
+                    <li><strong>Other distributions:</strong> <code>SignAI.AppImage</code></li>
+                </ul>
+            </div>
+
+            <div class="step">
+                <h3>Step 2: Install the Package</h3>
+                <p><strong>For .deb files (Debian/Ubuntu):</strong></p>
+                <p>Open a terminal and run: <code>sudo dpkg -i SignAI.deb</code></p>
+                <p>If there are dependency issues, run: <code>sudo apt-get install -f</code></p>
+
+                <p><strong>For .rpm files (Fedora/RHEL):</strong></p>
+                <p>Open a terminal and run: <code>sudo rpm -i SignAI.rpm</code></p>
+
+                <p><strong>For .AppImage files:</strong></p>
+                <p>Make the file executable: <code>chmod +x SignAI.AppImage</code></p>
+                <p>Then run it: <code>./SignAI.AppImage</code></p>
+            </div>
+
+            <div class="step">
+                <h3>Step 3: Launch SignAI</h3>
+                <p>You can launch SignAI from your application menu or by running <code>signai</code> in the terminal.</p>
+            </div>
+
+            <div class="step">
+                <h3>Step 4: Grant Camera Permissions</h3>
+                <p>When first launching SignAI, make sure to grant camera permissions when prompted. This is required for sign language translation.</p>
+            </div>
+
+            <div class="step">
+                <h3>System Requirements</h3>
+                <ul>
+                    <li>Linux Kernel 5.0 or later</li>
+                    <li>At least 8 GB RAM</li>
+                    <li>500 MB of free disk space</li>
+                    <li>Webcam or camera for live sign translation</li>
+                    <li>Graphics driver with OpenGL 3.0+ support</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="appstore-section">
+            <h4>Also available on:</h4>
+            <div class="appstore-buttons">
+                <a href="https://flathub.org" class="btn-appstore" target="_blank">
+                    <img src="{{ url_for('static', filename='images/flathub-icon.png') }}" alt="Flathub">
+                    <span>Flathub</span>
+                </a>
+                <a href="https://snapcraft.io" class="btn-appstore" target="_blank">
+                    <img src="{{ url_for('static', filename='images/snapcraft-icon.png') }}" alt="Snap Store">
+                    <span>Snap Store</span>
+                </a>
+            </div>
+        </div>
+    </div>
 </section>
 
 <section id="android">
-    <h2>Android</h2>
-    <p>Here comes the instruction from Android</p>
+    <div class="container">
+        <h2>Android Installation</h2>
+        <p>Here comes the instruction from Android</p>
+
+        {#    installing steps    #}
+        <div class="instruction-steps">
+            <div class="step">
+                <h3>Step 1: Download the APK</h3>
+                <p>Go to the <a href="/download#download-android">Download Page</a> and click on the Android download link to get the <code>SignAI.apk</code> file.</p>
+            </div>
+
+            <div class="step">
+                <h3>Step 2: Enable Unknown Sources</h3>
+                <p>Before installing, you need to allow installation from unknown sources:</p>
+                <ul>
+                    <li>Go to <strong>Settings → Security</strong> (or <strong>Settings → Apps</strong> on newer Android versions)</li>
+                    <li>Enable <strong>"Install unknown apps"</strong> or <strong>"Unknown sources"</strong> for your browser or file manager</li>
+                </ul>
+                <p><strong>Note:</strong> You can disable this after installation for security.</p>
+            </div>
+
+            <div class="step">
+                <h3>Step 3: Install the APK</h3>
+                <p>Open your <strong>Downloads</strong> folder or notification area, tap on the <code>SignAI.apk</code> file, and follow the on-screen instructions to install.</p>
+            </div>
+
+            <div class="step">
+                <h3>Step 4: Grant Permissions</h3>
+                <p>When you first launch SignAI, grant the following permissions:</p>
+                <ul>
+                    <li><strong>Camera:</strong> Required for sign language translation</li>
+                    <li><strong>Storage:</strong> To save and load videos</li>
+                    <li><strong>Microphone:</strong> Optional, for audio features</li>
+                </ul>
+            </div>
+
+            <div class="step">
+                <h3>System Requirements</h3>
+                <ul>
+                    <li>Android 8.0 (Oreo) or later</li>
+                    <li>At least 4 GB RAM</li>
+                    <li>200 MB of free storage</li>
+                    <li>Camera for live sign translation</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="appstore-section">
+            <h4>Also available on:</h4>
+            <div class="appstore-buttons">
+                <a href="https://play.google.com/store" class="btn-appstore" target="_blank">
+                    <img src="{{ url_for('static', filename='images/GetItOnGooglePlay_Badge_Web_color_English.svg') }}" alt="Google Play" style="height: 40px; width: auto;">
+                </a>
+            </div>
+        </div>
+    </div>
 </section>
 
 <section id="ios">
-    <h2>iOS</h2>
-    <p>Here comes the instruction from iOS</p>
+    <div class="container">
+        <h2>iOS Installation</h2>
+        <p>Here comes the instruction from iOS</p>
+
+        {#    installing steps    #}
+        <div class="instruction-steps">
+            <div class="step">
+                <h3>Step 1: Download from App Store (Recommended)</h3>
+                <p>The easiest way to install SignAI on iOS is through the <a href="https://apps.apple.com" target="_blank">App Store</a>. Search for "SignAI" and tap <strong>Get</strong> to install.</p>
+            </div>
+
+            <div class="step">
+                <h3>Step 2: Alternative - TestFlight (Beta)</h3>
+                <p>If you want to test the latest beta version:</p>
+                <ul>
+                    <li>Install <strong>TestFlight</strong> from the App Store (if you don't have it)</li>
+                    <li>Get the TestFlight invitation link from our <a href="/download#download-ios">Download Page</a></li>
+                    <li>Open the link on your iOS device and tap <strong>Accept</strong></li>
+                    <li>Open TestFlight and install SignAI</li>
+                </ul>
+            </div>
+
+            <div class="step">
+                <h3>Step 3: Launch SignAI</h3>
+                <p>Find the SignAI icon on your home screen and tap it to launch the app.</p>
+            </div>
+
+            <div class="step">
+                <h3>Step 4: Grant Camera Permissions</h3>
+                <p>When you first open SignAI, you'll be asked to grant camera access. Tap <strong>Allow</strong> to enable sign language translation features.</p>
+            </div>
+
+            <div class="step">
+                <h3>System Requirements</h3>
+                <ul>
+                    <li>iOS 14.0 or later</li>
+                    <li>iPhone 7 or newer (iPhone 8+ recommended)</li>
+                    <li>200 MB of free storage</li>
+                    <li>Camera for live sign translation</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="appstore-section">
+            <h4>Also available on:</h4>
+            <div class="appstore-buttons">
+                <a href="https://apps.apple.com" class="btn-appstore" target="_blank">
+                    <img src="{{ url_for('static', filename='images/Download_on_the_App_Store_Badge_US-UK_RGB_wht_092917.svg') }}" alt="App Store" style="height: 40px; width: auto;">
+                </a>
+            </div>
+        </div>
+    </div>
 </section>
 
 <footer>

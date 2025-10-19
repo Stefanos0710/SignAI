@@ -1,1 +1,106 @@
-/* here comes the css for the instructions */
+.platform-selection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin: 30px 0;
+}
+
+.step li,
+.step ul {
+    list-style-type: none;
+    padding-left: 20px;
+    font-size: 17px;
+    line-height: 1.6;
+    color: #2f2f2f;
+}
+
+.appstore-section {
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.appstore-section h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.appstore-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.btn-appstore {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    background: #f5f5f5;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 8px;
+    color: #2f2f2f;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-appstore:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: #6366f1;
+    transform: translateY(-2px);
+    text-decoration: none;
+}
+
+.btn-appstore img {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+}
+
+/* Spezielle Styles für offizielle Store-Badges (SVG) */
+.btn-appstore:has(img[src*=".svg"]) {
+    padding: 0;
+    background: transparent;
+    border: none;
+}
+
+.btn-appstore:has(img[src*=".svg"]):hover {
+    background: transparent;
+    transform: translateY(-3px);
+}
+
+.instruction-steps {
+    margin-bottom: 2rem;
+}
+
+.step {
+    background: #f9f9f9;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+}
+
+.step h3 {
+    color: #6366f1;
+    margin-bottom: 0.8rem;
+    font-size: 1.3rem;
+}
+
+.step p {
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+    color: #2f2f2f;
+}
+
+.btn-appstore span {
+    white-space: nowrap;
+}
