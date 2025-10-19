@@ -4,7 +4,7 @@ footer {
   color: white;
   width: 100%;
   margin: 0;
-  padding: 80px 0 0 0;
+  padding: 60px 0 0 0;
   box-sizing: border-box;
   position: relative;
   overflow-x: hidden;
@@ -22,18 +22,32 @@ footer::before {
 
 .footer-container {
   display: grid;
-  grid-template-columns: 1.8fr 1fr 1fr 1fr 1fr;
-  gap: 20px;
+  grid-template-columns: 1.6fr 0.9fr 0.9fr 0.9fr 0.7fr;
+  gap: 25px;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 40px 60px 40px;
+  padding: 0 30px 50px 30px;
+}
+
+@media (max-width: 1400px) {
+  .footer-container {
+    grid-template-columns: 1.5fr 1fr 1fr 1fr 0.8fr;
+    gap: 20px;
+  }
 }
 
 @media (max-width: 1200px) {
   .footer-container {
     grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
     gap: 15px;
-    padding: 0 20px 60px 20px;
+    padding: 0 20px 50px 20px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .footer-container {
+    grid-template-columns: 1.3fr 1fr 1fr 1fr 0.9fr;
+    gap: 12px;
   }
 }
 
@@ -59,16 +73,16 @@ footer::before {
 
 .footer-section h2 {
   color: #fff;
-  font-size: 28px;
-  margin-bottom: 15px;
+  font-size: 24px;
+  margin-bottom: 12px;
   font-weight: 800;
   letter-spacing: -0.5px;
 }
 
 .footer-section h3 {
   color: #fff;
-  margin-bottom: 20px;
-  font-size: 16px;
+  margin-bottom: 15px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -77,11 +91,11 @@ footer::before {
 
 .footer-section p {
   color: rgba(255, 255, 255, 0.85);
-  font-size: 15px;
-  line-height: 1.8;
+  font-size: 14px;
+  line-height: 1.6;
   max-width: none;
   width: 100%;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   word-wrap: break-word;
   overflow-wrap: break-word;
   hyphens: auto;
@@ -91,8 +105,8 @@ footer::before {
   display: block;
   color: rgba(255, 255, 255, 0.8);
   text-decoration: none;
-  margin-bottom: 12px;
-  font-size: 15px;
+  margin-bottom: 10px;
+  font-size: 14px;
   transition: all 0.3s ease;
   padding-left: 20px;
   position: relative;
@@ -121,13 +135,13 @@ footer::before {
   text-align: center;
   margin: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 30px 20px;
+  padding: 25px 20px;
   background: rgba(0, 0, 0, 0.15);
 }
 
 .footer-bottom p {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.75);
   max-width: 100%;
   letter-spacing: 0.3px;

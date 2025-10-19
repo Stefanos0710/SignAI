@@ -204,6 +204,7 @@ section p {
     max-width: 1400px;
     margin: 0 auto;
     padding: 2rem;
+    margin-bottom: 40px;
 }
 
 .download-window,
