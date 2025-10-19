@@ -1,7 +1,6 @@
 from flask import Flask
 from flask import request, render_template, url_for, redirect
 
-# Initialisiere die Flask-Anwendung
 app = Flask(__name__)
 
 # DELETE THIS IN PRODUKTION

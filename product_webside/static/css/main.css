@@ -63,7 +63,7 @@ a {
     transition: color 0.3s ease;
 }
 
-a:hover {
+a:hover:not(.btn):not(.btn-primary):not(.btn-secondary):not(.btn-download) {
     color: #3749ff;
     text-decoration: underline;
 }
@@ -447,7 +447,7 @@ nav.scrolled {
 .btn {
     padding: 1rem 2.5rem;
     border-radius: 50px;
-    text-decoration: none;
+    text-decoration: none !important;
     font-weight: 600;
     font-size: 1.05rem;
     transition: var(--transition);
@@ -459,26 +459,49 @@ nav.scrolled {
 
 .btn-primary {
     background: linear-gradient(135deg, var(--primary), var(--accent));
-    color: white;
+    color: white !important;
+    text-decoration: none !important;
 }
 
-.btn-primary:hover {
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active,
+.btn-primary:visited {
     transform: translateY(-3px);
     box-shadow: var(--shadow-lg);
-    text-decoration: none;
+    color: white !important;
+    text-decoration: none !important;
 }
 
 .btn-secondary {
     background: white;
-    color: var(--primary);
+    color: var(--primary) !important;
     border: 2px solid var(--primary);
+    text-decoration: none !important;
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover,
+.btn-secondary:focus,
+.btn-secondary:active,
+.btn-secondary:visited {
     background: var(--primary);
-    color: white;
+    color: white !important;
     transform: translateY(-3px);
-    text-decoration: none;
+    text-decoration: none !important;
+}
+
+/* Spezifische Regel für Home-Buttons */
+#home .btn-primary,
+#home .btn-primary:hover,
+#home .btn-primary:focus,
+#home .btn-primary:active {
+    color: white !important;
+}
+
+#home .btn-secondary:hover,
+#home .btn-secondary:focus,
+#home .btn-secondary:active {
+    color: white !important;
 }
 
 .container {
@@ -535,7 +558,7 @@ section .container p {
     .btn-download {
         align-self: flex-start;
     }
-    
+
     section .container {
         text-align: left;
     }

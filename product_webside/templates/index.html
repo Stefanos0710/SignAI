@@ -54,20 +54,36 @@
 <section id="about">
     <div class="container">
         <h2>About</h2>
+
+        <h3 class="about-3">Our Mission</h3>
         <p>
-            Our mission is to make communication accessible to everyone.
-            SignAI is trained on tens of thousands of video samples from diverse, large-scale datasets.
-            Through continuous development, the system is able to detect subtle differences in hand movements,
-            facial expressions, and context to provide accurate translations.
+            Our mission is to make communication accessible for everyone, no matter their language or ability.
+            SignAI bridges the gap between spoken and sign languages through advanced artificial intelligence.
+            By combining cutting-edge computer vision, natural language processing, and deep learning, SignAI can
+            understand and translate gestures, facial expressions, and context with remarkable accuracy.
+        </p>
+
+        <h3 class="about-3">Advanced Technology</h3>
+        <p>
+            Trained on tens of thousands of video samples from diverse, large-scale datasets, SignAI continues to
+            improve through ongoing research and user feedback. Its adaptive learning model enables it to recognize
+            subtle variations in regional sign languages and the personal signing styles of individuals.
+        </p>
+
+        <h3 class="about-3">Building Bridges</h3>
+        <p>
+            Our goal goes beyond translation — we aim to build a world where communication barriers no longer exist.
+            Whether it's in education, public services, or daily life, SignAI empowers people to connect, understand,
+            and share their voices freely.
         </p>
     </div>
 </section>
 
 <section id="desktop">
     <div class="container">
-        <h2>Desktop</h2>
         <div class="hero-content">
             <div class="hero-text">
+                <h2>Desktop</h2>
                 <p>
                     The desktop version of SignAI provides a powerful environment for testing, recording,
                     and analyzing sign language. It allows users to record custom videos
@@ -78,11 +94,11 @@
                     detailed analytics, and the ability to save and review your translation history.
                     The intuitive interface makes it easy for both beginners and professionals to communicate effectively.
                 </p>
-                <div class="platform-switch" role="tablist" aria-label="Platform switch">
-                    <button class="platform active" data-os="win" role="tab" aria-selected="true">Windows</button>
-                    <button class="platform" data-os="mac" role="tab" aria-selected="false">macOS</button>
-                    <button class="platform" data-os="linux" role="tab" aria-selected="false">Linux</button>
-                </div>
+{#                <div class="platform-switch" role="tablist" aria-label="Platform switch">#}
+{#                    <button class="platform active" data-os="win" role="tab" aria-selected="true">Windows</button>#}
+{#                    <button class="platform" data-os="mac" role="tab" aria-selected="false">macOS</button>#}
+{#                    <button class="platform" data-os="linux" role="tab" aria-selected="false">Linux</button>#}
+{#                </div>#}
 
                 <div class="download-row">
                     <a class="btn btn-download" href="/download#download-windows">Download Windows</a>
@@ -122,9 +138,9 @@
 
 <section id="mobile">
     <div class="container">
-        <h2>Mobile</h2>
         <div class="hero-content">
             <div class="hero-text">
+                <h2>Mobile</h2>
                 <p>
                     Our mobile version of SignAI brings the power of real-time translation directly to your pocket.
                     Using your smartphone's camera and flash, the app delivers incredible results and enables
@@ -138,10 +154,10 @@
                 <p>
                     <strong>Note:</strong> The app is currently under development for both Android and iOS.
                 </p>
-                <div class="platform-switch" role="tablist" aria-label="Platform switch">
-                    <button class="platform active" data-os="android" role="tab" aria-selected="true">Android</button>
-                    <button class="platform" data-os="ios" role="tab" aria-selected="false">iOS</button>
-                </div>
+{#                <div class="platform-switch" role="tablist" aria-label="Platform switch">#}
+{#                    <button class="platform active" data-os="android" role="tab" aria-selected="true">Android</button>#}
+{#                    <button class="platform" data-os="ios" role="tab" aria-selected="false">iOS</button>#}
+{#                </div>#}
 
                 <div class="download-row">
                     <a class="btn btn-download" href="/download#download-android">Download Android</a>
@@ -172,17 +188,40 @@
     </div>
 </section>
 
+{# in production change to an real email#}
 <section id="contact">
     <div class="container">
-        <h2>Contact</h2>
-        <p>Have questions, suggestions, or collaboration ideas?</p>
-        <p>We'd love to hear from you!</p>
-        <p>
-            Contact us at <a href="mailto:text@test.dev">we don´t actually have an email yet</a>
-            or follow us on
-            <a href="https://github.com/Stefanos0710/SignAI/">GitHub</a>
-            for the latest updates.
-        </p>
+        <h2>Contact Us</h2>
+        <p>Have questions, suggestions, or collaboration ideas? We'd love to hear from you!</p>
+
+        <div class="contact-grid">
+            <div class="contact-card">
+                <h3>Email</h3>
+                <p>
+                    Currently, we don't have a dedicated email address.
+                    Check back soon or follow us on GitHub for updates.
+                </p>
+                <a href="mailto:text@test.dev" class="btn-contact">hello@signai.com</a>
+            </div>
+
+            <div class="contact-card">
+                <h3>GitHub</h3>
+                <p>
+                    Explore our open-source projects, report issues,
+                    or contribute to SignAI's development.
+                </p>
+                <a href="https://github.com/Stefanos0710/SignAI/" target="_blank" class="btn-contact">Visit Repository</a>
+            </div>
+
+            <div class="contact-card">
+                <h3>Community</h3>
+                <p>
+                    Join discussions, share feedback, and connect
+                    with other SignAI users and developers.
+                </p>
+                <a href="https://github.com/Stefanos0710/SignAI/discussions" target="_blank" class="btn-contact">Join Discussions</a>
+            </div>
+        </div>
     </div>
 </section>
 
