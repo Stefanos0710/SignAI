@@ -10,6 +10,8 @@ recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 
 ToDo List:
 - [ ] more settings options
+-  make upadte loader
+-  model selection for different AI models
 
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
@@ -33,6 +35,9 @@ import os
 import subprocess
 import platform
 
+# add resource_path import
+from resource_path import resource_path
+
 #setup application
 app = QApplication(sys.argv)
 loader = QUiLoader()
@@ -44,13 +49,14 @@ settings = Settings()
 history_videos = HistoryVideos()
 
 # load UI
-ui_file = QFile("ui/main_window.ui")
+ui_file_path = resource_path("ui/main_window.ui")
+ui_file = QFile(ui_file_path)
 ui_file.open(QFile.ReadOnly)
 window = loader.load(ui_file)
 ui_file.close()
 
 # setup icons
-window.setWindowIcon(QIcon("icons/icon.png"))
+window.setWindowIcon(QIcon(resource_path("icons/icon.png")))
 
 # get buttons from UI
 recordButton = window.findChild(QPushButton, "recordButton")
@@ -64,8 +70,8 @@ historybutton = window.findChild(QToolButton, "historybutton")
 githubbutton = window.findChild(QToolButton, "githubButton")
 
 # set icon to buttons
-historybutton.setIcon(QIcon("icons/history.png"))
-githubbutton.setIcon(QIcon("icons/github.png"))
+historybutton.setIcon(QIcon(resource_path("icons/history.png")))
+githubbutton.setIcon(QIcon(resource_path("icons/github.png")))
 
 # get camera feed label
 videofeedlabel = window.findChild(QLabel, "videofeedlabel")
@@ -109,7 +115,7 @@ camera = None
 pressed = 0
 
 # open style sheet
-with open("style.qss", "r") as f:
+with open(resource_path("style.qss"), "r") as f:
     app.setStyleSheet(f.read())
 
 # thread for video processing and AI translation
@@ -221,7 +227,7 @@ def recordfunc():
         loading_timer.start(500)  # Update every 0.5 sec
 
         # start video processing thread
-        processing_worker = VideoProcessingThread("videos/current_video.mp4")
+        processing_worker = VideoProcessingThread(resource_path("videos/current_video.mp4"))
         processing_worker.finished.connect(on_processing_finished)
         processing_worker.progress.connect(on_progress_update)
         processing_worker.start()
@@ -303,7 +309,7 @@ def cleanup():
 def historyfunc():
     system = platform.system()
 
-    path = os.path.abspath("videos/history")
+    path = os.path.abspath(resource_path("videos/history"))
     if system == "Windows": # Windows
         os.startfile(path)
     elif system == "Darwin":  # macOS

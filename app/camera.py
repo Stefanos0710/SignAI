@@ -23,6 +23,9 @@ from PySide6.QtGui import QImage, QPixmap
 import threading
 from videos import HistoryVideos
 
+# add writable_path import
+from resource_path import writable_path
+
 # Suppress OpenCV warnings about camera indices
 os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
 os.environ["OPENCV_LOG_LEVEL"] = "OFF"
@@ -32,7 +35,8 @@ class Camera:
         self.camera_id = camera_id
         self.resolution = resolution
         self.fps = fps
-        self.filepath = os.path.join(os.path.dirname(__file__), "videos", "current_video.mp4")
+        # Use a writable path for runtime files so bundling doesn't write into the package
+        self.filepath = writable_path(os.path.join("videos", "current_video.mp4"))
         self.camera_feed = camera_feed  # Reference to CameraFeed to share frames
 
         # Ensure directory exists
