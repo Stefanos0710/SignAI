@@ -21,13 +21,46 @@ import time
 from . import preprocessing_live_data as pre
 from . import inference
 
+try:
+    from app.resource_path import resource_path, writable_path
+except Exception:
+    # Fallback implementations (minimal)
+    import sys
+    def resource_path(relative_path):
+        if hasattr(sys, '_MEIPASS'):
+            return os.path.join(sys._MEIPASS, relative_path)
+        return os.path.join(os.path.abspath('.'), relative_path)
+    def writable_path(relative_path):
+        if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
+            base = os.path.dirname(sys.executable)
+        else:
+            base = os.path.abspath('.')
+        full = os.path.join(base, relative_path)
+        parent = os.path.dirname(full)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        return full
+
 # Flask app instance (referenced by request.py)
 app = Flask(__name__)
 
 # Configuration
-UPLOAD_DIR = os.path.join('../data', 'live', 'video')
-CSV_DIR = os.path.join('../data', 'live')
-MODEL_PATH = os.path.join('../models', 'trained_model_v21.keras')
+UPLOAD_DIR = writable_path(os.path.join('data', 'live', 'video'))
+CSV_DIR = writable_path(os.path.join('data', 'live'))
+
+model_candidate = None
+try:
+    candidate = resource_path(os.path.join('models', 'trained_model_v21.keras'))
+    if os.path.exists(candidate):
+        model_candidate = candidate
+except Exception:
+    model_candidate = None
+
+if model_candidate:
+    MODEL_PATH = model_candidate
+else:
+    # fallback to repo-location relative to this file
+    MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models', 'trained_model_v21.keras'))
 
 # Ensure required directories exist
 os.makedirs(UPLOAD_DIR, exist_ok=True)

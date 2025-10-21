@@ -16,6 +16,7 @@ import signal
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import api.signai_api as signai_api
+from resource_path import resource_path
 
 class API:
     def __init__(self):
@@ -66,6 +67,7 @@ class API:
             print(f"✗ Could not find process using port {port}")
             return False
 
+        pid = None
         try:
             pid = process_info['pid']
             name = process_info['name']
@@ -95,7 +97,10 @@ class API:
             print(f"✓ Process already terminated")
             return True
         except psutil.AccessDenied:
-            print(f"✗ Access denied - cannot kill process {pid}")
+            if pid:
+                print(f"✗ Access denied - cannot kill process {pid}")
+            else:
+                print(f"✗ Access denied - cannot kill process (unknown PID)")
             print(f"  Run the application as administrator to kill this process")
             return False
         except Exception as e:
@@ -300,7 +305,7 @@ class API:
 
     def start(self):
         # Test with current video
-        test_video = "videos/current_video.mp4"
+        test_video = resource_path("videos/current_video.mp4")
 
         if os.path.exists(test_video):
             print(f"\n{'='*50}")

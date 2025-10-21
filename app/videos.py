@@ -8,10 +8,14 @@ from datetime import datetime
 import os
 import shutil
 
+# add writable_path import
+from resource_path import writable_path
+
 class HistoryVideos:
     def __init__(self):
-        self.path = os.path.join(os.path.dirname(__file__), "videos", "history")
-        self.source_path = os.path.join(os.path.dirname(__file__), "videos", "current_video.mp4")
+        # Store runtime videos in a writable location so the exe can write files
+        self.path = writable_path(os.path.join("videos", "history"))
+        self.source_path = writable_path(os.path.join("videos", "current_video.mp4"))
 
         # setup the history folder
         self.setup()
