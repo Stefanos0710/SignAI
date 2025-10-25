@@ -29,6 +29,7 @@ CANDIDATE_DATA = {
     'style': (os.path.join(BASE_DIR, "style.qss"), "."),
     'settings': (os.path.join(BASE_DIR, "settings"), "settings"),
     'version': (os.path.join(BASE_DIR, "version.txt"), "."),
+    'updater': (os.path.join(BASE_DIR, "updater"), "updater"),
     'tokenizers': (os.path.abspath(os.path.join(BASE_DIR, "..", "tokenizers")), "tokenizers"),
     'api': (os.path.abspath(os.path.join(BASE_DIR, "..", "api")), "api"),
     'models': (os.path.abspath(os.path.join(BASE_DIR, "..", "models")), "models"),
@@ -50,7 +51,7 @@ args = parser.parse_args()
 # determine which data entries to include
 DATA_DIRS = []
 # always include these if present
-for key in ('ui', 'icons', 'videos', 'style', 'settings', 'version'):
+for key in ('ui', 'icons', 'videos', 'style', 'settings', 'version', 'updater'):
     src, dest = CANDIDATE_DATA[key]
     DATA_DIRS.append((src, dest))
 
