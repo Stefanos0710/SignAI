@@ -9,16 +9,17 @@ ZIP_DIR = PROJECT_ROOT / "app" / "builds" / "zip"
 os.makedirs(ZIP_DIR, exist_ok=True)
 
 def zip_items(exe_path, updater_path, zip_name, version):
-    # start make zip file
     print("Starting to create zip file...")
+
     with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        # add exe file in exe folder
+        # add exe file directly
         if exe_path.exists():
-            arcname = f"{version}/exe/{exe_path.name}"
+            arcname = exe_path.name
             zipf.write(exe_path, arcname)
             print(f"Do file: {arcname}")
         else:
             print(f"Warning: {exe_path.resolve()} not here or skip.")
+
         # add updater folder content, skip __pycache__
         if updater_path.exists() and updater_path.is_dir():
             print(f"Do directory: {updater_path}")
@@ -34,7 +35,8 @@ def zip_items(exe_path, updater_path, zip_name, version):
                     print(f"\tSkip directory: {file.relative_to(updater_path)}")
         else:
             print(f"Warning: {updater_path.resolve()} not here or skip.")
-    print(f"Zip file make: {zip_name}")
+
+    print(f"Zip file made: {zip_name}")
 
 def get_current_version():
     version_file = PROJECT_ROOT / "app" / "updater" / "version.txt"

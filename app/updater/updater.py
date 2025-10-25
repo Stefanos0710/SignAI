@@ -240,8 +240,9 @@ class Updatersecond:
 
         # files and folders to save during update
         self.save_files = ["settings/", "videos/", "data/"]
+        self.dont_delete = ["tmp_data/", "tmp_updater/", "Uninstall SignAI - Desktop_lang.ifl", "Uninstall SignAI - Desktop.exe", "Uninstall SignAI - Desktop.dat"]
 
-    def get_project_paths(self, exist=True):
+    def get_project_paths(self):
         # get path to app folder
         current_file = Path(__file__).resolve()
         updater_dir = current_file.parent
@@ -257,25 +258,60 @@ class Updatersecond:
         pass
 
     def create_tmp_data(self):
-        os.mkdir("tmp_data", exist_ok=True, parents=True)
-
-        # now get all the paths we need
-        settings_dir = self.get_project_paths() / "settings"
-        videos_dir = self.get_project_paths() / "videos"
-        data_dir = self.get_project_paths() / "data"
+        # get the app dir from func get_project_paths
+        app_dir = self.get_project_paths()
 
         # get the tmp data dir
         tmp_data_dir = self.get_project_paths() / "tmp_data"
 
-        shutil.copytree({settings_dir, videos_dir, data_dir}, tmp_data_dir)
+        # create the tmp data dir
+        os.makedirs(tmp_data_dir, exist_ok=True)
+
+        # copy all save_files into tmp_data
+        for folder in self.save_files:
+            source_path = app_dir / folder
+            target_path = tmp_data_dir / folder
+            if source_path.exists():
+                if target_path.exists():
+                    shutil.rmtree(target_path)
+                shutil.copytree(source_path, target_path)
+                print(f"Copied {folder} -> tmp_data/{folder}")
+            else:
+                print(f"Folder {folder} not found, skipped.")
 
         print("User data saved to tmp_data.")
 
 
     def delete_old_data(self):
-        pass
+        # get the app dir from func get_project_paths
+        app_dir = self.get_project_paths()
+
+        deleted_count = 0
+        skipped_count = 0
+
+        for item in app_dir.iterdir():
+            if item.name in self.dont_delete:
+                print(f"Skipped: {item.name}")
+                skipped_count += 1
+                continue
+            try:
+                if item.is_file():
+                    item.unlink()
+                    print(f"Deleted file: {item.name}")
+
+                else:
+                    shutil.rmtree(item)
+                    print(f"Deleted directory: {item.name}")
+                deleted_count += 1
+
+            except Exception as e:
+                print(f"Failed to delete {item.name}: {e}")
+
+        print(f"\n Cleanup complete! Deleted: {deleted_count}, Skipped: {skipped_count}")
 
     def start(self):
         pass
 
-print(Updatersecond().get_paths())
+# for testing, del in production
+if __name__ == '__main__':
+    u = Updatersecond()
