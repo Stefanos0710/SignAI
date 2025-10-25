@@ -273,6 +273,10 @@ class Updater:
 
             if latest_v > current_v:
                 print(f"Update available: {latest_tag}")
+
+                # update the verion.txt file
+                self.update_version_file(latest_tag)
+
                 for asset in data.get("assets", []):
                     if asset.get("name", "").endswith(".zip"):
                         return asset["browser_download_url"]
@@ -308,8 +312,31 @@ class Updater:
 
         return app_dir
 
-    def download_new_version(self, version):
-        pass
+    def download_new_version(self, download_url):
+        app_dir = self.get_project_paths()
+        tmp_version_dir = app_dir / "tmp_version"
+        update_zip_path = tmp_version_dir / "update.zip"
+
+        # create or clean update directory (tmp_version)
+        if tmp_version_dir.exists():
+            shutil.rmtree(tmp_version_dir)
+        tmp_version_dir.mkdir(parents=True, exist_ok=True)
+
+        print(f"Downloading the newest version: {update_zip_path}")
+        with requests.get(download_url, headers=self.HEADERS, stream=True) as response:
+            if response.status_code != 200:
+                print("Failed to download the new version.")
+                return None
+            total = int(response.headers.get("content-length", 0))
+            downloaded = 0
+            with open(update_zip_path, "wb") as f:
+                for chunk in response.iter_content(1024):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        print(f"\rProgress: {downloaded / total:.0%}", end="")
+        print("\nDownload finished!")
+        return update_zip_path
 
     def create_tmp_updater(self):
         pass
@@ -365,6 +392,15 @@ class Updater:
 
         print(f"\n Cleanup complete! Deleted: {deleted_count}, Skipped: {skipped_count}")
 
+    def update_version_file(self, new_version):
+        version_file = Path("version.txt")
+        try:
+            with open(version_file, "w") as f:
+                f.write(new_version)
+            print(f"Updated version file to: {new_version}")
+        except Exception as e:
+            print(f"Failed to update version file: {e}")
+
     def start(self):
         if self.check_for_updates(self.current_version()):
             pass
@@ -372,4 +408,6 @@ class Updater:
 # for testing, del in production
 if __name__ == '__main__':
     u = Updater()
-    u.check_for_updates(u.current_version())
+    download_url = u.check_for_updates(u.current_version())
+    if download_url:
+        u.download_new_version(download_url)
