@@ -1,0 +1,140 @@
+/*
+### SignAI - Sign Language translater ###
+
+## style ##
+
+-------------------------------------------------------------
+
+here comes the description of the app
+
+-------------------------------------------------------------
+
+## Metadata
+- **Author**: Stefanos Koufogazos Loukianov
+- **Original Creation Date**: 2025/10/11
+- **Last Update**: 2025/10/11
+*/
+
+
+/* Main window */
+QWidget#MainWindow {
+    background-color: #2E3440; /* Dark minimal background */
+}
+
+/* Live-feed label */
+QLabel#videofeedlabel {
+    background-color: #3B4252;   /* Slightly lighter dark tone */
+    border: 2px solid #81A1C1;  /* subtle border */
+    border-radius: 8px;          /* rounded corners */
+    color: #ECEFF4;              /* light text */
+    font: bold 14px Arial;
+    qproperty-alignment: 'AlignCenter';
+    padding: 5px;
+}
+
+/* Settings Panel */
+QFrame#settingsPanel {
+    background-color: #3B4252;   /* dark background */
+    color: #ECEFF4;              /* light text */
+    font: 14px Arial;
+    border: 2px solid #81A1C1;  /* subtle border */
+    border-radius: 8px;          /* rounded corners */
+    padding: 8px;
+}
+
+/* General buttons */
+QPushButton {
+    background-color: #5E81AC;   /* solid color, minimal */
+    color: white;
+    font: bold 12px Arial;
+    border-radius: 6px;
+    padding: 6px 10px;
+    border: none;                /* clean look */
+}
+
+/* Hover effect */
+QPushButton:hover {
+    background-color: #81A1C1;   /* slightly lighter on hover */
+    color: #2E3440;              /* optional contrast */
+}
+
+/* Pressed effect */
+QPushButton:pressed {
+    background-color: #4C566A;
+}
+
+/* Switch-Cam button distinct color */
+QPushButton#switchcam {
+    background-color: #A3BE8C;
+}
+
+QPushButton#switchcam:hover {
+    background-color: #B48EAD;
+    color: white;
+}
+
+/* Translation box */
+QTextEdit#plainTextEdit {
+    background-color: #3B4252;   /* dark background */
+    color: #ECEFF4;              /* light text */
+    font: 14px Arial;
+    border: 2px solid #81A1C1;  /* subtle border */
+    border-radius: 8px;          /* rounded corners */
+    padding: 8px;
+}
+
+/* ## QCheckBox ## */
+QCheckBox {
+    color: #ECEFF4;              /* light text */
+    font: 14px Arial;
+    spacing: 7px;
+    padding: 5px;
+}
+
+QCheckBox::indicator {
+    width: 13px;
+    height: 13px;
+    border: 1px solid #81A1C1;  /* subtle border */
+    border-radius: 5px;          /* rounded corners */
+    background-color: #3B4252;   /* dark background */
+}
+
+QCheckBox::indicator:hover {
+    border: 2px solid #88C0D0;  /* lighter blue on hover */
+    background-color: #434C5E;   /* slightly lighter background */
+}
+
+QCheckBox::indicator:checked {
+    background-color: #A3BE8C;   /* green checked state */
+    border: 2px solid #8FBCBB;   /* matching border */
+}
+
+QCheckBox::indicator:checked:hover {
+    background-color: #8FBCBB;   /* lighter green on hover */
+}
+
+QCheckBox::indicator:unchecked {
+    background-color: #3B4252;   /* dark unchecked state */
+}
+
+/* QGroupBox Styling for Settings Panel */
+QGroupBox {
+    color: #ECEFF4;
+    font-size: 14px;
+    font-weight: bold;
+    border: 2px solid #81A1C1;
+    border-radius: 8px;
+    margin-top: 10px;
+    padding-top: 15px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 15px;
+    padding: 0 5px;
+    color: #88C0D0;
+}
+QLabel#titleLabel {
+    color: #D8DEE9;
+    font: 14px Arial;
+}
