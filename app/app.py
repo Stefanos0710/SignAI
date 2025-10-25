@@ -346,6 +346,7 @@ def switchcamfunc():
     if camerafeed:
         camerafeed.stop()
 
+
     # start new camera feed
     camerafeed = CameraFeed(videofeedlabel, cam_number=available_cams[camera_number])
     print(f"Change to camera {camera_number}: {available_cams[camera_number]}")
