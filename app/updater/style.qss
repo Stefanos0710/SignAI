@@ -11,14 +11,18 @@ here comes the description of the app
 
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
-- **Original Creation Date**: 2025/10/11
-- **Last Update**: 2025/10/11
+- **Original Creation Date**: 2025/10/25
+- **Last Update**: 2025/10/35
 */
 
 
 /* Main window */
 QWidget#MainWindow {
     background-color: #2E3440; /* Dark minimal background */
+}
+
+QMainWindow {
+    background-color: #f0f0f0;
 }
 
 /* Live-feed label */
@@ -44,23 +48,26 @@ QFrame#settingsPanel {
 
 /* General buttons */
 QPushButton {
-    background-color: #5E81AC;   /* solid color, minimal */
-    color: white;
-    font: bold 12px Arial;
+    background-color: #3a3f4b;
+    color: #e0e0e0;
     border-radius: 6px;
-    padding: 6px 10px;
-    border: none;                /* clean look */
+    padding: 8px 16px;
+    font-size: 15px;
+    min-width: 120px;
+}
+
+QPushButton#cancelBtn {
+    background-color: #e04f4f;
+    color: #fff;
 }
 
 /* Hover effect */
 QPushButton:hover {
-    background-color: #81A1C1;   /* slightly lighter on hover */
-    color: #2E3440;              /* optional contrast */
+    background-color: #50566a;
 }
 
-/* Pressed effect */
 QPushButton:pressed {
-    background-color: #4C566A;
+    background-color: #2c2f38;
 }
 
 /* Switch-Cam button distinct color */
@@ -135,6 +142,32 @@ QGroupBox::title {
     color: #88C0D0;
 }
 QLabel#titleLabel {
-    color: #D8DEE9;
-    font: 14px Arial;
+    color: #23272e;
+    font-size: 22px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+QLabel#statusLabel {
+    color: #23272e;
+    font-size: 15px;
+    margin-bottom: 8px;
+}
+QLabel#infoLabel {
+    color: #7a7a7a;
+    font-size: 12px;
+    margin-top: 10px;
+}
+QLabel#iconLabel {
+    margin-bottom: 8px;
+}
+QProgressBar {
+    background-color: #e0e0e0;
+    color: #23272e;
+    border-radius: 8px;
+    height: 24px;
+    font-size: 14px;
+}
+QProgressBar::chunk {
+    background-color: #3a8ee6;
+    border-radius: 8px;
 }

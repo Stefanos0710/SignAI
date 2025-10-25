@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>220</height>
+    <width>420</width>
+    <height>300</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,33 +16,51 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <widget class="QLabel" name="statusLabel">
+     <widget class="QLabel" name="titleLabel">
+      <property name="styleSheet">
+       <string>font-size: 22px; font-weight: bold;</string>
+      </property>
       <property name="text">
-       <string>Welcome to the SignAI Updater!</string>
+       <string>SignAI Updater</string>
       </property>
       <property name="alignment">
-       <set>Qt::AlignCenter</set>
+       <set>Qt::AlignmentFlag::AlignCenter</set>
       </property>
      </widget>
     </item>
     <item>
-     <widget class="QPushButton" name="checkBtn">
-      <property name="text">
-       <string>Check for Updates</string>
+     <widget class="QLabel" name="iconLabel">
+      <property name="minimumSize">
+       <size>
+        <width>48</width>
+        <height>48</height>
+       </size>
+      </property>
+      <property name="pixmap">
+       <pixmap>icons/icon.png</pixmap>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignmentFlag::AlignCenter</set>
       </property>
      </widget>
     </item>
     <item>
-     <widget class="QPushButton" name="updateBtn">
+     <widget class="QLabel" name="statusLabel">
+      <property name="styleSheet">
+       <string>font-size: 15px;</string>
+      </property>
       <property name="text">
-       <string>Update Now</string>
+       <string>Ready to update your app.</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignmentFlag::AlignCenter</set>
       </property>
      </widget>
     </item>
     <item>
      <widget class="QProgressBar" name="progressBar">
-      <property name="value">
-       <number>0</number>
+      <property name="styleSheet">
+       <string>height: 24px; font-size: 14px;</string>
       </property>
       <property name="minimum">
        <number>0</number>
@@ -50,18 +68,38 @@
       <property name="maximum">
        <number>100</number>
       </property>
+      <property name="value">
+       <number>0</number>
+      </property>
       <property name="textVisible">
        <bool>true</bool>
       </property>
      </widget>
     </item>
     <item>
-     <widget class="QPushButton" name="cancelBtn">
-      <property name="text">
-       <string>Cancel</string>
+     <layout class="QHBoxLayout" name="buttonLayout">
+      <item>
+       <widget class="QPushButton" name="cancelBtn">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>Cancel</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QLabel" name="infoLabel">
+      <property name="styleSheet">
+       <string>font-size: 12px; color: #7a7a7a;</string>
       </property>
-      <property name="enabled">
-       <bool>false</bool>
+      <property name="text">
+       <string>Do not close the app during update.</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignmentFlag::AlignCenter</set>
       </property>
      </widget>
     </item>
