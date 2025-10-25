@@ -7,20 +7,51 @@ import zipfile
 import re
 
 """
-TODOs:
-# [ ] make that the new verion is written down after that
+# Updater Workflow
 
-Roadmap:    
-- backup user data (settings, videos, data)
-- get name/ url / version of the latest release from github
-- download zip in tmp folder
-- unzip in tmp folder
-- replace existing files with new ones
-- restore user data
+This document outlines the step-by-step process for updating the application safely while preserving user data.
+
+---
+
+## 1. Check for Updates
+- The updater first checks if a new version of the application is available on GitHub.
+
+---
+
+## 2. Backup User Data
+- Before making any changes, save important folders into temporary folders:
+  - `settings` → `tmp_settings`
+  - `videos` → `tmp_videos`
+  - `data` → `tmp_data`
+- This ensures that no user data is lost during the update process.
+
+---
+
+## 3. Clean Old Application
+- Delete all existing application files to prepare for the new version.
+- **Important:** Keep critical files such as the uninstaller and other essential files that should not be removed.
+
+---
+
+## 4. Download and Extract New Version
+- Locate the appropriate version from GitHub.
+- Download the release zip file.
+- Extract its contents into the application directory.
+
+---
+
+## 5. Restore User Data
+- Move the previously backed-up folders (`settings`, `videos`, `data`) back into the application directory.
+- This ensures that all user settings and files remain intact after the update.
+
+---
+
+## 6. Clean Temporary Files
+- After restoring user data, delete all temporary folders (`tmp_settings`, `tmp_videos`, `tmp_data`) to keep the application directory clean.
 
 
 C:\Program Files (x86)\SignAI - Desktop
-
+tmp_folders vs. save_files
 
 """
 
@@ -42,7 +73,7 @@ class Updater:
         self.dont_delete = ["tmp_data/", "tmp_updater/", "Uninstall SignAI - Desktop_lang.ifl", "Uninstall SignAI - Desktop.exe", "Uninstall SignAI - Desktop.dat"]
 
         # tmp folders
-        self.tmp_folders = ["tmp_data/", "tmp_updater/", "tmp_version/"]
+        self.tmp_folders = ["tmp_data/", "tmp_updater/", "tmp_settings/", "tmp_videos/"]
 
     def check_for_updates(self, current_version):
         print("Checking for updates...")
@@ -143,28 +174,24 @@ class Updater:
         pass
 
     def create_tmp_data(self):
-        # get the app dir from func get_project_paths
+        """Backup settings, videos, and data into their respective tmp folders."""
         app_dir = self.get_project_paths()
-
-        # get the tmp data dir
-        tmp_data_dir = self.get_project_paths() / "tmp_data"
-
-        # create the tmp data dir
-        os.makedirs(tmp_data_dir, exist_ok=True)
-
-        # copy all save_files into tmp_data
-        for folder in self.save_files:
-            source_path = app_dir / folder
-            target_path = tmp_data_dir / folder
-            if source_path.exists():
-                if target_path.exists():
-                    shutil.rmtree(target_path)
-                shutil.copytree(source_path, target_path)
-                print(f"Copied {folder} -> tmp_data/{folder}")
+        backup_map = {
+            "settings": "tmp_settings",
+            "videos": "tmp_videos",
+            "data": "tmp_data"
+        }
+        for src, tmp in backup_map.items():
+            src_path = app_dir / src
+            tmp_path = app_dir / tmp
+            if src_path.exists():
+                if tmp_path.exists():
+                    shutil.rmtree(tmp_path)
+                shutil.copytree(src_path, tmp_path)
+                print(f"Backed up {src} to {tmp}")
             else:
-                print(f"Folder {folder} not found, skipped.")
-
-        print("User data saved to tmp_data.")
+                print(f"Source folder {src} not found, skipping backup.")
+        print("User data backup to tmp folders completed.")
 
     def delete_old_data(self):
         # get the app dir from func get_project_paths
@@ -261,12 +288,20 @@ class Updater:
                 print(f"Backup folder '{tmp_name}' not found, skipping.")
 
     def start(self):
-        if self.check_for_updates(self.current_version()):
-            pass
+        current_version = self.current_version()
+        download_url = self.check_for_updates(current_version)
+        if not download_url:
+            print("No update needed.")
+            return
+        self.backup_user_data()
+        self.delete_old_app()
+        tmp_version_dir = self.download_and_unzip(download_url)
+        self.setup_new_version(tmp_version_dir)
+        self.restore_user_data()
+        self.delete_tmp_files()
+        print("Update completed successfully!")
 
 # for testing, del in production
 if __name__ == '__main__':
-    u = Updater()
-    download_url = u.check_for_updates(u.current_version())
-    if download_url:
-        u.download_new_version(download_url)
+    updater = Updater()
+    updater.start()
