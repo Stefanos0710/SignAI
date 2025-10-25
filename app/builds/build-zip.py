@@ -27,7 +27,7 @@ def zip_items(exe_path, updater_path, zip_name, version):
                     print(f"\tSkip pycache: {file}")
                     continue
                 if file.is_file():
-                    arcname = f"{version}/updater/{file.relative_to(updater_path)}"
+                    arcname = f"updater/{file.relative_to(updater_path)}"
                     zipf.write(file, arcname)
                     print(f"\t{arcname}")
                 else:

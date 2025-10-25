@@ -18,6 +18,9 @@ Roadmap:
 - restore user data
 
 
+C:\Program Files (x86)\SignAI - Desktop
+
+
 """
 
 class Updater:
@@ -80,7 +83,6 @@ class Updater:
         else:
             print("No version file.")
             return "0.0.0"
-
 
     def check_for_updates(self, current_version):
         """Check for updates by comparing the current version with the latest release on GitHub and get the download URL if an update is available."""
@@ -175,7 +177,6 @@ class Updater:
         except Exception as e:
             print(f"Failed to replace old version files: {e}")
 
-
     def save_user_data(self):
         """Save users data before updating.
         self.save_files = ["settings", "videos/", "data/"]
@@ -223,3 +224,58 @@ class Updater:
                         shutil.rmtree(item)
                     shutil.copytree(backup_item, item)
                 print(f"{item} restored successfully.")
+
+
+class Updatersecond:
+    def __init__(self):
+        # Load environment variables from a .env file
+        load_dotenv()
+        self.API_KEY = os.getenv("GITHUB_TOKEN")
+        self.OWNER = os.getenv("REPO_OWNER")
+        self.REPO = os.getenv("REPO_NAME")
+
+        # make url and headers for api request
+        self.API_URL = f"https://api.github.com/repos/{self.OWNER}/{self.REPO}/releases/latest"
+        self.HEADERS = {"Authorization": f"token {self.API_KEY}"}
+
+        # files and folders to save during update
+        self.save_files = ["settings/", "videos/", "data/"]
+
+    def get_project_paths(self, exist=True):
+        # get path to app folder
+        current_file = Path(__file__).resolve()
+        updater_dir = current_file.parent
+        app_dir = updater_dir.parent
+
+        # log the paths
+        print(f"Updater dir: {updater_dir}")
+        print(f"App dir: {app_dir}")
+
+        return app_dir
+
+    def create_tmp_updater(self):
+        pass
+
+    def create_tmp_data(self):
+        os.mkdir("tmp_data", exist_ok=True, parents=True)
+
+        # now get all the paths we need
+        settings_dir = self.get_project_paths() / "settings"
+        videos_dir = self.get_project_paths() / "videos"
+        data_dir = self.get_project_paths() / "data"
+
+        # get the tmp data dir
+        tmp_data_dir = self.get_project_paths() / "tmp_data"
+
+        shutil.copytree({settings_dir, videos_dir, data_dir}, tmp_data_dir)
+
+        print("User data saved to tmp_data.")
+
+
+    def delete_old_data(self):
+        pass
+
+    def start(self):
+        pass
+
+print(Updatersecond().get_paths())
