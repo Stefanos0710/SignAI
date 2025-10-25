@@ -42,7 +42,44 @@ class Updater:
 
     def start(self):
         """ Here is the logic to start the update process """
-        pass
+        print("-- Staring update --")
+
+        # save user data
+        self.save_user_data()
+        print("User data saved.")
+
+        # get current version and print it
+        current_version = self.get_current_version()
+        print(f"Current version: {current_version}")
+
+        # check for updates
+        download_url, latest_version = self.check_for_updates(current_version)
+        if not download_url:
+            print("No updates available.")
+            return
+        print(f"Update available: {latest_version}")
+
+        zip_path = self.load_new_version(download_url)
+        if not zip_path:
+            print("Failed to download the update.")
+            return
+
+        self.unzip_new_version()
+        self.replace_old_version()
+        self.get_user_data()
+
+        print("-- Finished update! --")
+
+    def get_current_version(self):
+        """Get the local version from version.txt file"""
+        version_file = Path("version.txt")
+        if version_file.exists():
+            with open(version_file, "r") as f:
+                return f.read().strip()
+        else:
+            print("No version file.")
+            return "0.0.0"
+
 
     def check_for_updates(self, current_version):
         """Check for updates by comparing the current version with the latest release on GitHub and get the download URL if an update is available."""
@@ -116,7 +153,26 @@ class Updater:
 
     def replace_old_version(self):
         """Replace the old version files with the new version files."""
-        print("Replacing the old version files with new ones...")
+        print("replacing ikd version files...")
+        try:
+            app_dir = Path.cwd()
+
+            for item in self.UPDATE_DIR.iterdir():
+                target_path = app_dir / item.name
+                if target_path.exists():
+                    if target_path.is_file():
+                        target_path.unlink()
+                    elif target_path.is_dir():
+                        shutil.rmtree(target_path)
+
+                if item.is_file():
+                    shutil.copy2(item, target_path)
+                elif item.is_dir():
+                    shutil.copytree(item, target_path)
+                print(f"Replaced: {item.name}")
+            print("Replacement complete!")
+        except Exception as e:
+            print(f"Failed to replace old version files: {e}")
 
 
     def save_user_data(self):
