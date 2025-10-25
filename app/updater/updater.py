@@ -7,7 +7,7 @@ import zipfile
 
 """
 TODOs:
-
+# [ ] make that the new verion is written down after that
 
 Roadmap:    
 - backup user data (settings, videos, data)
@@ -16,6 +16,7 @@ Roadmap:
 - unzip in tmp folder
 - replace existing files with new ones
 - restore user data
+
 
 """
 
