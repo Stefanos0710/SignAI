@@ -19,10 +19,13 @@ def zip_items(exe_path, updater_path, zip_name, version):
             print(f"Do file: {arcname}")
         else:
             print(f"Warning: {exe_path.resolve()} not here or skip.")
-        # add updater folder content
+        # add updater folder content, skip __pycache__
         if updater_path.exists() and updater_path.is_dir():
             print(f"Do directory: {updater_path}")
             for file in updater_path.rglob('*'):
+                if "__pycache__" in file.parts:
+                    print(f"\tSkip pycache: {file}")
+                    continue
                 if file.is_file():
                     arcname = f"{version}/updater/{file.relative_to(updater_path)}"
                     zipf.write(file, arcname)
