@@ -5,6 +5,8 @@ import os
 import shutil
 import zipfile
 import re
+import time
+import subprocess
 
 """
 # Updater Workflow
@@ -300,6 +302,20 @@ class Updater:
         self.restore_user_data()
         self.delete_tmp_files()
         print("Update completed successfully!")
+
+        # wait a bit before starting app again
+        time.sleep(2)
+        app_dir = self.get_project_paths()
+        exe_path = app_dir / "SignAI - Desktop.exe"
+        if exe_path.exists():
+            subprocess.Popen([str(exe_path)])
+            print(f"Started app: {exe_path}")
+        else:
+            print(f"App-EXE didn´t found: {exe_path}")
+
+        # close updater
+        time.sleep(2)
+        subprocess.run(["taskkill", "/f", "/im", "updater.exe"])
 
 # for testing, del in production
 if __name__ == '__main__':
