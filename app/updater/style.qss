@@ -22,7 +22,7 @@ QWidget#MainWindow {
 }
 
 QMainWindow {
-    background-color: #f0f0f0;
+    background-color: #23272e;
 }
 
 /* Live-feed label */
@@ -46,28 +46,38 @@ QFrame#settingsPanel {
     padding: 8px;
 }
 
+QFrame#mainFrame {
+    background-color: #282c34;
+    border-radius: 16px;
+    border: 2px solid #3a8ee6;
+    margin: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+}
+
 /* General buttons */
 QPushButton {
-    background-color: #3a3f4b;
-    color: #e0e0e0;
+    background-color: #5E81AC;   /* solid color, minimal */
+    color: white;
+    font: bold 12px Arial;
     border-radius: 6px;
-    padding: 8px 16px;
-    font-size: 15px;
-    min-width: 120px;
+    padding: 6px 10px;
+    border: none;                /* clean look */
 }
 
 QPushButton#cancelBtn {
     background-color: #e04f4f;
     color: #fff;
+    font-weight: bold;
 }
 
 /* Hover effect */
 QPushButton:hover {
-    background-color: #50566a;
+    background-color: #81A1C1;   /* slightly lighter on hover */
+    color: #2E3440;              /* optional contrast */
 }
 
 QPushButton:pressed {
-    background-color: #2c2f38;
+    background-color: #4C566A;
 }
 
 /* Switch-Cam button distinct color */
@@ -141,33 +151,35 @@ QGroupBox::title {
     padding: 0 5px;
     color: #88C0D0;
 }
+
 QLabel#titleLabel {
-    color: #23272e;
-    font-size: 22px;
+    color: #e0e0e0;
+    font-size: 24px;
     font-weight: bold;
     margin-bottom: 8px;
 }
+
 QLabel#statusLabel {
-    color: #23272e;
-    font-size: 15px;
+    color: #e0e0e0;
+    font-size: 16px;
     margin-bottom: 8px;
 }
+
 QLabel#infoLabel {
     color: #7a7a7a;
-    font-size: 12px;
+    font-size: 13px;
     margin-top: 10px;
 }
+
 QLabel#iconLabel {
     margin-bottom: 8px;
 }
+
+/* Progress Bar */
 QProgressBar {
-    background-color: #e0e0e0;
-    color: #23272e;
-    border-radius: 8px;
-    height: 24px;
-    font-size: 14px;
-}
-QProgressBar::chunk {
-    background-color: #3a8ee6;
-    border-radius: 8px;
+    background-color: #23272e;
+    color: #e0e0e0;
+    border-radius: 12px;
+    height: 28px;
+    font-size: 15px;
 }
