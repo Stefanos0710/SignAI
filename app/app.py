@@ -30,11 +30,11 @@ from camera import Camera, CameraFeed, findcams
 from settings import Settings
 from videos import HistoryVideos
 from api_call import API
-from updater.updater import Updater
 import sys
 import os
 import subprocess
 import platform
+import start_updater as updater
 
 # add resource_path import
 from resource_path import resource_path
@@ -69,6 +69,7 @@ chekDebugMode = window.findChild(QCheckBox, "CheckDebugMode")
 checkHistory = window.findChild(QCheckBox, "checkHistory")
 historybutton = window.findChild(QToolButton, "historybutton")
 githubbutton = window.findChild(QToolButton, "githubButton")
+updateButton = window.findChild(QPushButton, "updateButton")
 
 # set icon to buttons
 historybutton.setIcon(QIcon(resource_path("icons/history.png")))
@@ -187,82 +188,6 @@ class VideoProcessingThread(QThread):
         result = api.api_translation(self.video_path)
 
         self.finished.emit(result)
-
-# --- Updater integration: background thread and UI hook ---
-class UpdateThread(QThread):
-    started_check = Signal()
-    finished_check = Signal(bool, str)  # success, message
-
-    def __init__(self):
-        super().__init__()
-        self.updater = None
-
-    def run(self):
-        try:
-            self.started_check.emit()
-            self.updater = Updater()
-            # Updater.start() currently prints progress to console; run it
-            self.updater.start()
-            # We can't easily get structured status from Updater.start(), so indicate finished
-            self.finished_check.emit(True, "Updater finished. Check console output for details.")
-        except Exception as e:
-            self.finished_check.emit(False, str(e))
-
-# global variable for updater thread
-update_thread = None
-
-# function to start update check from UI
-def check_updates_func():
-    global update_thread, loading_timer
-
-    # Quick config check: instantiate Updater and ensure repo info exists
-    try:
-        cfg = Updater()
-    except Exception as e:
-        resultDisplay.setVisible(True)
-        resultDisplay.setPlainText(f"Updater initialization failed: {e}")
-        QMessageBox.warning(window, "Updater", f"Updater initialization failed:\n{e}")
-        return
-
-    if not cfg.OWNER or not cfg.REPO:
-        resultDisplay.setVisible(True)
-        resultDisplay.setPlainText("Updater not configured. Please set REPO_OWNER and REPO_NAME in .env or environment variables.")
-        QMessageBox.warning(window, "Updater", "Updater not configured. Set REPO_OWNER and REPO_NAME in app/updater/.env or environment variables.")
-        return
-
-    # Show result area and indicate checking
-    resultDisplay.setVisible(True)
-    resultDisplay.setMaximumHeight(120)
-    resultDisplay.setPlainText("Checking for updates...")
-
-    update_thread = UpdateThread()
-    update_thread.started_check.connect(lambda: resultDisplay.setPlainText("Checking for updates..."))
-    update_thread.finished_check.connect(on_update_finished)
-    update_thread.start()
-
-
-def on_update_finished(success, message):
-    # Stop any loading animation
-    global loading_timer
-    if loading_timer:
-        loading_timer.stop()
-
-    if success:
-        resultDisplay.setPlainText("Update check finished. " + message)
-        QMessageBox.information(window, "Updater", "Update process finished. See console for details.")
-    else:
-        resultDisplay.setPlainText("Update failed: " + message)
-        QMessageBox.warning(window, "Updater", "Update failed:\n" + message)
-
-# Add menu entry here (after updater functions exist) so the connection to check_updates_func resolves
-try:
-    menubar = window.menuBar()
-    help_menu = menubar.addMenu("Help")
-    check_updates_action = help_menu.addAction("Check for updates")
-    check_updates_action.triggered.connect(check_updates_func)
-except Exception:
-    # If the loaded UI doesn't have a QMainWindow menuBar or it fails, we silently ignore
-    pass
 
 # click function
 def recordfunc():
@@ -388,6 +313,7 @@ def cleanup():
     if camera:
         camera.close()
 
+# open history folder
 def historyfunc():
     system = platform.system()
 
@@ -399,9 +325,14 @@ def historyfunc():
     else:  # Linux
         subprocess.Popen(["xdg-open", path])
 
+# open github link
 def githubfunc():
     import webbrowser
     webbrowser.open("https://github.com/Stefanos0710/SignAI/")
+
+# open the start updater
+def update():
+    updater.main()
 
 # buttons connections/ events
 recordButton.clicked.connect(recordfunc)
@@ -411,6 +342,7 @@ checkHistory.clicked.connect(checksettings)
 chekDebugMode.clicked.connect(checksettings)
 historybutton.clicked.connect(historyfunc)
 githubbutton.clicked.connect(githubfunc)
+updateButton.clicked.connect(update)
 
 app.aboutToQuit.connect(cleanup)
 
