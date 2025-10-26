@@ -70,7 +70,7 @@ class Updater:
 
         # files and folders to save during update
         self.save_files = ["settings/", "videos/", "data/"]
-        self.dont_delete = ["tmp_data/", "tmp_updater/", "Uninstall SignAI - Desktop_lang.ifl", "Uninstall SignAI - Desktop.exe", "Uninstall SignAI - Desktop.dat"]
+        self.dont_delete = ["tmp_data/", "tmp_updater/", "tmp_updater/", "Uninstall SignAI - Desktop_lang.ifl", "Uninstall SignAI - Desktop.exe", "Uninstall SignAI - Desktop.dat"]
 
         # tmp folders
         self.tmp_folders = ["tmp_data/", "tmp_updater/", "tmp_settings/", "tmp_videos/"]
