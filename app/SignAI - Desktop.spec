@@ -1,16 +1,31 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_all
+
+datas = [('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\ui', 'ui'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\icons', 'icons'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\videos', 'videos'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\style.qss', '.'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\settings', 'settings'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\updater', 'updater'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\tokenizers', 'tokenizers'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\api', 'api')]
+binaries = []
+hiddenimports = ['tensorflow.python.platform._pywrap_tf2', 'tensorflow.python', 'tensorflow.python.framework.ops', 'tensorflow.python.trackable', 'tensorflow.python.trackable.data_structures', 'tensorflow.python.trackable.base', 'tensorflow.python.training.tracking', 'mediapipe', 'matplotlib._c_internal_utils', 'matplotlib.ft2font', 'matplotlib.backends', 'matplotlib.pyplot', 'matplotlib.cbook', 'matplotlib._api', 'matplotlib._docstring', 'matplotlib._pylab_helpers', 'numpy.core._methods', 'numpy.lib.format', 'numpy._globals', 'numpy._distributor_init', 'cv2', 'numpy']
+hiddenimports += collect_submodules('tensorflow')
+hiddenimports += collect_submodules('mediapipe')
+hiddenimports += collect_submodules('matplotlib')
+tmp_ret = collect_all('tensorflow')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('mediapipe')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('matplotlib')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
     ['C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\app.py'],
     pathex=['C:\\Users\\stefa\\Documents\\GitHub\\SignAI'],
-    binaries=[],
-    datas=[('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\ui', 'ui'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\icons', 'icons'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\videos', 'videos'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\style.qss', '.'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\settings', 'settings'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\version.txt', '.'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\tokenizers', 'tokenizers'), ('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\api', 'api')],
-    hiddenimports=['numpy.core._methods', 'numpy.lib.format', 'numpy._globals', 'numpy._distributor_init', 'cv2', 'numpy'],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['mediapipe.tasks.python.genai.converter'],
     noarchive=False,
     optimize=0,
 )

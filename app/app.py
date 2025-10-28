@@ -21,7 +21,7 @@ ToDo List:
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QHBoxLayout, QWidget, QVBoxLayout, QCheckBox, QSpinBox, \
-    QFormLayout, QToolButton, QBoxLayout
+    QFormLayout, QToolButton, QBoxLayout, QMessageBox
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer, Qt, QEvent, QThread, Signal
 from networkx.algorithms.distance_measures import center
@@ -34,6 +34,7 @@ import sys
 import os
 import subprocess
 import platform
+import start_updater as updater
 
 # add resource_path import
 from resource_path import resource_path
@@ -68,6 +69,7 @@ chekDebugMode = window.findChild(QCheckBox, "CheckDebugMode")
 checkHistory = window.findChild(QCheckBox, "checkHistory")
 historybutton = window.findChild(QToolButton, "historybutton")
 githubbutton = window.findChild(QToolButton, "githubButton")
+updateButton = window.findChild(QPushButton, "updateButton")
 
 # set icon to buttons
 historybutton.setIcon(QIcon(resource_path("icons/history.png")))
@@ -114,9 +116,60 @@ camera = None
 # var for clicks
 pressed = 0
 
+# globals for processing/updater
+loading_timer = None
+loading_dots = 0
+processing_worker = None
+
 # open style sheet
 with open(resource_path("style.qss"), "r") as f:
     app.setStyleSheet(f.read())
+
+# loading anim
+def update_loading_animation():
+    global loading_dots
+    try:
+        loading_dots = (loading_dots + 1) % 4
+        dots = '.' * loading_dots
+        if resultDisplay is not None:
+            resultDisplay.setPlainText('AI is thinking' + dots)
+    except Exception:
+        pass
+
+# processing finished callback
+def on_processing_finished(result):
+    global processing_worker, loading_timer
+    try:
+        # stop loading timer if running
+        if loading_timer is not None:
+            loading_timer.stop()
+
+        # re-enable record button
+        try:
+            recordButton.setEnabled(True)
+            recordButton.setText('Record')
+        except Exception:
+            pass
+
+        # display result
+        if isinstance(result, dict):
+            # try common keys
+            text = result.get('text') or result.get('result') or str(result)
+        else:
+            text = str(result)
+
+        if resultDisplay is not None:
+            resultDisplay.setPlainText(text)
+    finally:
+        processing_worker = None
+
+# progress update from worker
+def on_progress_update(message: str):
+    try:
+        if resultDisplay is not None:
+            resultDisplay.setPlainText(message)
+    except Exception:
+        pass
 
 # thread for video processing and AI translation
 class VideoProcessingThread(QThread):
@@ -135,53 +188,6 @@ class VideoProcessingThread(QThread):
         result = api.api_translation(self.video_path)
 
         self.finished.emit(result)
-
-# Global var for worker
-processing_worker = None
-loading_timer = None
-loading_dots = 0
-
-
-# animation for loading
-def update_loading_animation():
-    global loading_dots
-    loading_dots = (loading_dots + 1) % 4
-    dots = "." * loading_dots
-    resultDisplay.setPlainText(f"Processing video{dots}")
-
-# function that generates message wehen succses is ture otherwise error message
-def on_processing_finished(result):
-    global loading_timer
-
-    # Stop loading animation
-    if loading_timer:
-        loading_timer.stop()
-
-    # Display results
-    if result.get("success"):
-        translation = result.get("translation", "N/A").upper()
-        confidence = result.get("confidence", 0)
-        timing = result.get("timing", {})
-        total_time = timing.get("total_processing_time", 0)
-
-        result_text = f"<p align='center'><b>Translation:</b> {translation}</p>\n"
-        result_text += f"<p align='center'><b>Confidence:</b> {confidence}%</p>\n"
-        result_text += f"<p align='center'><b>Time:</b> {total_time}s</p>"
-
-        resultDisplay.setHtml(result_text)
-        print("Translation successful:", translation)
-    else:
-        error_msg = result.get("error", "Unknown error")
-        resultDisplay.setPlainText(f"Translation failed\nError: {error_msg}")
-        print("Translation failed:", error_msg)
-
-    # Enable record button again and reset text
-    recordButton.setEnabled(True)
-    recordButton.setText("Start Recording")
-
-# function to update progress messages
-def on_progress_update(message):
-    resultDisplay.setPlainText(message)
 
 # click function
 def recordfunc():
@@ -265,6 +271,7 @@ def switchcamfunc():
     if camerafeed:
         camerafeed.stop()
 
+
     # start new camera feed
     camerafeed = CameraFeed(videofeedlabel, cam_number=available_cams[camera_number])
     print(f"Change to camera {camera_number}: {available_cams[camera_number]}")
@@ -306,6 +313,7 @@ def cleanup():
     if camera:
         camera.close()
 
+# open history folder
 def historyfunc():
     system = platform.system()
 
@@ -317,9 +325,31 @@ def historyfunc():
     else:  # Linux
         subprocess.Popen(["xdg-open", path])
 
+# open github link
 def githubfunc():
     import webbrowser
     webbrowser.open("https://github.com/Stefanos0710/SignAI/")
+
+# open the start updater
+def update():
+    updater.main()
+
+def start_update():
+    global loading_timer, processing_worker
+    # stop all timers and threads
+    try:
+        if loading_timer is not None:
+            loading_timer.stop()
+        if processing_worker is not None:
+            processing_worker.terminate()
+    except Exception:
+        pass
+    # start updater exe
+    updater_script = os.path.join(os.path.dirname(__file__), "start_updater.py")
+    subprocess.Popen([sys.executable, updater_script], close_fds=True)
+    # stop app
+    app.quit()
+    os._exit(0)
 
 # buttons connections/ events
 recordButton.clicked.connect(recordfunc)
@@ -329,6 +359,7 @@ checkHistory.clicked.connect(checksettings)
 chekDebugMode.clicked.connect(checksettings)
 historybutton.clicked.connect(historyfunc)
 githubbutton.clicked.connect(githubfunc)
+updateButton.clicked.connect(start_update)
 
 app.aboutToQuit.connect(cleanup)
 
