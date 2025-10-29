@@ -25,6 +25,7 @@ from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QH
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer, Qt, QEvent, QThread, Signal
 from networkx.algorithms.distance_measures import center
+from scipy.optimize import newton
 
 from camera import Camera, CameraFeed, findcams
 from settings import Settings
@@ -336,20 +337,22 @@ def update():
 
 def start_update():
     global loading_timer, processing_worker
-    # stop all timers and threads
-    try:
-        if loading_timer is not None:
-            loading_timer.stop()
-        if processing_worker is not None:
-            processing_worker.terminate()
-    except Exception:
-        pass
-    # start updater exe
-    updater_script = os.path.join(os.path.dirname(__file__), "start_updater.py")
-    subprocess.Popen([sys.executable, updater_script], close_fds=True)
-    # stop app
-    app.quit()
-    os._exit(0)
+
+    current_version = "v0.1.0-alpha"
+    new_version = "v0.2.0-alpha"  # This would be fetched from a server in a real scenario
+
+    this_path = os.path.abspath(__file__)
+    path_to_dic = os.path.dirname(this_path)
+
+    if current_version != new_version:
+        # start the updater exe
+        updater_exe_path = resource_path(path_to_dic + "/SignAI - Updater.exe")
+        try:
+            subprocess.Popen([updater_exe_path])
+        except Exception as e:
+            print(f"Failed to start the exe: {e}")
+        # wait a few seconds and close the app
+        QTimer.singleShot(2000, app.quit)  # 2000 ms = 2 sec
 
 # buttons connections/ events
 recordButton.clicked.connect(recordfunc)
