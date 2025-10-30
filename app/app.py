@@ -35,11 +35,11 @@ import sys
 import os
 import subprocess
 import platform
-import start_updater as updater#
+import start_updater as updater
 import time
 
 # add resource_path import
-from resource_path import resource_path
+from resource_path import resource_path, writable_path
 
 #setup application
 app = QApplication(sys.argv)
@@ -316,16 +316,34 @@ def cleanup():
         camera.close()
 
 # open history folder
+# def historyfunc():
+#     system = platform.system()
+#
+#     # warum funktioniert dies nicht wenn man die exe hat also es öffnet den explorere nicht
+#
+#     path = os.path.abspath(resource_path("videos/history"))
+#     if system == "Windows": # Windows
+#         os.startfile(path)
+#     elif system == "Darwin":  # macOS
+#         subprocess.Popen(["open", path])
+#     else:  # Linux
+#         subprocess.Popen(["xdg-open", path])
+
 def historyfunc():
     system = platform.system()
 
-    path = os.path.abspath(resource_path("videos/history"))
-    if system == "Windows": # Windows
-        os.startfile(path)
-    elif system == "Darwin":  # macOS
-        subprocess.Popen(["open", path])
-    else:  # Linux
-        subprocess.Popen(["xdg-open", path])
+    path = os.path.abspath(writable_path("videos/history"))
+
+    try:
+        if system == "Windows":
+            os.startfile(path)
+        elif system == "Darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+    except Exception as e:
+        print(f"Failed to open history: {e}")
+
 
 # open github link
 def githubfunc():
@@ -379,8 +397,11 @@ def start_update():
         try:
             subprocess.Popen([updater_exe_path])
             print("✅ Updater started successfully.")
-            time.sleep(2)
-            sys.exit(0)  # Exit the app
+            # Use QTimer to quit the app after 2 seconds
+
+            app.quit()
+            QTimer.singleShot(100, lambda: sys.exit(0))
+
         except Exception as e:
             print(f"⚠️ Error starting the updater: {e}")
 
