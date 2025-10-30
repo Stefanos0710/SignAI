@@ -65,8 +65,8 @@ def main():
     exe_path = os.path.join(dist_dir, 'SignAI - Desktop.exe')
     copy_build_output(exe_path, 'SignAI - Desktop.exe')
 
-    # delete previous build dirs before next build
-    clean_build_dirs()
+    # # delete previous build dirs before next build
+    # clean_build_dirs()
 
     # build updater exe
     print("Build updater...")

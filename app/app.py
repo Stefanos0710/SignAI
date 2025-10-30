@@ -35,7 +35,8 @@ import sys
 import os
 import subprocess
 import platform
-import start_updater as updater
+import start_updater as updater#
+import time
 
 # add resource_path import
 from resource_path import resource_path
@@ -335,24 +336,53 @@ def githubfunc():
 def update():
     updater.main()
 
+# def start_update():
+#     global loading_timer, processing_worker
+#
+#     current_version = "v0.1.0-alpha"
+#     new_version = "v0.2.0-alpha"  # This would be fetched from a server in a real scenario
+#
+#     this_path = os.path.abspath(__file__)
+#     path_to_dic = os.path.dirname(this_path)
+#
+#     if current_version != new_version:
+#         # start the updater exe
+#         updater_exe_path = resource_path(path_to_dic + "/SignAI - Updater.exe")
+#         try:
+#             subprocess.Popen([updater_exe_path])
+#         except Exception as e:
+#             print(f"Failed to start the exe: {e}")
+#         # wait a few seconds and close the app
+#         QTimer.singleShot(2000, app.quit)  # 2000 ms = 2 sec
+
 def start_update():
-    global loading_timer, processing_worker
-
     current_version = "v0.1.0-alpha"
-    new_version = "v0.2.0-alpha"  # This would be fetched from a server in a real scenario
+    new_version = "v0.2.0-alpha"  # Later: fetch from server
 
-    this_path = os.path.abspath(__file__)
-    path_to_dic = os.path.dirname(this_path)
+    # Determine the path to the current EXE or script
+    if getattr(sys, 'frozen', False):
+        # If the script is compiled as .exe (PyInstaller)
+        path_to_dic = os.path.dirname(sys.executable)
+    else:
+        # If you start it from Python
+        path_to_dic = os.path.dirname(os.path.abspath(__file__))
+
+    updater_exe_path = os.path.join(path_to_dic, "SignAI - Updater.exe")
 
     if current_version != new_version:
-        # start the updater exe
-        updater_exe_path = resource_path(path_to_dic + "/SignAI - Updater.exe")
+        print(f"Starting updater from: {updater_exe_path}")
+
+        if not os.path.exists(updater_exe_path):
+            print(f"❌ File not found at: {updater_exe_path}")
+            return
+
         try:
             subprocess.Popen([updater_exe_path])
+            print("✅ Updater started successfully.")
+            time.sleep(2)
+            sys.exit(0)  # Exit the app
         except Exception as e:
-            print(f"Failed to start the exe: {e}")
-        # wait a few seconds and close the app
-        QTimer.singleShot(2000, app.quit)  # 2000 ms = 2 sec
+            print(f"⚠️ Error starting the updater: {e}")
 
 # buttons connections/ events
 recordButton.clicked.connect(recordfunc)

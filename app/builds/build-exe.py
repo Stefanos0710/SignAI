@@ -190,7 +190,6 @@ print(" Building SignAI Desktop EXE with PyInstaller ")
 print("==============================================\n")
 print("Command:")
 print(" ".join(cmd))
-print()
 
 if added_data:
     print("Including Data:")
