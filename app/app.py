@@ -344,7 +344,6 @@ def historyfunc():
     except Exception as e:
         print(f"Failed to open history: {e}")
 
-
 # open github link
 def githubfunc():
     import webbrowser

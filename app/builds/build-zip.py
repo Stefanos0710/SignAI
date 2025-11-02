@@ -1,10 +1,3 @@
-"""
-
-also i should implement this in the final app script
-
-
-"""
-
 from pathlib import Path
 import zipfile
 import os
@@ -15,28 +8,33 @@ ZIP_DIR = PROJECT_ROOT / "app" / "builds" / "zip"
 # make zip folder if not there
 os.makedirs(ZIP_DIR, exist_ok=True)
 
-def zip_items(dist_dir, zip_name, version):
+def zip_items(exe_path, updater_path, zip_name, version):
     print("Starting to create zip file...")
 
-    desktop_exe = dist_dir / "SignAI - Desktop.exe"
-    updater_exe = dist_dir / "SignAI - Updater.exe"
-
     with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        # add SignAI - Desktop.exe
-        if desktop_exe.exists():
-            arcname = desktop_exe.name
-            zipf.write(desktop_exe, arcname)
+        # add exe file directly
+        if exe_path.exists():
+            arcname = exe_path.name
+            zipf.write(exe_path, arcname)
             print(f"Do file: {arcname}")
         else:
-            print(f"Warning: {desktop_exe.resolve()} not here or skip.")
+            print(f"Warning: {exe_path.resolve()} not here or skip.")
 
-        # add SignAI - Updater.exe
-        if updater_exe.exists():
-            arcname = updater_exe.name
-            zipf.write(updater_exe, arcname)
-            print(f"Do file: {arcname}")
+        # add updater folder content, skip __pycache__
+        if updater_path.exists() and updater_path.is_dir():
+            print(f"Do directory: {updater_path}")
+            for file in updater_path.rglob('*'):
+                if "__pycache__" in file.parts:
+                    print(f"\tSkip pycache: {file}")
+                    continue
+                if file.is_file():
+                    arcname = f"updater/{file.relative_to(updater_path)}"
+                    zipf.write(file, arcname)
+                    print(f"\t{arcname}")
+                else:
+                    print(f"\tSkip directory: {file.relative_to(updater_path)}")
         else:
-            print(f"Warning: {updater_exe.resolve()} not here or skip.")
+            print(f"Warning: {updater_path.resolve()} not here or skip.")
 
     print(f"Zip file made: {zip_name}")
 
@@ -50,6 +48,7 @@ def get_current_version():
 
 if __name__ == "__main__":
     version = get_current_version()
-    dist_dir = PROJECT_ROOT / "app" / "dist"
-    zip_name = ZIP_DIR / f"{version}.zip"
-    zip_items(dist_dir, zip_name, version)
+    exe_path = PROJECT_ROOT / "app" / "dist" / "SignAI - Desktop.exe"
+    updater_path = PROJECT_ROOT / "app" / "updater"
+    zip_name = ZIP_DIR / f"v{version}.zip"
+    zip_items(exe_path, updater_path, zip_name, version)

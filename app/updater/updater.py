@@ -323,7 +323,7 @@ class Updater:
 
         # close updater
         time.sleep(2)
-        subprocess.run(["taskkill", "/f", "/im", "updater.exe"])
+        subprocess.run(["taskkill", "/f", "/im", "SignAI - Updater.exe"])
 
 # for testing, del in production
 if __name__ == '__main__':
