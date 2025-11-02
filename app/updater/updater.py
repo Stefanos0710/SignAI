@@ -180,9 +180,6 @@ class Updater:
         print("\nDownload finished!")
         return update_zip_path
 
-    def create_tmp_updater(self):
-        pass
-
     def create_tmp_data(self):
         """Backup settings, videos, and data into their respective tmp folders."""
         app_dir = self.get_project_paths()
@@ -303,15 +300,31 @@ class Updater:
         if not download_url:
             print("No update needed.")
             return
-        self.backup_user_data()
-        self.delete_old_app()
-        tmp_version_dir = self.download_and_unzip(download_url)
-        self.setup_new_version(tmp_version_dir)
-        self.restore_user_data()
+
+        # 1. Backup user data
+        self.create_tmp_data()
+
+        # 2. Delete old app files
+        self.delete_old_data()
+
+        # 3. Download new version
+        zip_path = self.download_new_version(download_url)
+        if not zip_path:
+            print("Failed to download new version.")
+            return
+
+        # 4. Unzip new version
+        self.unzip_new_version(zip_path)
+
+        # 5. Restore user data
+        self.get_tmp_data()
+
+        # 6. Delete temporary files
         self.delete_tmp_files()
+
         print("Update completed successfully!")
 
-        # wait a bit before starting app again
+        # 7. Restart app
         time.sleep(2)
         app_dir = self.get_project_paths()
         exe_path = app_dir / "SignAI - Desktop.exe"
@@ -319,9 +332,9 @@ class Updater:
             subprocess.Popen([str(exe_path)])
             print(f"Started app: {exe_path}")
         else:
-            print(f"App-EXE didn´t found: {exe_path}")
+            print(f"App-EXE not found: {exe_path}")
 
-        # close updater
+        # 8. Close updater
         time.sleep(2)
         subprocess.run(["taskkill", "/f", "/im", "SignAI - Updater.exe"])
 

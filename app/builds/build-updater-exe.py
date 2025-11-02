@@ -122,7 +122,7 @@ print("Command:", " ".join(cmd))
 if args.dry_run:
     sys.exit(0)
 
-result = subprocess.run(cmd, cwd=BASE_DIR)
+result = subprocess.run([sys.executable, "-m", "PyInstaller"] + cmd[1:], cwd=BASE_DIR)
 if result.returncode == 0:
     print(f"Build success! EXE is in: {os.path.join(BASE_DIR, 'dist', APP_NAME)}")
 else:
