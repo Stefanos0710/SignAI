@@ -56,10 +56,8 @@ for src, dest in DATA_DIRS:
     if os.path.exists(src):
         cmd.append(f"--add-data={src}{os.pathsep}{dest}")
 
-# hidden imports (NumPy, cv2, PySide6, requests, dotenv)
+# hidden imports (PySide6, requests, dotenv)
 hidden_imports = [
-    "numpy",
-    "cv2",
     "PySide6.QtWidgets",
     "PySide6.QtUiTools",
     "PySide6.QtCore",
@@ -70,47 +68,8 @@ hidden_imports = [
 for hidden in hidden_imports:
     cmd.append(f"--hidden-import={hidden}")
 
-# Matplotlib, ft2font, submodules, Mediapipe, Tensorflow
-cmd.append("--collect-all")
-cmd.append("matplotlib")
+# Matplotlib ft2font (only keep specific hidden import if required)
 cmd.append("--hidden-import=matplotlib.ft2font")
-cmd.append("--collect-submodules")
-cmd.append("matplotlib")
-cmd.append("--collect-all")
-cmd.append("mediapipe")
-cmd.append("--collect-all")
-cmd.append("tensorflow")
-
-matplotlib_hidden_imports = [
-    "matplotlib.backends",
-    "matplotlib.pyplot",
-    "matplotlib.cbook",
-    "matplotlib._c_internal_utils",
-    "matplotlib._api",
-    "matplotlib._docstring",
-    "matplotlib._pylab_helpers"
-]
-for hidden in matplotlib_hidden_imports:
-    cmd.append(f"--hidden-import={hidden}")
-
-# Bundle Numpy and OpenCV DLLs
-try:
-    import numpy
-    numpy_dir = os.path.dirname(numpy.__file__)
-    numpy_dll_dir = os.path.join(numpy_dir, '.libs')
-    if os.path.exists(numpy_dll_dir):
-        cmd.append(f'--add-binary={numpy_dll_dir}{os.pathsep}.libs')
-except ImportError:
-    print("Warning: numpy could not be imported. DLLs are not explicitly bundled.")
-
-try:
-    import cv2
-    cv2_dir = os.path.dirname(cv2.__file__)
-    cv2_dll_dir = os.path.join(cv2_dir, '.libs')
-    if os.path.exists(cv2_dll_dir):
-        cmd.append(f'--add-binary={cv2_dll_dir}{os.pathsep}.libs')
-except ImportError:
-    print("Warning: cv2 could not be imported. DLLs are not explicitly bundled.")
 
 # Entry File
 entry_path = os.path.join(BASE_DIR, ENTRY_FILE)

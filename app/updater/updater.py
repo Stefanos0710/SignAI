@@ -143,16 +143,10 @@ class Updater:
             return "0.0.0"
 
     def get_project_paths(self):
-        # get path to app folder
-        current_file = Path(__file__).resolve()
-        updater_dir = current_file.parent
-        app_dir = updater_dir.parent
-
-        # log the paths
-        print(f"Updater dir: {updater_dir}")
-        print(f"App dir: {app_dir}")
-
-        return app_dir
+        if getattr(sys, 'frozen', False):
+            return Path(sys.executable).parent
+        else:
+            return Path(__file__).resolve().parent.parent
 
     def download_new_version(self, download_url):
         app_dir = self.get_project_paths()
@@ -182,6 +176,7 @@ class Updater:
 
     def create_tmp_data(self):
         """Backup settings, videos, and data into their respective tmp folders."""
+        # app_dir = self.get_project_paths()
         app_dir = self.get_project_paths()
         backup_map = {
             "settings": "tmp_settings",
