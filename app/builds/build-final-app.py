@@ -3,6 +3,13 @@ import sys
 import shutil
 import subprocess
 import time
+import argparse
+
+# CLI args to allow dry-run/clean orchestration
+parser = argparse.ArgumentParser(description='Orchestrate final builds for SignAI')
+parser.add_argument('--dry-run', action='store_true', help='Run inner build scripts in dry-run mode')
+parser.add_argument('--clean', action='store_true', help='Pass --clean to inner build scripts')
+args = parser.parse_args()
 
 # folder for final builds
 FINAL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'final'))
@@ -51,11 +58,18 @@ def main():
         time.sleep(2)  # wat a moment to ensure process is closed
 
     # delete previous build dirs before build
-    clean_build_dirs()
+    if args.clean:
+        clean_build_dirs()
 
     # build desktop app
     print("Build desktop-app...")
-    result = subprocess.run([sys.executable, 'build-exe.py'], cwd=os.path.dirname(__file__))
+    # build-exe: pass --dry-run/--clean flags if requested
+    build_exe_cmd = [sys.executable, 'build-exe.py']
+    if args.dry_run:
+        build_exe_cmd.append('--dry-run')
+    if args.clean:
+        build_exe_cmd.append('--clean')
+    result = subprocess.run(build_exe_cmd, cwd=os.path.dirname(__file__))
     if result.returncode != 0:
         print("error building desktop app!")
         sys.exit(1)
@@ -70,13 +84,21 @@ def main():
 
     # build updater exe
     print("Build updater...")
-    result = subprocess.run([sys.executable, 'build-updater-exe.py'], cwd=os.path.dirname(__file__))
+    build_updater_cmd = [sys.executable, 'build-updater-exe.py']
+    if args.dry_run:
+        build_updater_cmd.append('--dry-run')
+    if args.clean:
+        build_updater_cmd.append('--clean')
+    result = subprocess.run(build_updater_cmd, cwd=os.path.dirname(__file__))
     if result.returncode != 0:
         print("error building updater!")
         sys.exit(1)
 
     updater_exe_path = os.path.join(dist_dir, 'SignAI - Updater.exe')
-    copy_build_output(updater_exe_path, 'SignAI - Updater.exe')
+    if not args.dry_run:
+        copy_build_output(updater_exe_path, 'SignAI - Updater.exe')
+    else:
+        print(f"Dry-run: would copy {updater_exe_path} to final folder")
     print("Finished! The final exe´s are in /builds/final/")
 
 if __name__ == "__main__":

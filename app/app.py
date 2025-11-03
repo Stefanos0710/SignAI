@@ -372,37 +372,45 @@ def update():
 #         # wait a few seconds and close the app
 #         QTimer.singleShot(2000, app.quit)  # 2000 ms = 2 sec
 
-def start_update():
+
+def start_update(app):
     current_version = "v0.1.0-alpha"
-    new_version = "v0.2.0-alpha"  # Later: fetch from server
+    new_version = "v0.2.0-alpha"  # get later from server
 
-    # Determine the path to the current EXE or script
+    # get current path from exe or script
     if getattr(sys, 'frozen', False):
-        # If the script is compiled as .exe (PyInstaller)
-        path_to_dic = os.path.dirname(sys.executable)
+        # if the app is run as a bundled exe
+        path_to_dir = os.path.dirname(sys.executable)
     else:
-        # If you start it from Python
-        path_to_dic = os.path.dirname(os.path.abspath(__file__))
+        # if it´s running as script
+        path_to_dir = os.path.dirname(os.path.abspath(__file__))
 
-    updater_exe_path = os.path.join(path_to_dic, "SignAI - Updater.exe")
+    updater_exe_path = os.path.join(path_to_dir, "SignAI - Updater.exe")
 
     if current_version != new_version:
         print(f"Starting updater from: {updater_exe_path}")
 
         if not os.path.exists(updater_exe_path):
-            print(f"❌ File not found at: {updater_exe_path}")
+            print(f"File not found at: {updater_exe_path}")
             return
 
         try:
-            subprocess.Popen([updater_exe_path])
-            print("✅ Updater started successfully.")
-            # Use QTimer to quit the app after 2 seconds
+            # says the updater where the dir app is located
+            os.environ["SIGN_AI_APP_DIR"] = path_to_dir
 
-            app.quit()
+            print("SIGN_AI_APP_DIR =", os.environ["SIGN_AI_APP_DIR"])
+
+            # start the updater process
+            subprocess.Popen([updater_exe_path])
+
+            print("Updater started successfully.")
+
+            # close the main app after a short delay to ensure the updater starts properly
             QTimer.singleShot(100, lambda: sys.exit(0))
+            app.quit()
 
         except Exception as e:
-            print(f"⚠️ Error starting the updater: {e}")
+            print(f"Error starting the updater: {e}")
 
 # buttons connections/ events
 recordButton.clicked.connect(recordfunc)

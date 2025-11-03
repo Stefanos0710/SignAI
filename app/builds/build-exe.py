@@ -203,9 +203,14 @@ if args.dry_run:
     sys.exit(0)
 
 # -------------------------------
-# Run PyInstaller
-# -------------------------------
-result = subprocess.run(cmd, cwd=BASE_DIR)
+# Run PyInstaller using the current Python interpreter module form
+pyinstaller_cmd = [sys.executable, "-m", "PyInstaller"] + cmd[1:]
+try:
+    result = subprocess.run(pyinstaller_cmd, cwd=BASE_DIR)
+except FileNotFoundError as e:
+    print("Failed to start PyInstaller. Ensure Python and PyInstaller are installed in the virtualenv.")
+    print(f"Error: {e}")
+    sys.exit(1)
 
 if result.returncode == 0:
     print("\nBuild successful!")

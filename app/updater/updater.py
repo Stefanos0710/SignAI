@@ -66,8 +66,37 @@ tmp_folders vs. save_files
 """
 
 
+def get_project_paths():
+    """Top-level helper to determine the real app directory.
+
+    Priority:
+    - environment variable SIGN_AI_APP_DIR (if set and exists)
+    - when frozen (PyInstaller): parent folder of sys.executable
+    - otherwise: parent.parent of this file (project app folder)
+
+    Prints debug information and returns a pathlib.Path.
+    """
+    app_dir_env = os.environ.get("SIGN_AI_APP_DIR")
+
+    if app_dir_env and Path(app_dir_env).exists():
+        base_dir = Path(app_dir_env)
+        print(f"DEBUG get_project_paths: Using env var path: {base_dir}")
+    else:
+        if getattr(sys, 'frozen', False):
+            base_dir = Path(sys.executable).parent
+        else:
+            base_dir = Path(__file__).resolve().parent.parent
+        print(f"DEBUG get_project_paths: Fallback path used: {base_dir}")
+
+    return base_dir
+
+
 class Updater:
     def __init__(self):
+        # Determine base dir early so other methods use the correct path
+        self.base_dir = get_project_paths()
+        print(f"Updater base dir: {self.base_dir}")
+
         # Load environment variables from a .env file
         load_dotenv()
         self.API_KEY = os.getenv("GITHUB_TOKEN")
@@ -142,14 +171,8 @@ class Updater:
             print("No version file.")
             return "0.0.0"
 
-    def get_project_paths(self):
-        if getattr(sys, 'frozen', False):
-            return Path(sys.executable).parent
-        else:
-            return Path(__file__).resolve().parent.parent
-
     def download_new_version(self, download_url):
-        app_dir = self.get_project_paths()
+        app_dir = self.base_dir
         tmp_version_dir = app_dir / "tmp_version"
         update_zip_path = tmp_version_dir / "update.zip"
 
@@ -176,8 +199,7 @@ class Updater:
 
     def create_tmp_data(self):
         """Backup settings, videos, and data into their respective tmp folders."""
-        # app_dir = self.get_project_paths()
-        app_dir = self.get_project_paths()
+        app_dir = self.base_dir
         backup_map = {
             "settings": "tmp_settings",
             "videos": "tmp_videos",
@@ -197,10 +219,14 @@ class Updater:
 
     def delete_old_data(self):
         # get the app dir from func get_project_paths
-        app_dir = self.get_project_paths()
+        app_dir = self.base_dir
 
         deleted_count = 0
         skipped_count = 0
+
+        if "_MEI" in str(app_dir):
+            print("⚠️ Abgebrochen: Temp-Ordner erkannt, Update nicht ausgeführt.")
+            return
 
         for item in app_dir.iterdir():
             if item.name in self.dont_delete:
@@ -247,7 +273,7 @@ class Updater:
 
     def setup_new_version(self, new_version):
         new_version = Path(new_version)
-        app_dir = self.get_project_paths()
+        app_dir = self.base_dir
 
         for item in new_version.iterdir():  # gets throuh all files and folder in the tmp_version
             target = new_version / item.name
@@ -257,7 +283,7 @@ class Updater:
                 shutil.copy2(item, target)  # copy file with all content
 
     def delete_tmp_files(self):
-        app_dir = self.get_project_paths()
+        app_dir = self.base_dir
 
         for folder in self.tmp_folders:
             tmp_path = app_dir / folder
@@ -268,7 +294,7 @@ class Updater:
                 print(f"Temporary folder not found, skipped: {folder}")
 
     def get_tmp_data(self):
-        app_dir = self.get_project_paths()
+        app_dir = self.base_dir
 
         tmp_folders = {
             "tmp_settings": "settings",
@@ -321,7 +347,7 @@ class Updater:
 
         # 7. Restart app
         time.sleep(2)
-        app_dir = self.get_project_paths()
+        app_dir = self.base_dir
         exe_path = app_dir / "SignAI - Desktop.exe"
         if exe_path.exists():
             subprocess.Popen([str(exe_path)])
