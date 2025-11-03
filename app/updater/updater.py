@@ -109,7 +109,7 @@ class Updater:
 
         # files and folders to save during update
         self.save_files = ["settings/", "videos/", "data/"]
-        self.dont_delete = ["tmp_data/", "tmp_updater/", "tmp_updater/", "Uninstall SignAI - Desktop_lang.ifl", "Uninstall SignAI - Desktop.exe", "Uninstall SignAI - Desktop.dat"]
+        self.dont_delete = ["tmp_videos/", "tmp_updater/", "tmp_updater/", "Uninstall SignAI - Desktop_lang.ifl", "Uninstall SignAI - Desktop.exe", "Uninstall SignAI - Desktop.dat"]
 
         # tmp folders
         self.tmp_folders = ["tmp_data/", "tmp_updater/", "tmp_settings/", "tmp_videos/"]
@@ -228,8 +228,15 @@ class Updater:
             print("⚠️ Abgebrochen: Temp-Ordner erkannt, Update nicht ausgeführt.")
             return
 
+        # dont_delete list
+        dont_delete_names = [
+            "tmp_videos", "tmp_updater", "Uninstall SignAI - Desktop_lang.ifl",
+            "Uninstall SignAI - Desktop.exe", "Uninstall SignAI - Desktop.dat",
+            "SignAI - Updater.exe", "tmp_data", "tmp_settings"
+        ]
+
         for item in app_dir.iterdir():
-            if item.name in self.dont_delete:
+            if item.name in dont_delete_names:
                 print(f"Skipped: {item.name}")
                 skipped_count += 1
                 continue
@@ -237,12 +244,10 @@ class Updater:
                 if item.is_file():
                     item.unlink()
                     print(f"Deleted file: {item.name}")
-
                 else:
                     shutil.rmtree(item)
                     print(f"Deleted directory: {item.name}")
                 deleted_count += 1
-
             except Exception as e:
                 print(f"Failed to delete {item.name}: {e}")
 
@@ -322,42 +327,48 @@ class Updater:
             print("No update needed.")
             return
 
-        # 1. Backup user data
+        # 1️. Backup user data
+        print("\n=== STEP 1: BACKUP USER DATA ===")
         self.create_tmp_data()
 
-        # 2. Delete old app files
+        # 2️. Delete old app files
+        print("\n=== STEP 2: DELETE OLD FILES ===")
         self.delete_old_data()
 
-        # 3. Download new version
+        # 3️. Download new version
+        print("\n=== STEP 3: DOWNLOAD NEW VERSION ===")
         zip_path = self.download_new_version(download_url)
         if not zip_path:
-            print("Failed to download new version.")
-            return
+            raise RuntimeError("Failed to download new version.")
 
-        # 4. Unzip new version
+        # 4️. Extract new version
+        print("\n=== STEP 4: EXTRACT NEW VERSION ===")
         self.unzip_new_version(zip_path)
 
-        # 5. Restore user data
+        # 5️. Restore user data
+        print("\n=== STEP 5: RESTORE USER DATA ===")
         self.get_tmp_data()
 
-        # 6. Delete temporary files
+        # 6️. Verify that main exe exists before cleanup
+        exe_path = self.base_dir / "SignAI - Desktop.exe"
+        if not exe_path.exists():
+            raise FileNotFoundError("Main application EXE not found after update!")
+
+        # 7️. Cleanup tmp folders AFTER everything is successful
+        print("\n=== STEP 6: CLEANUP TEMPORARY FILES ===")
         self.delete_tmp_files()
 
-        print("Update completed successfully!")
+        print("\n✅ Update completed successfully!")
 
-        # 7. Restart app
+        # 8️. Restart app
         time.sleep(2)
-        app_dir = self.base_dir
-        exe_path = app_dir / "SignAI - Desktop.exe"
-        if exe_path.exists():
-            subprocess.Popen([str(exe_path)])
-            print(f"Started app: {exe_path}")
-        else:
-            print(f"App-EXE not found: {exe_path}")
+        subprocess.Popen([str(exe_path)])
+        print(f"Started app: {exe_path}")
 
-        # 8. Close updater
+        # Kill updater after short delay
         time.sleep(2)
         subprocess.run(["taskkill", "/f", "/im", "SignAI - Updater.exe"])
+
 
 # for testing, del in production
 if __name__ == '__main__':
