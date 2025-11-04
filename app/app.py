@@ -35,7 +35,6 @@ import sys
 import os
 import subprocess
 import platform
-import start_updater as updater
 import time
 
 # add resource_path import
@@ -349,42 +348,24 @@ def githubfunc():
     import webbrowser
     webbrowser.open("https://github.com/Stefanos0710/SignAI/")
 
-# open the start updater
-def update():
-    updater.main()
-
-# def start_update():
-#     global loading_timer, processing_worker
-#
-#     current_version = "v0.1.0-alpha"
-#     new_version = "v0.2.0-alpha"  # This would be fetched from a server in a real scenario
-#
-#     this_path = os.path.abspath(__file__)
-#     path_to_dic = os.path.dirname(this_path)
-#
-#     if current_version != new_version:
-#         # start the updater exe
-#         updater_exe_path = resource_path(path_to_dic + "/SignAI - Updater.exe")
-#         try:
-#             subprocess.Popen([updater_exe_path])
-#         except Exception as e:
-#             print(f"Failed to start the exe: {e}")
-#         # wait a few seconds and close the app
-#         QTimer.singleShot(2000, app.quit)  # 2000 ms = 2 sec
-
-
-def start_update(app):
+def start_update():
+    """Start the updater application and close the main app."""
     current_version = "v0.1.0-alpha"
     new_version = "v0.2.0-alpha"  # get later from server
 
-    # get current path from exe or script
-    if getattr(sys, 'frozen', False):
-        # if the app is run as a bundled exe
+    # Use the same logic as writable_path() - THIS WORKS FINALLY
+    if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
+        # ff frozen by PyInstaller, use directory next to the executable file
         path_to_dir = os.path.dirname(sys.executable)
     else:
-        # if it´s running as script
-        path_to_dir = os.path.dirname(os.path.abspath(__file__))
+        # Development mode:  uses current working directory
+        path_to_dir = os.path.abspath('.')
 
+    print(f"App directory: {path_to_dir}")
+    print(f"sys.frozen: {getattr(sys, 'frozen', False)}")
+    print(f"sys.executable: {sys.executable if hasattr(sys, 'executable') else 'N/A'}")
+
+    # Updater exe is in the same directory as the main app
     updater_exe_path = os.path.join(path_to_dir, "SignAI - Updater.exe")
 
     if current_version != new_version:
@@ -392,16 +373,24 @@ def start_update(app):
 
         if not os.path.exists(updater_exe_path):
             print(f"File not found at: {updater_exe_path}")
+            print(f"Searched in directory: {path_to_dir}")
+            # List files in directory for debugging
+            try:
+                files = os.listdir(path_to_dir)
+                print(f"Files in directory: {files}")
+            except Exception as e:
+                print(f"Could not list directory: {e}")
             return
 
         try:
-            # says the updater where the dir app is located
-            os.environ["SIGN_AI_APP_DIR"] = path_to_dir
+            # Set environment variable so updater knows where the app directory is
+            env = os.environ.copy()
+            env["SIGN_AI_APP_DIR"] = path_to_dir
 
-            print("SIGN_AI_APP_DIR =", os.environ["SIGN_AI_APP_DIR"])
+            print(f"SIGN_AI_APP_DIR = {path_to_dir}")
 
-            # start the updater process
-            subprocess.Popen([updater_exe_path])
+            # start the updater process with the environment variable
+            subprocess.Popen([updater_exe_path], env=env)
 
             print("Updater started successfully.")
 
@@ -411,6 +400,8 @@ def start_update(app):
 
         except Exception as e:
             print(f"Error starting the updater: {e}")
+            import traceback
+            traceback.print_exc()
 
 # buttons connections/ events
 recordButton.clicked.connect(recordfunc)

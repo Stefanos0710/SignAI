@@ -334,15 +334,16 @@ class Updater:
         deleted_count = 0
         skipped_count = 0
 
-        if "_MEI" in str(app_dir):
-            print("[WARNING] Abgebrochen: Temp-Ordner erkannt, Update nicht ausgefuehrt.")
-            return
-
         # dont_delete list
         dont_delete_names = [
-            "tmp_videos", "tmp_updater", "tmp_version", "Uninstall SignAI - Desktop_lang.ifl",
-            "Uninstall SignAI - Desktop.exe", "Uninstall SignAI - Desktop.dat",
-            "SignAI - Updater.exe", "tmp_data", "tmp_settings"
+            "tmp_videos", "tmp_version", "tmp_data", "tmp_settings",
+            "SignAI - Updater.exe",  # Keep the updater EXE (it's in the same folder)
+            "updater",  # Keep the updater source folder (if it exists)
+            "Uninstall SignAI - Desktop_lang.ifl",
+            "Uninstall SignAI - Desktop.exe",
+            "Uninstall SignAI - Desktop.dat",
+            "version.txt",  # Keep version file
+            ".env"  # Keep environment variables
         ]
 
         for item in app_dir.iterdir():
@@ -464,8 +465,8 @@ class Updater:
         # 3. Download new version
         print("\n=== STEP 3: DOWNLOAD NEW VERSION ===")
         zip_path = self.download_new_version(download_url)
-        if not zip_path:
-            raise RuntimeError("Failed to download new version.")
+        # if not zip_path:
+        #     raise RuntimeError("Failed to download new version.")
 
         # 4. Extract new version
         print("\n=== STEP 4: EXTRACT NEW VERSION ===")
