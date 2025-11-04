@@ -12,7 +12,6 @@ import sys
 try:
     from dotenv import load_dotenv
 except ImportError:
-    import subprocess
     subprocess.check_call([sys.executable, "-m", "pip", "install", "python-dotenv"])
     from dotenv import load_dotenv
 
@@ -148,11 +147,20 @@ class Updater:
                 # update the verion.txt file
                 self.update_version_file(latest_tag)
 
-                for asset in data.get("assets", []):
-                    if asset.get("name", "").endswith(".zip"):
-                        return asset["browser_download_url"]
+                # Find and return the download URL for the zip file
+                assets = data.get("assets", [])
+                print(f"Found {len(assets)} assets in release")
 
-                print("No zip asset found in the latest release.")
+                for asset in assets:
+                    asset_name = asset.get("name", "")
+                    print(f"  - Asset: {asset_name}")
+                    if asset_name.endswith(".zip"):
+                        download_url = asset["browser_download_url"]
+                        print(f"[OK] Selected ZIP asset: {asset_name}")
+                        print(f"  Download URL: {download_url}")
+                        return download_url
+
+                print("[WARNING] No zip asset found in the latest release.")
 
             else:
                 print("Already on the latest version.")
@@ -163,12 +171,14 @@ class Updater:
         return None
 
     def current_version(self):
-        version_file = Path("version.txt")
+        version_file = self.base_dir / "version.txt"
         if version_file.exists():
             with open(version_file, "r") as f:
-                return f.read().strip()
+                version = f.read().strip()
+                print(f"Current version from file: {version}")
+                return version
         else:
-            print("No version file.")
+            print(f"No version file found at {version_file}")
             return "0.0.0"
 
     def download_new_version(self, download_url):
@@ -181,21 +191,121 @@ class Updater:
             shutil.rmtree(tmp_version_dir)
         tmp_version_dir.mkdir(parents=True, exist_ok=True)
 
-        print(f"Downloading the newest version: {update_zip_path}")
-        with requests.get(download_url, headers=self.HEADERS, stream=True) as response:
-            if response.status_code != 200:
-                print("Failed to download the new version.")
-                return None
-            total = int(response.headers.get("content-length", 0))
-            downloaded = 0
-            with open(update_zip_path, "wb") as f:
-                for chunk in response.iter_content(1024):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        print(f"\rProgress: {downloaded / total:.0%}", end="")
-        print("\nDownload finished!")
-        return update_zip_path
+        print(f"Download URL: {download_url}")
+        print(f"Downloading to: {update_zip_path}")
+
+        try:
+            # For private releases, we need to use the GitHub API with authentication
+            # Instead of browser_download_url, use the API endpoint
+            if "github.com" in download_url and self.API_KEY:
+                # Extract owner, repo, tag, and filename from the URL
+                # URL format: https://github.com/owner/repo/releases/download/tag/filename
+                parts = download_url.split('/')
+                owner = parts[3]
+                repo = parts[4]
+                tag = parts[7]
+                filename = parts[8]
+
+                # Get the asset ID from the API
+                release_url = f"https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}"
+                release_response = requests.get(release_url, headers=self.HEADERS)
+
+                if release_response.status_code == 200:
+                    release_data = release_response.json()
+                    assets = release_data.get("assets", [])
+
+                    for asset in assets:
+                        if asset["name"] == filename:
+                            # Use the API URL for downloading with authentication
+                            api_download_url = asset["url"]
+                            print(f"Using API download URL: {api_download_url}")
+
+                            # Download using API with Accept header for asset download
+                            headers = self.HEADERS.copy()
+                            headers["Accept"] = "application/octet-stream"
+
+                            with requests.get(api_download_url, headers=headers, stream=True, allow_redirects=True) as response:
+                                print(f"Response status: {response.status_code}")
+
+                                if response.status_code != 200:
+                                    print(f"Failed to download. Status code: {response.status_code}")
+                                    print(f"Response headers: {dict(response.headers)}")
+                                    return None
+
+                                total = int(response.headers.get("content-length", 0))
+                                downloaded = 0
+
+                                with open(update_zip_path, "wb") as f:
+                                    for chunk in response.iter_content(chunk_size=8192):
+                                        if chunk:
+                                            f.write(chunk)
+                                            downloaded += len(chunk)
+                                            if total > 0:
+                                                print(f"\rProgress: {downloaded / total:.0%}", end="")
+                                            else:
+                                                print(f"\rDownloaded: {downloaded / 1024 / 1024:.2f} MB", end="")
+
+                                print(f"\nDownload finished! File size: {downloaded / 1024 / 1024:.2f} MB")
+
+                                # Verify the file exists and has content
+                                if not update_zip_path.exists():
+                                    print("ERROR: Downloaded file does not exist!")
+                                    return None
+
+                                file_size = update_zip_path.stat().st_size
+                                if file_size == 0:
+                                    print("ERROR: Downloaded file is empty!")
+                                    return None
+
+                                print(f"Verified: File exists with size {file_size / 1024 / 1024:.2f} MB")
+                                return update_zip_path
+
+                    print("ERROR: Asset not found in release!")
+                    return None
+
+            # Fallback to direct download (for public releases)
+            with requests.get(download_url, stream=True, allow_redirects=True) as response:
+                print(f"Response status: {response.status_code}")
+
+                if response.status_code != 200:
+                    print(f"Failed to download. Status code: {response.status_code}")
+                    print(f"Response headers: {dict(response.headers)}")
+                    print(f"Response text: {response.text[:500]}")
+                    return None
+
+                total = int(response.headers.get("content-length", 0))
+                downloaded = 0
+
+                with open(update_zip_path, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            if total > 0:
+                                print(f"\rProgress: {downloaded / total:.0%}", end="")
+                            else:
+                                print(f"\rDownloaded: {downloaded / 1024 / 1024:.2f} MB", end="")
+
+                print(f"\nDownload finished! File size: {downloaded / 1024 / 1024:.2f} MB")
+
+                # Verify the file exists and has content
+                if not update_zip_path.exists():
+                    print("ERROR: Downloaded file does not exist!")
+                    return None
+
+                file_size = update_zip_path.stat().st_size
+                if file_size == 0:
+                    print("ERROR: Downloaded file is empty!")
+                    return None
+
+                print(f"Verified: File exists with size {file_size / 1024 / 1024:.2f} MB")
+                return update_zip_path
+
+        except Exception as e:
+            print(f"Download exception: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     def create_tmp_data(self):
         """Backup settings, videos, and data into their respective tmp folders."""
@@ -225,12 +335,12 @@ class Updater:
         skipped_count = 0
 
         if "_MEI" in str(app_dir):
-            print("⚠️ Abgebrochen: Temp-Ordner erkannt, Update nicht ausgeführt.")
+            print("[WARNING] Abgebrochen: Temp-Ordner erkannt, Update nicht ausgefuehrt.")
             return
 
         # dont_delete list
         dont_delete_names = [
-            "tmp_videos", "tmp_updater", "Uninstall SignAI - Desktop_lang.ifl",
+            "tmp_videos", "tmp_updater", "tmp_version", "Uninstall SignAI - Desktop_lang.ifl",
             "Uninstall SignAI - Desktop.exe", "Uninstall SignAI - Desktop.dat",
             "SignAI - Updater.exe", "tmp_data", "tmp_settings"
         ]
@@ -254,7 +364,7 @@ class Updater:
         print(f"\n Cleanup complete! Deleted: {deleted_count}, Skipped: {skipped_count}")
 
     def update_version_file(self, new_version):
-        version_file = Path("version.txt")
+        version_file = self.base_dir / "version.txt"
         try:
             with open(version_file, "w") as f:
                 f.write(new_version)
@@ -276,16 +386,32 @@ class Updater:
 
         print(f"Unzipped '{zip_path.name}' into '{extract_to}'")
 
-    def setup_new_version(self, new_version):
-        new_version = Path(new_version)
+    def setup_new_version(self, tmp_version_dir):
+        """Move all files from tmp_version to app directory."""
+        tmp_version_dir = Path(tmp_version_dir)
         app_dir = self.base_dir
 
-        for item in new_version.iterdir():  # gets throuh all files and folder in the tmp_version
-            target = new_version / item.name
-            if item.is_dir():
-                shutil.copytree(item, target, dirs_exist_ok=True)  # copy dictory with all content
-            else:
-                shutil.copy2(item, target)  # copy file with all content
+        print(f"Moving files from {tmp_version_dir} to {app_dir}")
+
+        for item in tmp_version_dir.iterdir():
+            target = app_dir / item.name
+
+            # Skip if it's a folder we want to preserve (will be restored later)
+            if item.name in ["settings", "videos", "data"]:
+                print(f"Skipped '{item.name}' (will be restored from backup)")
+                continue
+
+            try:
+                if item.is_dir():
+                    if target.exists():
+                        shutil.rmtree(target)
+                    shutil.copytree(item, target)
+                    print(f"Copied directory: {item.name}")
+                else:
+                    shutil.copy2(item, target)
+                    print(f"Copied file: {item.name}")
+            except Exception as e:
+                print(f"Failed to copy {item.name}: {e}")
 
     def delete_tmp_files(self):
         app_dir = self.base_dir
@@ -327,40 +453,51 @@ class Updater:
             print("No update needed.")
             return
 
-        # 1️. Backup user data
+        # 1. Backup user data
         print("\n=== STEP 1: BACKUP USER DATA ===")
         self.create_tmp_data()
 
-        # 2️. Delete old app files
+        # 2. Delete old app files
         print("\n=== STEP 2: DELETE OLD FILES ===")
         self.delete_old_data()
 
-        # 3️. Download new version
+        # 3. Download new version
         print("\n=== STEP 3: DOWNLOAD NEW VERSION ===")
         zip_path = self.download_new_version(download_url)
         if not zip_path:
             raise RuntimeError("Failed to download new version.")
 
-        # 4️. Extract new version
+        # 4. Extract new version
         print("\n=== STEP 4: EXTRACT NEW VERSION ===")
         self.unzip_new_version(zip_path)
 
-        # 5️. Restore user data
-        print("\n=== STEP 5: RESTORE USER DATA ===")
+        # 5. Move new files to app directory
+        print("\n=== STEP 5: SETUP NEW VERSION ===")
+        tmp_version_dir = self.base_dir / "tmp_version"
+        self.setup_new_version(tmp_version_dir)
+
+        # 6. Restore user data
+        print("\n=== STEP 6: RESTORE USER DATA ===")
         self.get_tmp_data()
 
-        # 6️. Verify that main exe exists before cleanup
+        # 7. Verify that main exe exists before cleanup
         exe_path = self.base_dir / "SignAI - Desktop.exe"
         if not exe_path.exists():
             raise FileNotFoundError("Main application EXE not found after update!")
 
-        # 7️. Cleanup tmp folders AFTER everything is successful
-        print("\n=== STEP 6: CLEANUP TEMPORARY FILES ===")
+        # 8. Cleanup tmp folders AFTER everything is successful
+        print("\n=== STEP 7: CLEANUP TEMPORARY FILES ===")
         self.delete_tmp_files()
 
-        print("\n✅ Update completed successfully!")
+        # Also delete tmp_version folder
+        tmp_version_dir = self.base_dir / "tmp_version"
+        if tmp_version_dir.exists():
+            shutil.rmtree(tmp_version_dir)
+            print("Deleted tmp_version folder")
 
-        # 8️. Restart app
+        print("\n[SUCCESS] Update completed successfully!")
+
+        # 9. Restart app
         time.sleep(2)
         subprocess.Popen([str(exe_path)])
         print(f"Started app: {exe_path}")
