@@ -2,6 +2,8 @@ import os
 import sys
 import subprocess
 import argparse
+import shutil
+import stat
 
 # ---------------------------
 # Configuration
@@ -34,13 +36,38 @@ DATA_DIRS = [
     (os.path.join(BASE_DIR, "updater", "version.txt"), "."),
 ]
 
+def _rmtree(path: str):
+    if not os.path.exists(path):
+        return
+    def onerror(func, p, exc_info):
+        try:
+            os.chmod(p, stat.S_IWRITE)
+            func(p)
+        except Exception:
+            pass
+    shutil.rmtree(path, onerror=onerror)
+
 parser = argparse.ArgumentParser(description='Build SignAI Updater EXE using PyInstaller')
 parser.add_argument('--onefile', action='store_true', help='Build as one-file executable (default is onedir)')
 parser.add_argument('--dry-run', action='store_true', help='Print the PyInstaller command and exit')
-parser.add_argument('--clean', action='store_true', help='Remove previous build/dist folders')
+parser.add_argument('--clean', action='store_true', help='Remove previous build/dist folders before building')
 args = parser.parse_args()
 
-cmd = ["pyinstaller", "--noconsole"]
+# Optional cleaning
+if args.clean:
+    build_dir = os.path.join(BASE_DIR, 'build')
+    dist_dir = os.path.join(BASE_DIR, 'dist')
+    print(f"Cleaning: {build_dir} and {dist_dir}")
+    _rmtree(build_dir)
+    _rmtree(dist_dir)
+else:
+    # ensure target output folder is empty to avoid PyInstaller error
+    target_dist = os.path.join(BASE_DIR, 'dist', APP_NAME)
+    if os.path.isdir(target_dist):
+        print(f"Removing previous target output: {target_dist}")
+        _rmtree(target_dist)
+
+cmd = ["pyinstaller", "-y", "--noconsole"]
 cmd.append(f"--name={APP_NAME}")
 # Default to --onedir to avoid PyInstaller temp extraction
 cmd.append("--onefile" if args.onefile else "--onedir")

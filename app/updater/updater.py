@@ -73,20 +73,46 @@ def get_project_paths():
     1) SIGN_AI_APP_DIR (env)
     2) If frozen (PyInstaller): parent of sys.executable (onedir)
     3) Dev mode: parent of this file (../app)
+
+    Extra: If running from the updater folder, try to locate a sibling 'SignAI - Desktop' folder
+    or any folder in the parent that contains 'SignAI - Desktop.exe'.
     """
     app_dir_env = os.environ.get("SIGN_AI_APP_DIR")
 
     if app_dir_env and Path(app_dir_env).exists():
         base_dir = Path(app_dir_env)
         print(f"DEBUG get_project_paths: Using env var path: {base_dir}")
-    else:
-        if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
-            base_dir = Path(sys.executable).parent
-        else:
-            base_dir = Path(__file__).resolve().parent.parent
-        print(f"DEBUG get_project_paths: Fallback path used: {base_dir}")
+        return base_dir
 
-    return base_dir
+    # Default base (exe dir when frozen; repo app/ in dev)
+    if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
+        exe_dir = Path(sys.executable).parent
+    else:
+        exe_dir = Path(__file__).resolve().parent.parent
+
+    # If desktop exe is here, use it
+    if (exe_dir / "SignAI - Desktop.exe").exists():
+        print(f"DEBUG get_project_paths: Fallback path used (has desktop exe): {exe_dir}")
+        return exe_dir
+
+    # If we're inside an updater folder, try to find sibling desktop folder
+    parent = exe_dir.parent
+    candidate = parent / "SignAI - Desktop"
+    if candidate.exists() and (candidate / "SignAI - Desktop.exe").exists():
+        print(f"DEBUG get_project_paths: Found sibling desktop folder: {candidate}")
+        return candidate
+
+    # Scan parent for any folder containing the desktop exe
+    try:
+        for child in parent.iterdir():
+            if child.is_dir() and (child / "SignAI - Desktop.exe").exists():
+                print(f"DEBUG get_project_paths: Found desktop exe in sibling: {child}")
+                return child
+    except Exception:
+        pass
+
+    print(f"DEBUG get_project_paths: Fallback path used: {exe_dir}")
+    return exe_dir
 
 
 class Updater:
@@ -97,13 +123,35 @@ class Updater:
 
         # Load environment variables from a .env file
         load_dotenv()
+
+        # Optional config file for repo
+        repo_cfg = None
+        for cfg in [self.base_dir / "repo.json", self.base_dir / "updater" / "repo.json", Path(__file__).resolve().parent / "repo.json"]:
+            try:
+                if cfg.exists():
+                    import json
+                    with open(cfg, "r", encoding="utf-8") as f:
+                        repo_cfg = json.load(f)
+                        print(f"Using repo config file: {cfg}")
+                        break
+            except Exception:
+                pass
+
         self.API_KEY = os.getenv("GITHUB_TOKEN")
-        self.OWNER = os.getenv("REPO_OWNER")
-        self.REPO = os.getenv("REPO_NAME")
+        # Prefer env, then repo.json, then sane defaults based on project link
+        self.OWNER = os.getenv("REPO_OWNER") or (repo_cfg.get("owner") if repo_cfg else None) or "Stefanos0710"
+        self.REPO = os.getenv("REPO_NAME") or (repo_cfg.get("repo") if repo_cfg else None) or "SignAI"
+        if not os.getenv("REPO_OWNER") or not os.getenv("REPO_NAME"):
+            print(f"Using fallback repo: {self.OWNER}/{self.REPO}")
 
         # make url and headers for api request
-        self.API_URL = f"https://api.github.com/repos/{self.OWNER}/{self.REPO}/releases/latest"
-        self.HEADERS = {"Authorization": f"token {self.API_KEY}"}
+        self.API_URL = (
+            f"https://api.github.com/repos/{self.OWNER}/{self.REPO}/releases/latest"
+            if self.OWNER and self.REPO else None
+        )
+        self.HEADERS = {"Accept": "application/vnd.github+json"}
+        if self.API_KEY:
+            self.HEADERS["Authorization"] = f"token {self.API_KEY}"
 
         # files and folders to save during update
         self.save_files = ["settings/", "videos/", "data/"]
@@ -112,9 +160,95 @@ class Updater:
         # tmp folders
         self.tmp_folders = ["tmp_data/", "tmp_updater/", "tmp_settings/", "tmp_videos/"]
 
+    def _get_latest_release(self):
+        """Fetch latest release JSON or return None."""
+        if not self.API_URL:
+            print("Repository owner/name not configured; skip update check.")
+            return None
+        try:
+            # Test repository access first
+            repo_url = f"https://api.github.com/repos/{self.OWNER}/{self.REPO}"
+            repo_resp = requests.get(repo_url, headers=self.HEADERS, timeout=15)
+            if repo_resp.status_code == 404:
+                print(f"Repository not found: {self.OWNER}/{self.REPO}")
+                print("Check REPO_OWNER and REPO_NAME in .env")
+                return None
+            elif repo_resp.status_code == 401:
+                print("GitHub API authentication failed (401).")
+                print("Check if GITHUB_TOKEN in .env is valid.")
+                return None
+            elif repo_resp.status_code != 200:
+                print(f"GitHub API error: HTTP {repo_resp.status_code}")
+                try:
+                    error = repo_resp.json()
+                    print(f"API message: {error.get('message', 'No message')}")
+                except Exception:
+                    print(f"Raw response: {repo_resp.text[:500]}")
+                return None
+
+            # Repository exists, try to get latest release
+            resp = requests.get(self.API_URL, headers=self.HEADERS, timeout=15)
+            if resp.status_code == 404:
+                # Fall back to list of releases (includes prereleases)
+                url = f"https://api.github.com/repos/{self.OWNER}/{self.REPO}/releases?per_page=1"
+                alt = requests.get(url, headers=self.HEADERS, timeout=15)
+                if alt.status_code == 200:
+                    releases = alt.json() or []
+                    if releases:
+                        print("Using latest release from list (prerelease allowed).")
+                        return releases[0]
+                    print("Repository exists but has no releases.")
+                    print("Please create a release with a .zip asset first.")
+                    return None
+                else:
+                    print(f"Failed to fetch releases list (HTTP {alt.status_code})")
+                    try:
+                        error = alt.json()
+                        print(f"API message: {error.get('message', 'No message')}")
+                    except Exception:
+                        print(f"Raw response: {alt.text[:500]}")
+                    return None
+            if resp.status_code != 200:
+                print(f"Failed to fetch latest release (HTTP {resp.status_code})")
+                try:
+                    error = resp.json()
+                    print(f"API message: {error.get('message', 'No message')}")
+                except Exception:
+                    print(f"Raw response: {resp.text[:500]}")
+                return None
+            return resp.json()
+        except Exception as e:
+            print(f"Failed to fetch latest release: {e}")
+            return None
+
+    def get_latest_zip_download(self):
+        """Return (download_url, tag_name) for the first .zip asset in latest release, or (None, None)."""
+        data = self._get_latest_release()
+        if not data:
+            return None, None
+        tag = data.get("tag_name", "")
+        assets = data.get("assets", [])
+        for asset in assets:
+            name = asset.get("name", "")
+            if name.endswith(".zip"):
+                url = asset.get("browser_download_url")
+                if url:
+                    print(f"[OK] Selected ZIP asset: {name}")
+                    print(f"  Download URL: {url}")
+                    return url, tag
+        print("[WARNING] No zip asset found in the latest release.")
+        return None, tag or None
+
     def check_for_updates(self, current_version):
         print("Checking for updates...")
-        response = requests.get(self.API_URL, headers=self.HEADERS)
+        if not self.API_URL:
+            print("Repository owner/name not configured; skip update check.")
+            return None
+        try:
+            response = requests.get(self.API_URL, headers=self.HEADERS, timeout=15)
+        except Exception as e:
+            print(f"Failed to fetch release information (exception): {e}")
+            return None
 
         # check id response failed
         if response.status_code != 200:
@@ -170,15 +304,23 @@ class Updater:
         return None
 
     def current_version(self):
-        version_file = self.base_dir / "version.txt"
-        if version_file.exists():
-            with open(version_file, "r") as f:
-                version = f.read().strip()
-                print(f"Current version from file: {version}")
-                return version
-        else:
-            print(f"No version file found at {version_file}")
-            return "0.0.0"
+        # Prefer version.txt in app directory, but fall back to bundled updater/version.txt or module directory
+        candidates = [
+            self.base_dir / "version.txt",
+            self.base_dir / "updater" / "version.txt",
+            Path(__file__).resolve().parent / "version.txt",
+        ]
+        for vf in candidates:
+            try:
+                if vf.exists():
+                    with open(vf, "r", encoding="utf-8") as f:
+                        version = f.read().strip()
+                        print(f"Current version from file: {version} ({vf})")
+                        return version
+            except Exception:
+                continue
+        print("No version file found (using default 0.0.0)")
+        return "0.0.0"
 
     def download_new_version(self, download_url):
         app_dir = self.base_dir
@@ -447,12 +589,21 @@ class Updater:
             else:
                 print(f"Backup folder '{tmp_name}' not found, skipping.")
 
-    def start(self):
-        current_version = self.current_version()
-        download_url = self.check_for_updates(current_version)
-        if not download_url:
-            print("No update needed.")
-            return
+    def start(self, force: bool = True):
+        """Run the update process. If force=True, always install the latest release without comparing versions."""
+        if force:
+            download_url, latest_tag = self.get_latest_zip_download()
+            if not download_url:
+                print("No download URL for latest release; aborting.")
+                return
+            if latest_tag:
+                self.update_version_file(latest_tag)
+        else:
+            current_version = self.current_version()
+            download_url = self.check_for_updates(current_version)
+            if not download_url:
+                print("No update needed.")
+                return
 
         # 1. Backup user data
         print("\n=== STEP 1: BACKUP USER DATA ===")
@@ -465,8 +616,9 @@ class Updater:
         # 3. Download new version
         print("\n=== STEP 3: DOWNLOAD NEW VERSION ===")
         zip_path = self.download_new_version(download_url)
-        # if not zip_path:
-        #     raise RuntimeError("Failed to download new version.")
+        if not zip_path:
+            print("Download failed; aborting update.")
+            return
 
         # 4. Extract new version
         print("\n=== STEP 4: EXTRACT NEW VERSION ===")
