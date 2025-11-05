@@ -51,6 +51,7 @@ parser.add_argument("--include-tokenizers", action="store_true", help="Include .
 parser.add_argument("--include-api", action="store_true", help="Include ../api folder")
 parser.add_argument("--include-webside", action="store_true", help="Include webside folders")
 parser.add_argument("--onedir", action="store_true", help="Use --onedir (debug mode)")
+parser.add_argument("--onefile", action="store_true", help="Use --onefile (single EXE)")
 parser.add_argument("--dry-run", action="store_true", help="Show command but do not run")
 parser.add_argument("--clean", action="store_true", help="Clean old build/dist folders")
 args = parser.parse_args()
@@ -91,7 +92,12 @@ if args.clean:
 # -------------------------------
 cmd = ["pyinstaller", "--noconsole"]
 
-cmd.append("--onedir" if args.onedir else "--onefile")
+# Default to --onedir to avoid _MEIPASS extraction; allow override with --onefile
+if args.onefile:
+    cmd.append("--onefile")
+else:
+    cmd.append("--onedir")
+
 cmd.append(f"--name={APP_NAME}")
 
 if ICON_PATH and os.path.exists(ICON_PATH):
@@ -114,6 +120,10 @@ for src, dest in DATA_DIRS:
 # -------------------------------
 # TensorFlow, Mediapipe, Matplotlib, NumPy, OpenCV
 hidden_imports = [
+    # PySide6 core/ui
+    "PySide6.QtWidgets",
+    "PySide6.QtUiTools",
+    "PySide6.QtCore",
     # TensorFlow Core
     "tensorflow.python.platform._pywrap_tf2",
     "tensorflow.python",
@@ -214,9 +224,9 @@ except FileNotFoundError as e:
 
 if result.returncode == 0:
     print("\nBuild successful!")
-    if args.onedir:
-        print(f"Output folder: {os.path.join(BASE_DIR, 'dist', APP_NAME)}")
-    else:
+    if args.onefile:
         print(f"Executable: dist\\{APP_NAME}.exe")
+    else:
+        print(f"Output folder: {os.path.join(BASE_DIR, 'dist', APP_NAME)}")
 else:
     print("\nBuild failed! Check the logs above.")

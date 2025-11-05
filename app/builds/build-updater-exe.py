@@ -35,14 +35,15 @@ DATA_DIRS = [
 ]
 
 parser = argparse.ArgumentParser(description='Build SignAI Updater EXE using PyInstaller')
-parser.add_argument('--onedir', action='store_true', help='Use --onedir instead of --onefile')
+parser.add_argument('--onefile', action='store_true', help='Build as one-file executable (default is onedir)')
 parser.add_argument('--dry-run', action='store_true', help='Print the PyInstaller command and exit')
 parser.add_argument('--clean', action='store_true', help='Remove previous build/dist folders')
 args = parser.parse_args()
 
 cmd = ["pyinstaller", "--noconsole"]
 cmd.append(f"--name={APP_NAME}")
-cmd.append("--onedir" if args.onedir else "--onefile")
+# Default to --onedir to avoid PyInstaller temp extraction
+cmd.append("--onefile" if args.onefile else "--onedir")
 
 if ICON_PATH:
     cmd.append(f"--icon={ICON_PATH}")
@@ -83,6 +84,6 @@ if args.dry_run:
 
 result = subprocess.run([sys.executable, "-m", "PyInstaller"] + cmd[1:], cwd=BASE_DIR)
 if result.returncode == 0:
-    print(f"Build success! EXE is in: {os.path.join(BASE_DIR, 'dist', APP_NAME)}")
+    print(f"Build success! EXE folder is in: {os.path.join(BASE_DIR, 'dist', APP_NAME)}")
 else:
     print("Build failed, check errors above.")

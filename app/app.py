@@ -10,8 +10,8 @@ recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 
 ToDo List:
 - [ ] more settings options
--  make upadte loader
--  model selection for different AI models
+- make upadte loader
+- model selection for different AI models
 
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
@@ -52,8 +52,13 @@ history_videos = HistoryVideos()
 
 # load UI
 ui_file_path = resource_path("ui/main_window.ui")
+if not os.path.exists(ui_file_path):
+    raise RuntimeError(f"UI file not found at: {ui_file_path}")
+
 ui_file = QFile(ui_file_path)
-ui_file.open(QFile.ReadOnly)
+if not ui_file.open(QFile.ReadOnly):
+    raise RuntimeError(f"Unable to open UI file: {ui_file_path}")
+
 window = loader.load(ui_file)
 ui_file.close()
 
@@ -123,8 +128,12 @@ loading_dots = 0
 processing_worker = None
 
 # open style sheet
-with open(resource_path("style.qss"), "r") as f:
-    app.setStyleSheet(f.read())
+style_path = resource_path("style.qss")
+if not os.path.exists(style_path):
+    print(f"Warning: style file not found: {style_path}")
+else:
+    with open(style_path, "r") as f:
+        app.setStyleSheet(f.read())
 
 # loading anim
 def update_loading_animation():
@@ -350,58 +359,81 @@ def githubfunc():
 
 def start_update():
     """Start the updater application and close the main app."""
-    current_version = "v0.1.0-alpha"
-    new_version = "v0.2.0-alpha"  # get later from server
+    print("[Update] Button clicked")
 
-    # Use the same logic as writable_path() - THIS WORKS FINALLY
+    # Determine app dir (frozen uses exe dir)
     if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
-        # ff frozen by PyInstaller, use directory next to the executable file
-        path_to_dir = os.path.dirname(sys.executable)
+        app_dir = os.path.dirname(sys.executable)
     else:
-        # Development mode:  uses current working directory
-        path_to_dir = os.path.abspath('.')
+        app_dir = os.path.abspath('.')
 
-    print(f"App directory: {path_to_dir}")
-    print(f"sys.frozen: {getattr(sys, 'frozen', False)}")
-    print(f"sys.executable: {sys.executable if hasattr(sys, 'executable') else 'N/A'}")
+    print(f"[Update] app_dir={app_dir}")
 
-    # Updater exe is in the same directory as the main app
-    updater_exe_path = os.path.join(path_to_dir, "SignAI - Updater.exe")
+    parent = os.path.dirname(app_dir)
+    grandparent = os.path.dirname(parent)
 
-    if current_version != new_version:
-        print(f"Starting updater from: {updater_exe_path}")
+    # Kandidatenpfade für Updater-EXE
+    candidates = [
+        # gleiche Ebene wie die App
+        os.path.join(app_dir, "SignAI - Updater.exe"),
+        os.path.join(app_dir, "SignAI - Updater", "SignAI - Updater.exe"),
+        os.path.join(app_dir, "updater", "SignAI - Updater.exe"),
+        # Geschwister unter parent (typisch: dist/SignAI - Desktop und dist/SignAI - Updater)
+        os.path.join(parent, "SignAI - Updater.exe"),
+        os.path.join(parent, "SignAI - Updater", "SignAI - Updater.exe"),
+        # eine Ebene höher (z. B. app/final vs. app/dist)
+        os.path.join(grandparent, "SignAI - Updater.exe"),
+        os.path.join(grandparent, "SignAI - Updater", "SignAI - Updater.exe"),
+    ]
 
-        if not os.path.exists(updater_exe_path):
-            print(f"File not found at: {updater_exe_path}")
-            print(f"Searched in directory: {path_to_dir}")
-            # List files in directory for debugging
-            try:
-                files = os.listdir(path_to_dir)
-                print(f"Files in directory: {files}")
-            except Exception as e:
-                print(f"Could not list directory: {e}")
-            return
+    updater_exe_path = next((p for p in candidates if os.path.isfile(p)), None)
 
+    if updater_exe_path:
         try:
-            # Set environment variable so updater knows where the app directory is
             env = os.environ.copy()
-            env["SIGN_AI_APP_DIR"] = path_to_dir
-
-            print(f"SIGN_AI_APP_DIR = {path_to_dir}")
-
-            # start the updater process with the environment variable
-            subprocess.Popen([updater_exe_path], env=env)
-
-            print("Updater started successfully.")
-
-            # close the main app after a short delay to ensure the updater starts properly
+            env["SIGN_AI_APP_DIR"] = app_dir
+            print(f"[Update] Using updater: {updater_exe_path}")
+            print(f"[Update] SIGN_AI_APP_DIR = {app_dir}")
+            cwd = os.path.dirname(updater_exe_path)
+            subprocess.Popen([updater_exe_path], env=env, cwd=cwd)
+            print("[Update] Updater started successfully.")
             QTimer.singleShot(100, lambda: sys.exit(0))
             app.quit()
-
+            return
         except Exception as e:
-            print(f"Error starting the updater: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"[Update] Error starting updater: {e}")
+            import traceback; traceback.print_exc()
+            try:
+                QMessageBox.critical(None, "Update", f"Updater konnte nicht gestartet werden:\n{e}")
+            except Exception:
+                pass
+            # continue to dev fallback
+
+    # Dev-Fallback: starte start_updater.py (kopiert updater/ und startet EXE dort)
+    start_updater_py = resource_path("start_updater.py")
+    if os.path.exists(start_updater_py):
+        print(f"[Update] Fallback to start_updater.py: {start_updater_py}")
+        try:
+            env = os.environ.copy()
+            env["SIGN_AI_APP_DIR"] = app_dir
+            subprocess.Popen([sys.executable, start_updater_py], env=env, cwd=os.path.dirname(start_updater_py))
+            QTimer.singleShot(100, lambda: sys.exit(0))
+            app.quit()
+            return
+        except Exception as e:
+            print(f"[Update] start_updater.py failed: {e}")
+
+    # Nichts gefunden -> Meldung
+    msg = (
+        "Updater wurde nicht gefunden. Erwartet unter:\n" +
+        "\n".join(candidates) +
+        "\n\nOder Fallback 'start_updater.py' ist nicht ausführbar."
+    )
+    print(msg)
+    try:
+        QMessageBox.warning(None, "Update", msg)
+    except Exception:
+        pass
 
 # buttons connections/ events
 recordButton.clicked.connect(recordfunc)

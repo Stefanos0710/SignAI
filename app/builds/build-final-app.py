@@ -76,8 +76,13 @@ def main():
 
     # copy output
     dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'dist'))
-    exe_path = os.path.join(dist_dir, 'SignAI - Desktop.exe')
-    copy_build_output(exe_path, 'SignAI - Desktop.exe')
+    # prefer onedir folder copy; if onefile was built, exe will exist instead
+    onedir_folder = os.path.join(dist_dir, 'SignAI - Desktop')
+    if os.path.isdir(onedir_folder):
+        copy_build_output(onedir_folder, 'SignAI - Desktop')
+    else:
+        exe_path = os.path.join(dist_dir, 'SignAI - Desktop.exe')
+        copy_build_output(exe_path, 'SignAI - Desktop.exe')
 
     # # delete previous build dirs before next build
     # clean_build_dirs()
@@ -94,11 +99,16 @@ def main():
         print("error building updater!")
         sys.exit(1)
 
-    updater_exe_path = os.path.join(dist_dir, 'SignAI - Updater.exe')
+    # Updater now defaults to onedir folder
+    updater_folder = os.path.join(dist_dir, 'SignAI - Updater')
     if not args.dry_run:
-        copy_build_output(updater_exe_path, 'SignAI - Updater.exe')
+        if os.path.isdir(updater_folder):
+            copy_build_output(updater_folder, 'SignAI - Updater')
+        else:
+            updater_exe_path = os.path.join(dist_dir, 'SignAI - Updater.exe')
+            copy_build_output(updater_exe_path, 'SignAI - Updater.exe')
     else:
-        print(f"Dry-run: would copy {updater_exe_path} to final folder")
+        print(f"Dry-run: would copy {updater_folder} (or exe fallback) to final folder")
     print("Finished! The final exe´s are in /builds/final/")
 
 if __name__ == "__main__":

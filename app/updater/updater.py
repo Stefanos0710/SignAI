@@ -7,6 +7,7 @@ import re
 import time
 import subprocess
 import sys
+import logging
 
 # Fallback für dotenv, falls nicht installiert
 try:
@@ -66,14 +67,12 @@ tmp_folders vs. save_files
 
 
 def get_project_paths():
-    """Top-level helper to determine the real app directory.
+    """Return base app directory.
 
     Priority:
-    - environment variable SIGN_AI_APP_DIR (if set and exists)
-    - when frozen (PyInstaller): parent folder of sys.executable
-    - otherwise: parent.parent of this file (project app folder)
-
-    Prints debug information and returns a pathlib.Path.
+    1) SIGN_AI_APP_DIR (env)
+    2) If frozen (PyInstaller): parent of sys.executable (onedir)
+    3) Dev mode: parent of this file (../app)
     """
     app_dir_env = os.environ.get("SIGN_AI_APP_DIR")
 
@@ -81,7 +80,7 @@ def get_project_paths():
         base_dir = Path(app_dir_env)
         print(f"DEBUG get_project_paths: Using env var path: {base_dir}")
     else:
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
             base_dir = Path(sys.executable).parent
         else:
             base_dir = Path(__file__).resolve().parent.parent
@@ -343,7 +342,8 @@ class Updater:
             "Uninstall SignAI - Desktop.exe",
             "Uninstall SignAI - Desktop.dat",
             "version.txt",  # Keep version file
-            ".env"  # Keep environment variables
+            ".env",  # Keep environment variables
+            "_internal"  # Do not delete PyInstaller internal folder
         ]
 
         for item in app_dir.iterdir():
