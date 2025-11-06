@@ -9,7 +9,7 @@ import subprocess
 import sys
 import logging
 
-# Fallback für dotenv, falls nicht installiert
+# Fallback for dotenv, install if not available
 try:
     from dotenv import load_dotenv
 except ImportError:
@@ -117,14 +117,17 @@ def get_project_paths():
 
 class Updater:
     def __init__(self):
-        # Determine base dir early so other methods use the correct path
+        # Determine base_dir early so other methods can use the correct path
         self.base_dir = get_project_paths()
+        # Set parent_dir as parent directory of base_dir
+        self.parent_dir = self.base_dir.parent
         print(f"Updater base dir: {self.base_dir}")
+        print(f"Parent dir: {self.parent_dir}")
 
-        # Load environment variables from a .env file
+        # Load environment variables from .env file
         load_dotenv()
 
-        # Optional config file for repo
+        # Optional configuration file for repository
         repo_cfg = None
         for cfg in [self.base_dir / "repo.json", self.base_dir / "updater" / "repo.json", Path(__file__).resolve().parent / "repo.json"]:
             try:
@@ -138,13 +141,13 @@ class Updater:
                 pass
 
         self.API_KEY = os.getenv("GITHUB_TOKEN")
-        # Prefer env, then repo.json, then sane defaults based on project link
+        # Prefer env, then repo.json, then sensible default values based on project link
         self.OWNER = os.getenv("REPO_OWNER") or (repo_cfg.get("owner") if repo_cfg else None) or "Stefanos0710"
         self.REPO = os.getenv("REPO_NAME") or (repo_cfg.get("repo") if repo_cfg else None) or "SignAI"
         if not os.getenv("REPO_OWNER") or not os.getenv("REPO_NAME"):
             print(f"Using fallback repo: {self.OWNER}/{self.REPO}")
 
-        # make url and headers for api request
+        # Create URL and headers for API request
         self.API_URL = (
             f"https://api.github.com/repos/{self.OWNER}/{self.REPO}/releases/latest"
             if self.OWNER and self.REPO else None
@@ -153,12 +156,12 @@ class Updater:
         if self.API_KEY:
             self.HEADERS["Authorization"] = f"token {self.API_KEY}"
 
-        # files and folders to save during update
+        # Files and folders to be backed up during update
         self.save_files = ["settings/", "videos/", "data/"]
-        self.dont_delete = ["tmp_videos/", "tmp_updater/", "tmp_updater/", "Uninstall SignAI - Desktop_lang.ifl", "Uninstall SignAI - Desktop.exe", "Uninstall SignAI - Desktop.dat"]
+        self.dont_delete = ["Uninstall SignAI - Desktop_lang.ifl", "Uninstall SignAI - Desktop.exe", "Uninstall SignAI - Desktop.dat"]
 
-        # tmp folders
-        self.tmp_folders = ["tmp_data/", "tmp_updater/", "tmp_settings/", "tmp_videos/"]
+        # Temporary folders at parent level
+        self.tmp_folders = ["tmp_data/", "tmp_settings/", "tmp_videos/"]
 
     def _get_latest_release(self):
         """Fetch latest release JSON or return None."""
@@ -323,8 +326,9 @@ class Updater:
         return "0.0.0"
 
     def download_new_version(self, download_url):
-        app_dir = self.base_dir
-        tmp_version_dir = app_dir / "tmp_version"
+        # Create tmp_version in parent directory (same level as tmp_settings, etc.)
+        parent_dir = self.parent_dir
+        tmp_version_dir = parent_dir / "tmp_version"
         update_zip_path = tmp_version_dir / "update.zip"
 
         # create or clean update directory (tmp_version)
@@ -449,33 +453,36 @@ class Updater:
             return None
 
     def create_tmp_data(self):
-        """Backup settings, videos, and data into their respective tmp folders."""
+        """Backup settings, videos, and data into their respective tmp folders on parent level."""
         app_dir = self.base_dir
+        parent_dir = self.parent_dir
         backup_map = {
             "settings": "tmp_settings",
             "videos": "tmp_videos",
             "data": "tmp_data"
         }
+        print("Backing up user data to parent directory...")
         for src, tmp in backup_map.items():
             src_path = app_dir / src
-            tmp_path = app_dir / tmp
+            tmp_path = parent_dir / tmp
             if src_path.exists():
+                print(f"Backing up {src}...", end=" ")
                 if tmp_path.exists():
                     shutil.rmtree(tmp_path)
                 shutil.copytree(src_path, tmp_path)
-                print(f"Backed up {src} to {tmp}")
+                print(f"[OK] Backed up to {tmp}")
             else:
                 print(f"Source folder {src} not found, skipping backup.")
         print("User data backup to tmp folders completed.")
 
     def delete_old_data(self):
-        # get the app dir from func get_project_paths
+        # Get the app directory from func get_project_paths
         app_dir = self.base_dir
 
         deleted_count = 0
         skipped_count = 0
 
-        # dont_delete list
+        # Files/folders that should not be deleted
         dont_delete_names = [
             "tmp_videos", "tmp_version", "tmp_data", "tmp_settings",
             "SignAI - Updater.exe",  # Keep the updater EXE (it's in the same folder)
@@ -517,12 +524,21 @@ class Updater:
 
     def unzip_new_version(self, zip_path):
         zip_path = Path(zip_path)
-        extract_to = zip_path.parent # in the same dic as zip file
+        extract_to = zip_path.parent  # in the same directory as zip file
 
         extract_to.mkdir(parents=True, exist_ok=True)
 
+        print(f"Extracting '{zip_path.name}'...")
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(extract_to)
+            members = zip_ref.namelist()
+            total_files = len(members)
+            print(f"Total files to extract: {total_files}")
+
+            for i, member in enumerate(members, 1):
+                zip_ref.extract(member, extract_to)
+                if i % 100 == 0 or i == total_files:
+                    print(f"\rExtracted: {i}/{total_files} files ({i/total_files:.0%})", end="")
+            print()  # New line after progress
 
         # del zip file
         zip_path.unlink()
@@ -536,39 +552,52 @@ class Updater:
 
         print(f"Moving files from {tmp_version_dir} to {app_dir}")
 
-        for item in tmp_version_dir.iterdir():
+        items = list(tmp_version_dir.iterdir())
+        total = len(items)
+        print(f"Total items to copy: {total}")
+
+        for idx, item in enumerate(items, 1):
             target = app_dir / item.name
 
             # Skip if it's a folder we want to preserve (will be restored later)
             if item.name in ["settings", "videos", "data"]:
-                print(f"Skipped '{item.name}' (will be restored from backup)")
+                print(f"[{idx}/{total}] Skipped '{item.name}' (will be restored from backup)")
                 continue
 
             try:
+                print(f"[{idx}/{total}] Copying {item.name}...", end=" ")
                 if item.is_dir():
                     if target.exists():
                         shutil.rmtree(target)
                     shutil.copytree(item, target)
-                    print(f"Copied directory: {item.name}")
+                    print(f"[OK] (directory)")
                 else:
                     shutil.copy2(item, target)
-                    print(f"Copied file: {item.name}")
+                    print(f"[OK] (file)")
             except Exception as e:
-                print(f"Failed to copy {item.name}: {e}")
+                print(f"[FAILED] {e}")
 
     def delete_tmp_files(self):
-        app_dir = self.base_dir
+        """Delete temporary folders from parent directory."""
+        parent_dir = self.parent_dir
 
-        for folder in self.tmp_folders:
-            tmp_path = app_dir / folder
+        # Add tmp_version to the list of folders to delete
+        all_tmp_folders = self.tmp_folders + ["tmp_version/"]
+
+        for folder in all_tmp_folders:
+            # Remove trailing slash for consistent path handling
+            folder_name = folder.rstrip('/')
+            tmp_path = parent_dir / folder_name
             if tmp_path.exists():
                 shutil.rmtree(tmp_path)
-                print(f"Deleted temporary folder: {folder}")
+                print(f"Deleted temporary folder from parent: {folder_name}")
             else:
-                print(f"Temporary folder not found, skipped: {folder}")
+                print(f"Temporary folder not found in parent, skipped: {folder_name}")
 
     def get_tmp_data(self):
+        """Restore backup data from temporary folders in parent directory."""
         app_dir = self.base_dir
+        parent_dir = self.parent_dir
 
         tmp_folders = {
             "tmp_settings": "settings",
@@ -576,21 +605,24 @@ class Updater:
             "tmp_data": "data"
         }
 
+        print("Restoring user data from parent directory...")
         for tmp_name, target_name in tmp_folders.items():
-            source = app_dir / tmp_name
+            source = parent_dir / tmp_name
             target = app_dir / target_name
 
             if source.exists():
-                # Ordner im App-Verzeichnis vorher löschen, falls er existiert
+                print(f"Restoring {target_name}...", end=" ")
                 if target.exists():
                     shutil.rmtree(target)
                 shutil.copytree(source, target)
-                print(f"Restored '{target_name}' from '{tmp_name}'")
+                print(f"[OK] Restored from {tmp_name}")
             else:
-                print(f"Backup folder '{tmp_name}' not found, skipping.")
+                print(f"Backup folder '{tmp_name}' not found in parent directory, skipping.")
 
     def start(self, force: bool = True):
         """Run the update process. If force=True, always install the latest release without comparing versions."""
+        print("Starting updater...\n")
+
         if force:
             download_url, latest_tag = self.get_latest_zip_download()
             if not download_url:
@@ -605,48 +637,55 @@ class Updater:
                 print("No update needed.")
                 return
 
-        # 1. Backup user data
+        # 1. Backup user data to parent directory
         print("\n=== STEP 1: BACKUP USER DATA ===")
         self.create_tmp_data()
 
-        # 2. Delete old app files
-        print("\n=== STEP 2: DELETE OLD FILES ===")
-        self.delete_old_data()
-
-        # 3. Download new version
-        print("\n=== STEP 3: DOWNLOAD NEW VERSION ===")
+        # 2. Download new version before deleting the old one
+        print("\n=== STEP 2: DOWNLOAD NEW VERSION ===")
         zip_path = self.download_new_version(download_url)
         if not zip_path:
             print("Download failed; aborting update.")
             return
 
-        # 4. Extract new version
-        print("\n=== STEP 4: EXTRACT NEW VERSION ===")
+        # 3. Extract new version
+        print("\n=== STEP 3: EXTRACT NEW VERSION ===")
         self.unzip_new_version(zip_path)
+
+        # 4. Delete the entire SignAI - Desktop folder
+        print("\n=== STEP 4: DELETE OLD APPLICATION ===")
+        app_dir = self.base_dir
+        try:
+            # Only proceed if we have successfully backed up user data and downloaded the new version
+            if app_dir.exists():
+                print(f"Deleting entire application directory: {app_dir}")
+                shutil.rmtree(app_dir)
+                print("Successfully deleted old application directory")
+
+                # Recreate the empty directory
+                app_dir.mkdir(parents=True)
+                print("Created new empty application directory")
+        except Exception as e:
+            print(f"Failed to delete application directory: {e}")
+            return
 
         # 5. Move new files to app directory
         print("\n=== STEP 5: SETUP NEW VERSION ===")
-        tmp_version_dir = self.base_dir / "tmp_version"
+        tmp_version_dir = self.parent_dir / "tmp_version"
         self.setup_new_version(tmp_version_dir)
 
-        # 6. Restore user data
+        # 6. Restore user data from parent directory
         print("\n=== STEP 6: RESTORE USER DATA ===")
         self.get_tmp_data()
 
         # 7. Verify that main exe exists before cleanup
-        exe_path = self.base_dir / "SignAI - Desktop.exe"
+        exe_path = app_dir / "SignAI - Desktop.exe"
         if not exe_path.exists():
             raise FileNotFoundError("Main application EXE not found after update!")
 
         # 8. Cleanup tmp folders AFTER everything is successful
         print("\n=== STEP 7: CLEANUP TEMPORARY FILES ===")
         self.delete_tmp_files()
-
-        # Also delete tmp_version folder
-        tmp_version_dir = self.base_dir / "tmp_version"
-        if tmp_version_dir.exists():
-            shutil.rmtree(tmp_version_dir)
-            print("Deleted tmp_version folder")
 
         print("\n[SUCCESS] Update completed successfully!")
 
@@ -658,7 +697,6 @@ class Updater:
         # Kill updater after short delay
         time.sleep(2)
         subprocess.run(["taskkill", "/f", "/im", "SignAI - Updater.exe"])
-
 
 # for testing, del in production
 if __name__ == '__main__':
