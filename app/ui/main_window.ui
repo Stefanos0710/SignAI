@@ -131,40 +131,6 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="modelLabel">
-        <property name="text">
-         <string>AI Model:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QComboBox" name="modelComboBox">
-        <property name="toolTip">
-         <string>Select the AI model to use for sign language recognition</string>
-        </property>
-        <item>
-         <property name="text">
-          <string>trained_model_v18.keras</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>trained_model_v19.keras</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>trained_model_v20.keras</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>trained_model_v21.keras</string>
-         </property>
-        </item>
-       </widget>
-      </item>
-      <item>
        <widget class="QPushButton" name="updateButton">
         <property name="text">
          <string>Check for Updates</string>

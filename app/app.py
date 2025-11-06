@@ -11,7 +11,6 @@ recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 ToDo List:
 - [ ] more settings options
 - make upadte loader
-- model selection for different AI models
 
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
