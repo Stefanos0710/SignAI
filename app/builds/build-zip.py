@@ -58,30 +58,15 @@ def zip_items(desktop_dir, updater_dir, zip_name, version):
     print(f"\nZip file created: {zip_name}")
     print(f"Size: {size_mb:.1f} MB")
 
-def get_current_version():
-    """Get current version from version.txt, with fallbacks."""
-    candidates = [
-        PROJECT_ROOT / "app" / "version.txt",
-        PROJECT_ROOT / "app" / "updater" / "version.txt",
-    ]
-    for vf in candidates:
-        if vf.exists():
-            with open(vf, "r") as f:
-                version = f.read().strip()
-                print(f"Using version from {vf}: {version}")
-                return version
-    print("Warning: No version.txt found, using default")
-    return "0.0.0"
-
 if __name__ == "__main__":
-    version = get_current_version()
+    print("=== SignAI Release Zip Builder ===\n")
+    print("PLease enter a valid version (e.g. v1.2.4 or v0.2.3-alpha):")
+    version = input("=> ")
 
     # Use onedir builds from dist/
     desktop_dir = PROJECT_ROOT / "app" / "dist" / "SignAI - Desktop"
     updater_dir = PROJECT_ROOT / "app" / "dist" / "SignAI - Updater"
 
-    # Strip 'v' prefix if present in version string
-    version_clean = version.lstrip('v')
-    zip_name = ZIP_DIR / f"SignAI-v{version_clean}.zip"
+    zip_name = ZIP_DIR / f"{version}.zip"
 
     zip_items(desktop_dir, updater_dir, zip_name, version)
