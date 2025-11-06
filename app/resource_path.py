@@ -7,9 +7,25 @@ this should be in every file
 import os, sys
 
 def resource_path(relative_path):
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath('.'), relative_path)
+    # Prefer the directory of the executable (onedir build)
+    if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.abspath('.')
+
+    full = os.path.join(base, relative_path)
+    if os.path.exists(full):
+        return full
+
+    # Fallback for legacy onefile builds: use PyInstaller temp extraction (_MEIPASS)
+    meipass = getattr(sys, '_MEIPASS', None)
+    if meipass:
+        alt = os.path.join(meipass, relative_path)
+        if os.path.exists(alt):
+            return alt
+
+    # Return best-effort path (may be missing) to surface a clear error
+    return full
 
 
 def writable_path(relative_path):

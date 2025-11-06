@@ -10,8 +10,8 @@ recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 
 ToDo List:
 - [ ] more settings options
--  make upadte loader
--  model selection for different AI models
+- make upadte loader
+- model selection for different AI models
 
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
@@ -25,6 +25,7 @@ from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QH
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer, Qt, QEvent, QThread, Signal
 from networkx.algorithms.distance_measures import center
+from scipy.optimize import newton
 
 from camera import Camera, CameraFeed, findcams
 from settings import Settings
@@ -34,10 +35,10 @@ import sys
 import os
 import subprocess
 import platform
-import start_updater as updater
+import time
 
 # add resource_path import
-from resource_path import resource_path
+from resource_path import resource_path, writable_path
 
 #setup application
 app = QApplication(sys.argv)
@@ -51,8 +52,13 @@ history_videos = HistoryVideos()
 
 # load UI
 ui_file_path = resource_path("ui/main_window.ui")
+if not os.path.exists(ui_file_path):
+    raise RuntimeError(f"UI file not found at: {ui_file_path}")
+
 ui_file = QFile(ui_file_path)
-ui_file.open(QFile.ReadOnly)
+if not ui_file.open(QFile.ReadOnly):
+    raise RuntimeError(f"Unable to open UI file: {ui_file_path}")
+
 window = loader.load(ui_file)
 ui_file.close()
 
@@ -122,8 +128,58 @@ loading_dots = 0
 processing_worker = None
 
 # open style sheet
-with open(resource_path("style.qss"), "r") as f:
-    app.setStyleSheet(f.read())
+style_path = resource_path("style.qss")
+if not os.path.exists(style_path):
+    print(f"Warning: style file not found: {style_path}")
+else:
+    with open(style_path, "r") as f:
+        app.setStyleSheet(f.read())
+
+# loading anim
+def update_loading_animation():
+    global loading_dots
+    try:
+        loading_dots = (loading_dots + 1) % 4
+        dots = '.' * loading_dots
+        if resultDisplay is not None:
+            resultDisplay.setPlainText('AI is thinking' + dots)
+    except Exception:
+        pass
+
+# processing finished callback
+def on_processing_finished(result):
+    global processing_worker, loading_timer
+    try:
+        # stop loading timer if running
+        if loading_timer is not None:
+            loading_timer.stop()
+
+        # re-enable record button
+        try:
+            recordButton.setEnabled(True)
+            recordButton.setText('Record')
+        except Exception:
+            pass
+
+        # display result
+        if isinstance(result, dict):
+            # try common keys
+            text = result.get('text') or result.get('result') or str(result)
+        else:
+            text = str(result)
+
+        if resultDisplay is not None:
+            resultDisplay.setPlainText(text)
+    finally:
+        processing_worker = None
+
+# progress update from worker
+def on_progress_update(message: str):
+    try:
+        if resultDisplay is not None:
+            resultDisplay.setPlainText(message)
+    except Exception:
+        pass
 
 # helper: simple loading animation updater
 def update_loading_animation():
@@ -314,25 +370,116 @@ def cleanup():
         camera.close()
 
 # open history folder
+# def historyfunc():
+#     system = platform.system()
+#
+#     # warum funktioniert dies nicht wenn man die exe hat also es öffnet den explorere nicht
+#
+#     path = os.path.abspath(resource_path("videos/history"))
+#     if system == "Windows": # Windows
+#         os.startfile(path)
+#     elif system == "Darwin":  # macOS
+#         subprocess.Popen(["open", path])
+#     else:  # Linux
+#         subprocess.Popen(["xdg-open", path])
+
 def historyfunc():
     system = platform.system()
 
-    path = os.path.abspath(resource_path("videos/history"))
-    if system == "Windows": # Windows
-        os.startfile(path)
-    elif system == "Darwin":  # macOS
-        subprocess.Popen(["open", path])
-    else:  # Linux
-        subprocess.Popen(["xdg-open", path])
+    path = os.path.abspath(writable_path("videos/history"))
+
+    try:
+        if system == "Windows":
+            os.startfile(path)
+        elif system == "Darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+    except Exception as e:
+        print(f"Failed to open history: {e}")
 
 # open github link
 def githubfunc():
     import webbrowser
     webbrowser.open("https://github.com/Stefanos0710/SignAI/")
 
-# open the start updater
-def update():
-    updater.main()
+def start_update():
+    """Start the updater application and close the main app."""
+    print("[Update] Button clicked")
+
+    # Determine app dir (frozen uses exe dir)
+    if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
+        app_dir = os.path.dirname(sys.executable)
+    else:
+        app_dir = os.path.abspath('.')
+
+    print(f"[Update] app_dir={app_dir}")
+
+    parent = os.path.dirname(app_dir)
+    grandparent = os.path.dirname(parent)
+
+    # Kandidatenpfade für Updater-EXE
+    candidates = [
+        # gleiche Ebene wie die App
+        os.path.join(app_dir, "SignAI - Updater.exe"),
+        os.path.join(app_dir, "SignAI - Updater", "SignAI - Updater.exe"),
+        os.path.join(app_dir, "updater", "SignAI - Updater.exe"),
+        # Geschwister unter parent (typisch: dist/SignAI - Desktop und dist/SignAI - Updater)
+        os.path.join(parent, "SignAI - Updater.exe"),
+        os.path.join(parent, "SignAI - Updater", "SignAI - Updater.exe"),
+        # eine Ebene höher (z. B. app/final vs. app/dist)
+        os.path.join(grandparent, "SignAI - Updater.exe"),
+        os.path.join(grandparent, "SignAI - Updater", "SignAI - Updater.exe"),
+    ]
+
+    updater_exe_path = next((p for p in candidates if os.path.isfile(p)), None)
+
+    if updater_exe_path:
+        try:
+            env = os.environ.copy()
+            env["SIGN_AI_APP_DIR"] = app_dir
+            print(f"[Update] Using updater: {updater_exe_path}")
+            print(f"[Update] SIGN_AI_APP_DIR = {app_dir}")
+            cwd = os.path.dirname(updater_exe_path)
+            subprocess.Popen([updater_exe_path], env=env, cwd=cwd)
+            print("[Update] Updater started successfully.")
+            QTimer.singleShot(100, lambda: sys.exit(0))
+            app.quit()
+            return
+        except Exception as e:
+            print(f"[Update] Error starting updater: {e}")
+            import traceback; traceback.print_exc()
+            try:
+                QMessageBox.critical(None, "Update", f"Updater konnte nicht gestartet werden:\n{e}")
+            except Exception:
+                pass
+            # continue to dev fallback
+
+    # Dev-Fallback: starte start_updater.py (kopiert updater/ und startet EXE dort)
+    start_updater_py = resource_path("start_updater.py")
+    if os.path.exists(start_updater_py):
+        print(f"[Update] Fallback to start_updater.py: {start_updater_py}")
+        try:
+            env = os.environ.copy()
+            env["SIGN_AI_APP_DIR"] = app_dir
+            subprocess.Popen([sys.executable, start_updater_py], env=env, cwd=os.path.dirname(start_updater_py))
+            QTimer.singleShot(100, lambda: sys.exit(0))
+            app.quit()
+            return
+        except Exception as e:
+            print(f"[Update] start_updater.py failed: {e}")
+
+    # Nichts gefunden -> Meldung
+    msg = (
+        "Updater wurde nicht gefunden. Erwartet unter:\n" +
+        "\n".join(candidates) +
+        "\n\nOder Fallback 'start_updater.py' ist nicht ausführbar."
+    )
+    print(msg)
+    try:
+        QMessageBox.warning(None, "Update", msg)
+    except Exception:
+        pass
 
 # buttons connections/ events
 recordButton.clicked.connect(recordfunc)
@@ -342,7 +489,7 @@ checkHistory.clicked.connect(checksettings)
 chekDebugMode.clicked.connect(checksettings)
 historybutton.clicked.connect(historyfunc)
 githubbutton.clicked.connect(githubfunc)
-updateButton.clicked.connect(update)
+updateButton.clicked.connect(start_update)
 
 app.aboutToQuit.connect(cleanup)
 
