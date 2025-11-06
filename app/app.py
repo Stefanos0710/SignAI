@@ -181,6 +181,52 @@ def on_progress_update(message: str):
     except Exception:
         pass
 
+# helper: simple loading animation updater
+def update_loading_animation():
+    global loading_dots
+    try:
+        loading_dots = (loading_dots + 1) % 4
+        dots = '.' * loading_dots
+        if resultDisplay is not None:
+            resultDisplay.setPlainText('AI is thinking' + dots)
+    except Exception:
+        pass
+
+# processing finished callback
+def on_processing_finished(result):
+    global processing_worker, loading_timer
+    try:
+        # stop loading timer if running
+        if loading_timer is not None:
+            loading_timer.stop()
+
+        # re-enable record button
+        try:
+            recordButton.setEnabled(True)
+            recordButton.setText('Record')
+        except Exception:
+            pass
+
+        # display result
+        if isinstance(result, dict):
+            # try common keys
+            text = result.get('text') or result.get('result') or str(result)
+        else:
+            text = str(result)
+
+        if resultDisplay is not None:
+            resultDisplay.setPlainText(text)
+    finally:
+        processing_worker = None
+
+# progress update from worker
+def on_progress_update(message: str):
+    try:
+        if resultDisplay is not None:
+            resultDisplay.setPlainText(message)
+    except Exception:
+        pass
+
 # thread for video processing and AI translation
 class VideoProcessingThread(QThread):
     finished = Signal(dict)  # Signal mit Result

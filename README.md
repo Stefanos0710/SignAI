@@ -1,6 +1,6 @@
 <div align="center">
 
-# SignAI - Sign Language Translator (DGS)
+# SignAI - Sign Language Translator
 
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-2.12-orange.svg)](https://tensorflow.org/)
