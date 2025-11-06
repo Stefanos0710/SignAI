@@ -550,9 +550,18 @@ class Updater:
         tmp_version_dir = Path(tmp_version_dir)
         app_dir = self.base_dir
 
-        print(f"Moving files from {tmp_version_dir} to {app_dir}")
+        print(f"Setting up new version from {tmp_version_dir} to {app_dir}")
 
-        items = list(tmp_version_dir.iterdir())
+        # Check if there's a nested "SignAI - Desktop" folder in tmp_version
+        nested_app_dir = tmp_version_dir / "SignAI - Desktop"
+        if nested_app_dir.exists() and nested_app_dir.is_dir():
+            print(f"Found nested 'SignAI - Desktop' folder, using its contents")
+            source_dir = nested_app_dir
+        else:
+            print(f"No nested folder found, using tmp_version contents directly")
+            source_dir = tmp_version_dir
+
+        items = list(source_dir.iterdir())
         total = len(items)
         print(f"Total items to copy: {total}")
 
