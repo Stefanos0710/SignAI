@@ -364,6 +364,7 @@ class Updater:
                             # Use the API URL for downloading with authentication
                             api_download_url = asset["url"]
                             print(f"Using API download URL: {api_download_url}")
+                            print(f"Downloading private release with authentication...")
 
                             # Download using API with Accept header for asset download
                             headers = self.HEADERS.copy()
@@ -380,19 +381,29 @@ class Updater:
                                 total = int(response.headers.get("content-length", 0))
                                 downloaded = 0
 
+                                print(f"\nStarting download...")
+                                print(f"Total size: {total / 1024 / 1024:.2f} MB")
+                                start_time = time.time()
+
                                 with open(update_zip_path, "wb") as f:
                                     for chunk in response.iter_content(chunk_size=8192):
                                         if chunk:
                                             f.write(chunk)
                                             downloaded += len(chunk)
                                             if total > 0:
-                                                print(f"\rProgress: {downloaded / total:.0%}", end="")
+                                                percent = (downloaded / total) * 100
+                                                print(f"\rDownload Progress: {percent:.0f}%", end="", flush=True)
                                             else:
-                                                print(f"\rDownloaded: {downloaded / 1024 / 1024:.2f} MB", end="")
+                                                print(f"\rDownloaded: {downloaded / 1024 / 1024:.2f} MB", end="", flush=True)
 
-                                print(f"\nDownload finished! File size: {downloaded / 1024 / 1024:.2f} MB")
+                                elapsed_time = time.time() - start_time
+                                print(f"\n\n=== Download Complete ===")
+                                print(f"Downloaded: {downloaded / 1024 / 1024:.2f} MB")
+                                print(f"Time taken: {elapsed_time:.1f} seconds")
+                                print(f"Average speed: {(downloaded / 1024 / 1024) / elapsed_time:.2f} MB/s")
 
                                 # Verify the file exists and has content
+                                print(f"\nVerifying downloaded file...")
                                 if not update_zip_path.exists():
                                     print("ERROR: Downloaded file does not exist!")
                                     return None
@@ -402,7 +413,9 @@ class Updater:
                                     print("ERROR: Downloaded file is empty!")
                                     return None
 
-                                print(f"Verified: File exists with size {file_size / 1024 / 1024:.2f} MB")
+                                print(f"[OK] File verified successfully")
+                                print(f"[OK] File size: {file_size / 1024 / 1024:.2f} MB")
+                                print(f"[OK] File location: {update_zip_path}")
                                 return update_zip_path
 
                     print("ERROR: Asset not found in release!")
@@ -421,19 +434,29 @@ class Updater:
                 total = int(response.headers.get("content-length", 0))
                 downloaded = 0
 
+                print(f"\nStarting download...")
+                print(f"Total size: {total / 1024 / 1024:.2f} MB")
+                start_time = time.time()
+
                 with open(update_zip_path, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk:
                             f.write(chunk)
                             downloaded += len(chunk)
                             if total > 0:
-                                print(f"\rProgress: {downloaded / total:.0%}", end="")
+                                percent = (downloaded / total) * 100
+                                print(f"\rDownload Progress: {percent:.0f}%", end="", flush=True)
                             else:
-                                print(f"\rDownloaded: {downloaded / 1024 / 1024:.2f} MB", end="")
+                                print(f"\rDownloaded: {downloaded / 1024 / 1024:.2f} MB", end="", flush=True)
 
-                print(f"\nDownload finished! File size: {downloaded / 1024 / 1024:.2f} MB")
+                elapsed_time = time.time() - start_time
+                print(f"\n\n=== Download Complete ===")
+                print(f"Downloaded: {downloaded / 1024 / 1024:.2f} MB")
+                print(f"Time taken: {elapsed_time:.1f} seconds")
+                print(f"Average speed: {(downloaded / 1024 / 1024) / elapsed_time:.2f} MB/s")
 
                 # Verify the file exists and has content
+                print(f"\nVerifying downloaded file...")
                 if not update_zip_path.exists():
                     print("ERROR: Downloaded file does not exist!")
                     return None
@@ -443,7 +466,9 @@ class Updater:
                     print("ERROR: Downloaded file is empty!")
                     return None
 
-                print(f"Verified: File exists with size {file_size / 1024 / 1024:.2f} MB")
+                print(f"[OK] File verified successfully")
+                print(f"[OK] File size: {file_size / 1024 / 1024:.2f} MB")
+                print(f"[OK] File location: {update_zip_path}")
                 return update_zip_path
 
         except Exception as e:
@@ -528,42 +553,64 @@ class Updater:
 
         extract_to.mkdir(parents=True, exist_ok=True)
 
-        print(f"Extracting '{zip_path.name}'...")
+        print(f"\n=== Starting Extraction ===")
+        print(f"Source: {zip_path.name}")
+        print(f"Destination: {extract_to}")
+
+        start_time = time.time()
+
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             members = zip_ref.namelist()
             total_files = len(members)
             print(f"Total files to extract: {total_files}")
+            print(f"Starting extraction...\n")
 
             for i, member in enumerate(members, 1):
                 zip_ref.extract(member, extract_to)
                 if i % 100 == 0 or i == total_files:
-                    print(f"\rExtracted: {i}/{total_files} files ({i/total_files:.0%})", end="")
+                    percent = (i / total_files) * 100
+                    print(f"\rExtraction Progress: {percent:.0f}% ({i}/{total_files} files)", end="", flush=True)
             print()  # New line after progress
 
-        # del zip file
-        zip_path.unlink()
+        elapsed_time = time.time() - start_time
+        print(f"\n=== Extraction Complete ===")
+        print(f"Extracted {total_files} files")
+        print(f"Time taken: {elapsed_time:.1f} seconds")
+        print(f"Average speed: {total_files / elapsed_time:.0f} files/second")
 
-        print(f"Unzipped '{zip_path.name}' into '{extract_to}'")
+        # Delete zip file
+        print(f"\nDeleting temporary zip file...")
+        zip_path.unlink()
+        print(f"[OK] Zip file deleted")
+
+        print(f"[OK] Extraction completed successfully")
 
     def setup_new_version(self, tmp_version_dir):
         """Move all files from tmp_version to app directory."""
         tmp_version_dir = Path(tmp_version_dir)
         app_dir = self.base_dir
 
-        print(f"Setting up new version from {tmp_version_dir} to {app_dir}")
+        print(f"\n=== Setting Up New Version ===")
+        print(f"Source: {tmp_version_dir}")
+        print(f"Destination: {app_dir}")
 
         # Check if there's a nested "SignAI - Desktop" folder in tmp_version
         nested_app_dir = tmp_version_dir / "SignAI - Desktop"
         if nested_app_dir.exists() and nested_app_dir.is_dir():
-            print(f"Found nested 'SignAI - Desktop' folder, using its contents")
+            print(f"[INFO] Found nested 'SignAI - Desktop' folder, using its contents")
             source_dir = nested_app_dir
         else:
-            print(f"No nested folder found, using tmp_version contents directly")
+            print(f"[INFO] No nested folder found, using tmp_version contents directly")
             source_dir = tmp_version_dir
 
         items = list(source_dir.iterdir())
         total = len(items)
         print(f"Total items to copy: {total}")
+        print(f"Starting file copy operation...\n")
+
+        start_time = time.time()
+        copied_count = 0
+        skipped_count = 0
 
         for idx, item in enumerate(items, 1):
             target = app_dir / item.name
@@ -571,6 +618,7 @@ class Updater:
             # Skip if it's a folder we want to preserve (will be restored later)
             if item.name in ["settings", "videos", "data"]:
                 print(f"[{idx}/{total}] Skipped '{item.name}' (will be restored from backup)")
+                skipped_count += 1
                 continue
 
             try:
@@ -583,8 +631,16 @@ class Updater:
                 else:
                     shutil.copy2(item, target)
                     print(f"[OK] (file)")
+                copied_count += 1
             except Exception as e:
                 print(f"[FAILED] {e}")
+
+        elapsed_time = time.time() - start_time
+        print(f"\n=== Setup Complete ===")
+        print(f"Copied: {copied_count} items")
+        print(f"Skipped: {skipped_count} items")
+        print(f"Time taken: {elapsed_time:.1f} seconds")
+        print(f"[OK] New version setup completed successfully")
 
     def delete_tmp_files(self):
         """Delete temporary folders from parent directory."""

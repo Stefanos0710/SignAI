@@ -60,6 +60,8 @@
          </property>
         </widget>
        </item>
+
+
        <item>
         <widget class="QProgressBar" name="progressBar">
          <property name="value">
@@ -71,11 +73,21 @@
          <property name="maximum">
           <number>100</number>
          </property>
+         <property name="minimumHeight">
+          <number>30</number>
+         </property>
          <property name="textVisible">
           <bool>true</bool>
          </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+         <property name="format">
+          <string>%p% - Remaining: --:--</string>
+         </property>
         </widget>
        </item>
+
        <item>
         <widget class="QTextEdit" name="logText">
          <property name="readOnly">
@@ -89,21 +101,21 @@
          </property>
         </widget>
        </item>
+
        <item>
         <layout class="QHBoxLayout" name="buttonLayout">
          <item>
-          <widget class="QPushButton" name="checkBtn">
-           <property name="text">
-            <string>Check for Updates</string>
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
            </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="updateBtn">
-           <property name="text">
-            <string>Update Now</string>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
            </property>
-          </widget>
+          </spacer>
          </item>
          <item>
           <widget class="QPushButton" name="cancelBtn">
@@ -114,6 +126,19 @@
             <bool>false</bool>
            </property>
           </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_2">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
          </item>
         </layout>
        </item>

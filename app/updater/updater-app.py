@@ -6,6 +6,7 @@ import subprocess
 import sys
 import os
 import shutil
+import time
 
 # Headless mode: run the updater logic directly and exit
 if "--run-updater" in sys.argv:
@@ -141,18 +142,57 @@ process.setWorkingDirectory(base_path)
 if process.state() != QProcess.Running:
     process.start()
 
+# Time tracking for remaining time calculation
+start_time = time.time()
+last_progress = 0
+last_update_time = start_time
+
+def format_time(seconds):
+    """Format seconds into MM:SS format"""
+    if seconds < 0 or seconds > 3600:  # Cap at 1 hour
+        return "--:--"
+    mins = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{mins:02d}:{secs:02d}"
+
 # Wire stdout/stderr to the UI
 
 def handle_stdout():
+    global last_progress, last_update_time
+
     data = process.readAllStandardOutput().data().decode("utf-8", errors="replace")
     if log_text and data:
         log_text.append(data)
-    # try parse percent if present (dev mode), else ignore
+
+    # Try parse percent if present
     m = re.search(r"(\d+)%", data)
     if m and progress_bar:
         try:
-            progress_bar.setValue(int(m.group(1)))
-        except Exception:
+            current_progress = int(m.group(1))
+            progress_bar.setValue(current_progress)
+
+            # Calculate remaining time
+            if current_progress > last_progress and current_progress > 0:
+                current_time = time.time()
+                elapsed = current_time - start_time
+                progress_made = current_progress - 0  # from start
+
+                if progress_made > 0:
+                    time_per_percent = elapsed / progress_made
+                    remaining_percent = 100 - current_progress
+                    estimated_remaining = time_per_percent * remaining_percent
+
+                    # Update the progress bar format with remaining time
+                    time_str = format_time(estimated_remaining)
+                    progress_bar.setFormat(f"%p% - Remaining: {time_str}")
+
+                last_progress = current_progress
+                last_update_time = current_time
+            elif current_progress == 100:
+                progress_bar.setFormat("%p% - Complete!")
+
+        except Exception as e:
+            print(f"Error updating progress: {e}")
             pass
 
 def handle_stderr():
