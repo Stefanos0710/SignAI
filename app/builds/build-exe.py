@@ -73,9 +73,10 @@ if args.include_tokenizers or args.include_api or args.include_models or args.in
     if args.include_models:
         DATA_DIRS.append(CANDIDATE_DATA["models"])
 else:
-    # default include tokenizers + api
+    # default include tokenizers + api + models
     DATA_DIRS.append(CANDIDATE_DATA["tokenizers"])
     DATA_DIRS.append(CANDIDATE_DATA["api"])
+    DATA_DIRS.append(CANDIDATE_DATA["models"])
 
 # -------------------------------
 # Clean old builds

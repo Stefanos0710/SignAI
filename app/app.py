@@ -17,16 +17,70 @@ ToDo List:
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov
 - **Original Creation Date**: 2025/10/11
-- **Last Update**: 2025/10/15
+- **Last Update**: 2025/11/07
 """
+
+# Ensure to don't import user-site packages (e.g., protobuf 6.x) when using venv
+import sys as _sys
+import os as _os
+try:
+    import site as _site
+    _user_sites = _site.getusersitepackages()
+    if isinstance(_user_sites, str):
+        _user_sites = [_user_sites]
+except Exception:
+    _user_sites = []
+for _p in list(_sys.path):
+    try:
+        if any(_os.path.abspath(_p).startswith(_os.path.abspath(up)) for up in _user_sites):
+            _sys.path.remove(_p)
+    except Exception:
+        pass
+
+# download and install essential packages if missing
+ESSENTIAL_PACKAGES = {
+    'numpy': '1.26.4',
+    'protobuf': '4.25.8',
+    'ml-dtypes': '0.3.1',
+    'tensorflow': '2.16.2',
+    'mediapipe': '0.10.21'
+}
+
+def _ensure_packages():
+    import importlib, subprocess, sys
+    missing = []
+    for pkg, ver in ESSENTIAL_PACKAGES.items():
+        try:
+            importlib.import_module(pkg.replace('-', '_'))
+        except Exception:
+            missing.append((pkg, ver))
+    if not missing:
+        return
+    print("[Bootstrap] Installing missing packages:", ', '.join(f"{p}=={v}" for p,v in missing))
+    for pkg, ver in missing:
+        try:
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', f'{pkg}=={ver}'])
+        except Exception as e:
+            print(f"[Bootstrap] Failed to install {pkg}: {e}")
+    # Re-validate
+    still_missing = []
+    for pkg,_ in missing:
+        try:
+            importlib.import_module(pkg.replace('-', '_'))
+        except Exception:
+            still_missing.append(pkg)
+    if still_missing:
+        print("[Bootstrap] Still missing packages after attempt:", ', '.join(still_missing))
+    else:
+        print("[Bootstrap] All essential packages available.")
+
+_ensure_packages()
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QHBoxLayout, QWidget, QVBoxLayout, QCheckBox, QSpinBox, \
     QFormLayout, QToolButton, QBoxLayout, QMessageBox
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer, Qt, QEvent, QThread, Signal
-from networkx.algorithms.distance_measures import center
-from scipy.optimize import newton
 
 from camera import Camera, CameraFeed, findcams
 from settings import Settings
@@ -137,52 +191,6 @@ else:
         app.setStyleSheet(f.read())
 
 # loading anim
-def update_loading_animation():
-    global loading_dots
-    try:
-        loading_dots = (loading_dots + 1) % 4
-        dots = '.' * loading_dots
-        if resultDisplay is not None:
-            resultDisplay.setPlainText('AI is thinking' + dots)
-    except Exception:
-        pass
-
-# processing finished callback
-def on_processing_finished(result):
-    global processing_worker, loading_timer
-    try:
-        # stop loading timer if running
-        if loading_timer is not None:
-            loading_timer.stop()
-
-        # re-enable record button
-        try:
-            recordButton.setEnabled(True)
-            recordButton.setText('Record')
-        except Exception:
-            pass
-
-        # display result
-        if isinstance(result, dict):
-            # try common keys
-            text = result.get('text') or result.get('result') or str(result)
-        else:
-            text = str(result)
-
-        if resultDisplay is not None:
-            resultDisplay.setPlainText(text)
-    finally:
-        processing_worker = None
-
-# progress update from worker
-def on_progress_update(message: str):
-    try:
-        if resultDisplay is not None:
-            resultDisplay.setPlainText(message)
-    except Exception:
-        pass
-
-# helper: simple loading animation updater
 def update_loading_animation():
     global loading_dots
     try:
