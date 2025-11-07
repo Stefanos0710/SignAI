@@ -9,8 +9,10 @@ recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 -------------------------------------------------------------
 
 ToDo List:
-- [ ] more settings options
-- make upadte loader
+- allways show the right camera feed when starting the app (exe)
+- make debug mode show more info in the result display
+- make the ai works correctly with the executable version
+- make the app starts immediately
 
 ## Metadata
 - **Author**: Stefanos Koufogazos Loukianov

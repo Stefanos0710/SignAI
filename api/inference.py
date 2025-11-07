@@ -13,6 +13,27 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+# Import resource_path helper
+try:
+    from app.resource_path import resource_path, writable_path
+except Exception:
+    # Fallback implementations
+    import sys
+    def resource_path(relative_path):
+        if hasattr(sys, '_MEIPASS'):
+            return os.path.join(sys._MEIPASS, relative_path)
+        return os.path.join(os.path.abspath('.'), relative_path)
+    def writable_path(relative_path):
+        if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
+            base = os.path.dirname(sys.executable)
+        else:
+            base = os.path.abspath('.')
+        full = os.path.join(base, relative_path)
+        parent = os.path.dirname(full)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        return full
+
 
 def load_tokenizer(tokenizer_path):
     with open(tokenizer_path, 'r', encoding='utf-8') as f:
@@ -166,7 +187,14 @@ def main_inference(model_path):
         # Load model and tokenizer
         model_load_start = time.time()
         training_model = load_model(model_path)
-        tokenizer = load_tokenizer("../tokenizers/gloss_tokenizer.json")
+
+        # Use resource_path for tokenizer
+        tokenizer_path = resource_path(os.path.join("tokenizers", "gloss_tokenizer.json"))
+        if not os.path.exists(tokenizer_path):
+            # Fallback to relative path for development
+            tokenizer_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "tokenizers", "gloss_tokenizer.json"))
+
+        tokenizer = load_tokenizer(tokenizer_path)
         model_load_time = time.time() - model_load_start
 
         # Build inference models
@@ -175,11 +203,17 @@ def main_inference(model_path):
         build_time = time.time() - build_start
         print("Models successfully created")
 
-        if os.path.exists("../data/live/live_dataset.csv"):
+        # Use writable_path for live data
+        csv_path = writable_path(os.path.join("data", "live", "live_dataset.csv"))
+        if not os.path.exists(csv_path):
+            # Fallback to relative path for development
+            csv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "live", "live_dataset.csv"))
+
+        if os.path.exists(csv_path):
             try:
                 # Load new data (with average over all frames)
                 data_load_start = time.time()
-                encoder_input_data = load_and_prepare_data("../data/live/live_dataset.csv")
+                encoder_input_data = load_and_prepare_data(csv_path)
                 data_load_time = time.time() - data_load_start
 
                 # Make prediction for the entire sequence

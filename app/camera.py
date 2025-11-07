@@ -257,8 +257,15 @@ class CameraFeed:
         self.cam.set(cv2.CAP_PROP_FPS, self.fps)
         self.cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-        # Test if camera can actually grab frames
-        ret, test_frame = self.cam.read()
+        # Warm up camera by reading several frames
+        import time
+        ret = False
+        for attempt in range(10):
+            ret, test_frame = self.cam.read()
+            if ret:
+                break
+            time.sleep(0.1)
+
         if not ret:
             self.label.setText(f"Camera {self.cam_number} cannot grab frames!")
             self.cam.release()
@@ -326,6 +333,13 @@ class CameraFeed:
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
         self.cam.set(cv2.CAP_PROP_FPS, self.fps)
         self.cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+        # Warm up camera by reading several frames
+        for attempt in range(5):
+            ret, _ = self.cam.read()
+            if ret:
+                break
+            time.sleep(0.1)
 
         # Restart timer
         if self.timer:
