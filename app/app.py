@@ -136,7 +136,6 @@ else:
     with open(style_path, "r") as f:
         app.setStyleSheet(f.read())
 
-# loading anim
 def update_loading_animation():
     global loading_dots
     try:
@@ -147,7 +146,6 @@ def update_loading_animation():
     except Exception:
         pass
 
-# processing finished callback
 def on_processing_finished(result):
     global processing_worker, loading_timer
     try:
@@ -174,7 +172,6 @@ def on_processing_finished(result):
     finally:
         processing_worker = None
 
-# progress update from worker
 def on_progress_update(message: str):
     try:
         if resultDisplay is not None:
@@ -182,7 +179,6 @@ def on_progress_update(message: str):
     except Exception:
         pass
 
-# helper: simple loading animation updater
 def update_loading_animation():
     global loading_dots
     try:
@@ -193,34 +189,56 @@ def update_loading_animation():
     except Exception:
         pass
 
-# processing finished callback
+def format_translation_output(result: dict, debug: bool = False) -> str:
+    if not isinstance(result, dict):
+        return str(result)
+
+    translation = "Translation: " + result.get("translation") or result.get("text") or result.get("result") or "<no translation>"
+    if not debug:
+        return translation
+
+    # debug output
+    model = result.get("model")
+    timing = result.get("timing", {})
+    top = result.get("top_predictions", [])
+    top_words = ", ".join(f"{p.get('word', '?')} ({p.get('confidence', 0):.2f}%)" for p in top[:5])
+    confidence = result.get("confidence")
+    success = result.get("success")
+    video_info = result.get("video_info", {})
+
+    return (
+        f"{translation}\n\n"
+        f"[Debug]\n"
+        f"Succsess: {success}\n"
+        f"Modell: {model}\n"
+        f"Confidence: {confidence:.2f}%\n"
+        f"Top 5: {top_words}\n"
+        f"File: {video_info.get('filename', '?')} ({video_info.get('size_mb', '?')} MB)\n"
+        f"Processing time: {timing.get('total_processing_time', '?')} s\n"
+        f" - Preprocessing: {timing.get('preprocessing_time', '?')} s\n"
+        f" - Inference: {timing.get('inference_time', '?')} s\n"
+        f" - Model load: {timing.get('model_load_time', '?')} s"
+    )
+
+
 def on_processing_finished(result):
     global processing_worker, loading_timer
     try:
-        # stop loading timer if running
         if loading_timer is not None:
             loading_timer.stop()
-
-        # re-enable record button
         try:
             recordButton.setEnabled(True)
-            recordButton.setText('Record')
+            recordButton.setText("Record")
         except Exception:
             pass
 
-        # display result
-        if isinstance(result, dict):
-            # try common keys
-            text = result.get('text') or result.get('result') or str(result)
-        else:
-            text = str(result)
+        text = format_translation_output(result, debug=settings.debug)
 
         if resultDisplay is not None:
             resultDisplay.setPlainText(text)
     finally:
         processing_worker = None
 
-# progress update from worker
 def on_progress_update(message: str):
     try:
         if resultDisplay is not None:
@@ -246,7 +264,6 @@ class VideoProcessingThread(QThread):
 
         self.finished.emit(result)
 
-# click function
 def recordfunc():
     global pressed, camera, available_cams, camera_number, camerafeed, processing_worker, loading_timer
     pressed += 1
@@ -308,7 +325,6 @@ def recordfunc():
 
         pressed = 0
 
-# switch cam button function
 def switchcamfunc():
     global camera_number, camerafeed, camera
 
@@ -333,7 +349,6 @@ def switchcamfunc():
     camerafeed = CameraFeed(videofeedlabel, cam_number=available_cams[camera_number])
     print(f"Change to camera {camera_number}: {available_cams[camera_number]}")
 
-# toggle settings panel
 def togglesettings():
     settingspanel.setVisible(not settingspanel.isVisible())
 
@@ -342,7 +357,6 @@ def togglesettings():
     else:
         settingsButton.setText("Settings")
 
-# check settings and save
 def checksettings():
     # check history settings
     if checkHistory.isChecked():
@@ -363,26 +377,11 @@ def checksettings():
     # Save settings to file
     settings.save()
 
-# Cleanup on exit
 def cleanup():
     if camerafeed:
         camerafeed.stop()
     if camera:
         camera.close()
-
-# open history folder
-# def historyfunc():
-#     system = platform.system()
-#
-#     # warum funktioniert dies nicht wenn man die exe hat also es öffnet den explorere nicht
-#
-#     path = os.path.abspath(resource_path("videos/history"))
-#     if system == "Windows": # Windows
-#         os.startfile(path)
-#     elif system == "Darwin":  # macOS
-#         subprocess.Popen(["open", path])
-#     else:  # Linux
-#         subprocess.Popen(["xdg-open", path])
 
 def historyfunc():
     system = platform.system()
@@ -399,7 +398,6 @@ def historyfunc():
     except Exception as e:
         print(f"Failed to open history: {e}")
 
-# open github link
 def githubfunc():
     import webbrowser
     webbrowser.open("https://github.com/Stefanos0710/SignAI/")
