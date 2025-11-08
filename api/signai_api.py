@@ -11,6 +11,23 @@ Created: 2025-09-18
 Updated: 2025-09-19 22:11
 """
 
+# Ensure to do not  import user-site packages (e.g., protobuf 6.x) when using venv
+import sys as _sys
+import os as _os
+try:
+    import site as _site
+    _user_sites = _site.getusersitepackages()
+    if isinstance(_user_sites, str):
+        _user_sites = [_user_sites]
+except Exception:
+    _user_sites = []
+for _p in list(_sys.path):
+    try:
+        if any(_os.path.abspath(_p).startswith(_os.path.abspath(up)) for up in _user_sites):
+            _sys.path.remove(_p)
+    except Exception:
+        pass
+
 from flask import Flask, request, jsonify
 import os
 import traceback

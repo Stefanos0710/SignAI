@@ -41,44 +41,71 @@ def load_tokenizer(tokenizer_path):
     return tf.keras.preprocessing.text.tokenizer_from_json(tokenizer_json)
 
 
+FEATURES_PER_FRAME = 1086  # 33 pose + 42 hand + 468 face -> (543 * 2)
+
 def load_and_prepare_data(csv_file_path):
     samples = []
+
+    if not os.path.exists(csv_file_path) or os.path.getsize(csv_file_path) == 0:
+        logging.error(f"CSV not found or empty: {csv_file_path}")
+        # Return zeros to keep pipeline alive
+        sample = np.zeros((1, 1, FEATURES_PER_FRAME), dtype=np.float32)
+        return sample
 
     with open(csv_file_path, mode='r', encoding='utf-8') as file:
         reader = csv.DictReader(file)
 
+        # Validate expected columns exist
+        expected_cols = []
+        expected_cols += [f"pose_{i}_x" for i in range(33)] + [f"pose_{i}_y" for i in range(33)]
+        expected_cols += [f"hand_{i}_x" for i in range(42)] + [f"hand_{i}_y" for i in range(42)]
+        expected_cols += [f"face_{i}_x" for i in range(468)] + [f"face_{i}_y" for i in range(468)]
+
+        if not reader.fieldnames or any(col not in reader.fieldnames for col in expected_cols):
+            logging.error("CSV is missing expected keypoint columns; returning zeros sample.")
+            return np.zeros((1, 1, FEATURES_PER_FRAME), dtype=np.float32)
+
         # Collect all frames
         all_frames = []
         for row in reader:
-            # Extract keypoints
-            keypoints = []
+            try:
+                keypoints = []
 
-            # Pose Keypoints (33 points)
-            for i in range(33):
-                keypoints.extend([float(row[f"pose_{i}_x"]), float(row[f"pose_{i}_y"])])
+                # Pose Keypoints (33 points)
+                for i in range(33):
+                    keypoints.extend([float(row[f"pose_{i}_x"]), float(row[f"pose_{i}_y"])])
 
-            # Hand Keypoints (42 points)
-            for i in range(42):
-                keypoints.extend([float(row[f"hand_{i}_x"]), float(row[f"hand_{i}_y"])])
+                # Hand Keypoints (42 points)
+                for i in range(42):
+                    keypoints.extend([float(row[f"hand_{i}_x"]), float(row[f"hand_{i}_y"])])
 
-            # Face Keypoints (468 points)
-            for i in range(468):
-                keypoints.extend([float(row[f"face_{i}_x"]), float(row[f"face_{i}_y"])])
+                # Face Keypoints (468 points)
+                for i in range(468):
+                    keypoints.extend([float(row[f"face_{i}_x"]), float(row[f"face_{i}_y"])])
 
-            all_frames.append(np.array(keypoints, dtype=np.float32))
+                if len(keypoints) == FEATURES_PER_FRAME:
+                    all_frames.append(np.array(keypoints, dtype=np.float32))
+                else:
+                    logging.warning(f"Skipping frame with invalid feature count: {len(keypoints)}")
+            except Exception:
+                # Skip malformed rows
+                continue
+
+        if len(all_frames) == 0:
+            logging.error("No valid frames parsed from CSV; returning zeros sample.")
+            return np.zeros((1, 1, FEATURES_PER_FRAME), dtype=np.float32)
 
         # Average over all frames
         average_keypoints = np.mean(all_frames, axis=0)
 
-        # Normalization
-        min_val = average_keypoints.min()
-        max_val = average_keypoints.max()
-        range_val = max_val - min_val if max_val > min_val else 1.0
+        # Normalization (min-max per sample)
+        min_val = float(np.min(average_keypoints))
+        max_val = float(np.max(average_keypoints))
+        range_val = (max_val - min_val) if max_val > min_val else 1.0
         normalized_keypoints = (average_keypoints - min_val) / range_val
 
-        # Reshape for the model
-        sample = np.expand_dims(normalized_keypoints, axis=0)  # Add batch dimension
-        sample = np.expand_dims(sample, axis=1)  # Add sequence dimension
+        # Reshape for the model -> (batch, timesteps, features)
+        sample = normalized_keypoints.astype(np.float32)[None, None, :]
 
     return sample
 
@@ -150,7 +177,11 @@ def decode_sequence(encoder_input_data, encoder_model, decoder_model, tokenizer)
     encoder_outputs, state_h, state_c = encoder_model.predict(encoder_input_data, verbose=0)
 
     # Decoder setup
-    target_seq = np.array([[tokenizer.word_index['<start>']]])
+    start_index = tokenizer.word_index.get('<start>')
+    if start_index is None:
+        # Fallback: use most common token index 1
+        start_index = 1
+    target_seq = np.array([[start_index]])
 
     # Decoder prediction
     output_tokens, _, _ = decoder_model.predict(
@@ -161,14 +192,15 @@ def decode_sequence(encoder_input_data, encoder_model, decoder_model, tokenizer)
     # Calculate softmax probabilities
     probabilities = tf.nn.softmax(output_tokens[0, -1, :]).numpy()
 
-    # Find the word with the highest probability
-    predicted_token_index = np.argmax(probabilities)
+    # Predicted token index
+    predicted_token_index = int(np.argmax(probabilities))
 
-    # Store probabilities for all words
+    # Build word->prob mapping (skip special tokens when possible)
     all_probabilities = {}
+    vocab_size = probabilities.shape[-1]
     for word, index in tokenizer.word_index.items():
-        if word not in ['<start>', '<end>', '<unk>']:
-            all_probabilities[word] = probabilities[index] * 100
+        if index < vocab_size and word not in ['<start>', '<end>', '<unk>']:
+            all_probabilities[word] = float(probabilities[index] * 100.0)
 
     # Find the predicted word
     predicted_word = None
@@ -216,6 +248,12 @@ def main_inference(model_path):
                 encoder_input_data = load_and_prepare_data(csv_path)
                 data_load_time = time.time() - data_load_start
 
+                # Sanity check input shape
+                if encoder_input_data.shape != (1, 1, FEATURES_PER_FRAME):
+                    raise ValueError(
+                        f"Prepared data has wrong shape: {encoder_input_data.shape}, expected (1, 1, {FEATURES_PER_FRAME})"
+                    )
+
                 # Make prediction for the entire sequence
                 inference_start = time.time()
                 predicted_word, probabilities = decode_sequence(
@@ -226,21 +264,14 @@ def main_inference(model_path):
                 )
                 inference_time = time.time() - inference_start
 
+                total_time = time.time() - start_time
+
                 if predicted_word:
                     # Sort predictions by probability
                     sorted_predictions = sorted(probabilities.items(), key=lambda x: x[1], reverse=True)
                     top_predictions = sorted_predictions[:5]  # Top 5
 
                     confidence = probabilities.get(predicted_word, 0.0)
-                    total_time = time.time() - start_time
-
-                    print(f"\nPrediction: {predicted_word.upper()}")
-                    print(f"Confidence: {confidence:.2f}%")
-                    print("\nTop 5 Predictions:")
-                    for word, prob in top_predictions:
-                        print(f"{word.upper()}: {prob:.2f}%")
-                    print(f"\nTotal time: {total_time:.3f}s")
-                    print("-" * 50)
 
                     # Return detailed results
                     return {
@@ -250,6 +281,19 @@ def main_inference(model_path):
                             {'word': word, 'confidence': round(prob, 2)}
                             for word, prob in top_predictions
                         ],
+                        'timing': {
+                            'total_time': round(total_time, 3),
+                            'model_load_time': round(model_load_time, 3),
+                            'build_time': round(build_time, 3),
+                            'data_load_time': round(data_load_time, 3),
+                            'inference_time': round(inference_time, 3)
+                        }
+                    }
+                else:
+                    return {
+                        'predicted_word': None,
+                        'confidence': 0.0,
+                        'top_predictions': [],
                         'timing': {
                             'total_time': round(total_time, 3),
                             'model_load_time': round(model_load_time, 3),
