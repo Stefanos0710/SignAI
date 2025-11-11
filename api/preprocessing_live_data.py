@@ -1125,6 +1125,22 @@ def main(video_path=None, progress_callback=None, show_windows=True):
     Optional kann ein video_path übergeben werden, um ein vorhandenes Video zu verarbeiten.
     """
     try:
+        # Import writable_path helper
+        try:
+            from app.resource_path import writable_path
+        except Exception:
+            import sys
+            def writable_path(relative_path):
+                if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
+                    base = os.path.dirname(sys.executable)
+                else:
+                    base = os.path.abspath('.')
+                full = os.path.join(base, relative_path)
+                parent = os.path.dirname(full)
+                if parent:
+                    os.makedirs(parent, exist_ok=True)
+                return full
+
         if video_path is not None:
             # Video wurde übergeben, keine Aufnahme nötig
             if not os.path.exists(video_path):
@@ -1137,9 +1153,24 @@ def main(video_path=None, progress_callback=None, show_windows=True):
 
         if frame_count > 0:
             # Video verarbeiten und CSV erstellen
-            csv_path = "../data/live/live_dataset.csv"
+            csv_path = writable_path(os.path.join("data", "live", "live_dataset.csv"))
+
+            # DELETE OLD CSV FILE BEFORE PROCESSING
+            if os.path.exists(csv_path):
+                try:
+                    os.remove(csv_path)
+                    print(f"✓ Deleted old CSV before processing: {csv_path}")
+                except Exception as e:
+                    print(f"⚠ Could not delete old CSV: {e}")
+
             if process_video_to_csv(video_path, csv_path, frame_count, progress_callback=progress_callback, show_windows=show_windows):
                 print("\nProgramm erfolgreich beendet.")
+                # Verify CSV was created
+                if os.path.exists(csv_path):
+                    csv_size = os.path.getsize(csv_path)
+                    print(f"✓ CSV created successfully: {csv_size} bytes")
+                else:
+                    print("✗ WARNING: CSV file was not created!")
             else:
                 print("\nFehler bei der Verarbeitung.")
         else:

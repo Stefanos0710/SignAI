@@ -25,8 +25,6 @@ from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QMainWindow, QH
     QFormLayout, QToolButton, QBoxLayout, QMessageBox
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer, Qt, QEvent, QThread, Signal
-from networkx.algorithms.distance_measures import center
-from scipy.optimize import newton
 
 from camera import Camera, CameraFeed, findcams
 from settings import Settings
@@ -296,6 +294,25 @@ def recordfunc():
 
         camera.stop_recording()
 
+        # Verify video was created and has data
+        video_path = writable_path("videos/current_video.mp4")
+        if not os.path.exists(video_path):
+            print(f"✗ ERROR: Video was not created: {video_path}")
+            recordButton.setText("Error: No Video")
+            recordButton.setEnabled(True)
+            pressed = 0
+            return
+
+        video_size = os.path.getsize(video_path)
+        if video_size == 0:
+            print(f"✗ ERROR: Video file is empty: {video_path}")
+            recordButton.setText("Error: Empty Video")
+            recordButton.setEnabled(True)
+            pressed = 0
+            return
+
+        print(f"✓ Video created successfully: {video_size} bytes")
+
         # show and set max height for result display
         resultDisplay.setVisible(True)
         resultDisplay.setMaximumHeight(120)
@@ -307,7 +324,7 @@ def recordfunc():
         loading_timer.start(500)  # Update every 0.5 sec
 
         # start video processing thread
-        processing_worker = VideoProcessingThread(resource_path("videos/current_video.mp4"))
+        processing_worker = VideoProcessingThread(video_path)
         processing_worker.finished.connect(on_processing_finished)
         processing_worker.progress.connect(on_progress_update)
         processing_worker.start()
