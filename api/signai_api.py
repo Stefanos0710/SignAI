@@ -13,18 +13,28 @@ Updated: 2025-09-19 22:11
 
 # Ensure to do not  import user-site packages (e.g., protobuf 6.x) when using venv
 import sys as _sys
-import os as _os
-try:
-    import site as _site
-    _user_sites = _site.getusersitepackages()
-    if isinstance(_user_sites, str):
-        _user_sites = [_user_sites]
-except Exception:
-    _user_sites = []
-for _p in list(_sys.path):
+import os as _os, os
+
+# only clean up path if it´s not frozzen and ENV flag not active
+_DISABLE_CLEAN = os.environ.get('SIGNAI_DISABLE_SITE_CLEANUP', '0') in ('1', 'true', 'True')
+if not getattr(_sys, 'frozen', False) and not _DISABLE_CLEAN:
     try:
-        if any(_os.path.abspath(_p).startswith(_os.path.abspath(up)) for up in _user_sites):
-            _sys.path.remove(_p)
+        import site as _site
+        _user_sites = _site.getusersitepackages()
+        if isinstance(_user_sites, str):
+            _user_sites = [_user_sites]
+    except Exception:
+        _user_sites = []
+    for _p in list(_sys.path):
+        try:
+            if any(_os.path.abspath(_p).startswith(_os.path.abspath(up)) for up in _user_sites):
+                _sys.path.remove(_p)
+        except Exception:
+            pass
+else:
+    # Debug Logging warum nicht bereinigt wird
+    try:
+        print(f"[API Bootstrap] Skip site-package cleanup. frozen={getattr(_sys,'frozen',False)} disable_flag={_DISABLE_CLEAN}")
     except Exception:
         pass
 

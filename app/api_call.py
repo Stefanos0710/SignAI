@@ -1,7 +1,12 @@
 """
 SignAI API Call Module
 
-This module handles API calls to the SignAI translation service.
+This module handles API calls to the SignAI translation service. Currently only for the desktop application.
+
+## Metadata
+- **Author**: Stefanos Koufogazos Loukianov
+- **Original Creation Date**: 2025/10/11
+- **Last Update**: 2025/12/11
 """
 import sys
 import os
@@ -15,8 +20,25 @@ import signal
 # Add API folder to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-import api.signai_api as signai_api
 from resource_path import resource_path
+
+# Lazy placeholder
+_signai_api = None
+_signai_api_import_error = None
+
+def _lazy_load_signai_api():
+    """Lazy-load signai_api module to avoid early TensorFlow initialization."""
+    global _signai_api, _signai_api_import_error
+    if _signai_api or _signai_api_import_error:
+        return _signai_api
+    try:
+        import api.signai_api as signai_api  # noqa: F401
+        _signai_api = signai_api
+        print('[API] signai_api loaded succsessfully (lazy).')
+    except Exception as e:
+        _signai_api_import_error = e
+        print(f'[API] Error at launching signai_api (lazy): {e}')
+    return _signai_api
 
 class API:
     def __init__(self):
@@ -55,7 +77,7 @@ class API:
                     except (psutil.NoSuchProcess, psutil.AccessDenied):
                         return None
         except Exception as e:
-            print(f"⚠ Error finding process on port {port}: {e}")
+            print(f"[Error] Error finding process on port {port}: {e}")
         return None
 
 
@@ -113,9 +135,21 @@ class API:
             print("API server already running")
             return True
 
+        # Stelle sicher, dass signai_api keine Site-Cleanup macht
+        try:
+            os.environ.setdefault('SIGNAI_DISABLE_SITE_CLEANUP', '1')
+        except Exception:
+            pass
+
+        # Lazy load signai_api here
+        api_mod = _lazy_load_signai_api()
+        if not api_mod:
+            print('[API] failed to start API server due to import error.')
+            return False
+
         # Check if port is already in use
         if self.is_port_in_use(5000):
-            print("⚠ Port 5000 is already in use!")
+            print("[Error] Port 5000 is already in use!")
             print("Checking if it's our API server...")
 
             # Check if it's actually our API responding
@@ -144,7 +178,7 @@ class API:
             try:
                 self._server_running = True
                 # Start Flask server
-                signai_api.app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
+                api_mod.app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
             except Exception as e:
                 print(f"✗ Error starting Flask server: {e}")
                 self._server_running = False
@@ -165,7 +199,7 @@ class API:
             except requests.exceptions.ConnectionError:
                 continue
             except Exception as e:
-                print(f"⚠ Error checking API health: {e}")
+                print(f"[Error] Error checking API health: {e}")
                 continue
 
         print("✗ Failed to start API server - timeout after 5 seconds")
@@ -175,9 +209,9 @@ class API:
 
     def check_api_health(self):
         try:
-            response = requests.get(self.API_HEALTH_ENDPOINT, timeout=2)
+            response = requests.get(self.API_HEALTH_ENDPOINT, timeout=1.5)
             return response.status_code == 200
-        except:
+        except Exception:
             return False
 
 
@@ -234,10 +268,26 @@ class API:
 
                 # Upload video to API
                 print("→ Uploading video to API...")
-                response = requests.post(self.API_UPLOAD_ENDPOINT, files=files, timeout=60)
+                response = requests.post(self.API_UPLOAD_ENDPOINT, files=files, timeout=120)
 
-                # Parse response
-                result = response.json()
+                # Debug: show raw response for troubleshooting
+                try:
+                    print(f"→ API HTTP {response.status_code}")
+                    print(f"→ API raw response: {response.text}")
+                except Exception:
+                    pass
+
+                # Parse response safely
+                try:
+                    result = response.json()
+                except ValueError:
+                    print("✗ API returned non-JSON response")
+                    return {
+                        "success": False,
+                        "error": "Invalid response from API (not JSON)",
+                        "raw_response": response.text,
+                        "status_code": response.status_code
+                    }
 
                 if result.get("success"):
                     print(f"\n{'='*60}")
@@ -276,6 +326,12 @@ class API:
                     print(f"\nModel: {result.get('model', 'N/A')}")
                     print(f"{'='*60}\n")
                 else:
+                    translation = result.get("translation")
+                    if translation in (None, "", "<no translation>"):
+                        confidence = result.get("confidence", 0)
+                        top_preds = result.get("top_predictions", [])
+                        print("✗ No valid translation returned by API")
+                        print(f"  confidence={confidence}, top_predictions={top_preds}")
                     print(f"✗ Translation failed: {result.get('error')}")
 
                 return result

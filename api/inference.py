@@ -61,42 +61,79 @@ def load_and_prepare_data(csv_file_path):
         expected_cols += [f"hand_{i}_x" for i in range(42)] + [f"hand_{i}_y" for i in range(42)]
         expected_cols += [f"face_{i}_x" for i in range(468)] + [f"face_{i}_y" for i in range(468)]
 
+        use_fallback_numeric = False
         if not reader.fieldnames or any(col not in reader.fieldnames for col in expected_cols):
-            logging.error("CSV is missing expected keypoint columns; returning zeros sample.")
-            return np.zeros((1, 1, FEATURES_PER_FRAME), dtype=np.float32)
+            logging.error("CSV is missing expected keypoint columns; attempting numeric fallback parser.")
+            use_fallback_numeric = True
 
-        # Collect all frames
-        all_frames = []
-        for row in reader:
-            try:
-                keypoints = []
+        if not use_fallback_numeric:
+            # Collect all frames via DictReader
+            all_frames = []
+            for row in reader:
+                try:
+                    keypoints = []
+                    # Pose Keypoints (33 points)
+                    for i in range(33):
+                        keypoints.extend([float(row[f"pose_{i}_x"]), float(row[f"pose_{i}_y"])])
+                    # Hand Keypoints (42 points)
+                    for i in range(42):
+                        keypoints.extend([float(row[f"hand_{i}_x"]), float(row[f"hand_{i}_y"])])
+                    # Face Keypoints (468 points)
+                    for i in range(468):
+                        keypoints.extend([float(row[f"face_{i}_x"]), float(row[f"face_{i}_y"])])
 
-                # Pose Keypoints (33 points)
-                for i in range(33):
-                    keypoints.extend([float(row[f"pose_{i}_x"]), float(row[f"pose_{i}_y"])])
+                    if len(keypoints) == FEATURES_PER_FRAME:
+                        all_frames.append(np.array(keypoints, dtype=np.float32))
+                    else:
+                        logging.warning(f"Skipping frame with invalid feature count: {len(keypoints)}")
+                except Exception:
+                    # Skip malformed rows
+                    continue
 
-                # Hand Keypoints (42 points)
-                for i in range(42):
-                    keypoints.extend([float(row[f"hand_{i}_x"]), float(row[f"hand_{i}_y"])])
+            if len(all_frames) == 0:
+                logging.error("No valid frames parsed from CSV; returning zeros sample.")
+                return np.zeros((1, 1, FEATURES_PER_FRAME), dtype=np.float32)
 
-                # Face Keypoints (468 points)
-                for i in range(468):
-                    keypoints.extend([float(row[f"face_{i}_x"]), float(row[f"face_{i}_y"])])
+            # Average over all frames
+            average_keypoints = np.mean(all_frames, axis=0)
+        else:
+            # Fallback: numeric CSV reader; pick last 1086 numeric values per row
+            file.seek(0)
+            raw_reader = csv.reader(file)
+            all_frames = []
+            header_skipped = False
+            for row in raw_reader:
+                # Skip empty rows
+                if not row:
+                    continue
+                # Try to detect header (non-numeric tokens)
+                if not header_skipped:
+                    try:
+                        # Attempt to parse first row as floats; if fails, treat as header
+                        [float(x) for x in row]
+                    except Exception:
+                        header_skipped = True
+                        continue
+                    header_skipped = True
+                try:
+                    values = []
+                    for x in row:
+                        try:
+                            values.append(float(x))
+                        except Exception:
+                            # Non-numeric tokens become NaN; filter later
+                            continue
+                    if len(values) >= FEATURES_PER_FRAME:
+                        frame_vals = np.array(values[-FEATURES_PER_FRAME:], dtype=np.float32)
+                        all_frames.append(frame_vals)
+                except Exception:
+                    continue
 
-                if len(keypoints) == FEATURES_PER_FRAME:
-                    all_frames.append(np.array(keypoints, dtype=np.float32))
-                else:
-                    logging.warning(f"Skipping frame with invalid feature count: {len(keypoints)}")
-            except Exception:
-                # Skip malformed rows
-                continue
+            if len(all_frames) == 0:
+                logging.error("Fallback parser found no frames; returning zeros sample.")
+                return np.zeros((1, 1, FEATURES_PER_FRAME), dtype=np.float32)
 
-        if len(all_frames) == 0:
-            logging.error("No valid frames parsed from CSV; returning zeros sample.")
-            return np.zeros((1, 1, FEATURES_PER_FRAME), dtype=np.float32)
-
-        # Average over all frames
-        average_keypoints = np.mean(all_frames, axis=0)
+            average_keypoints = np.mean(all_frames, axis=0)
 
         # Normalization (min-max per sample)
         min_val = float(np.min(average_keypoints))
