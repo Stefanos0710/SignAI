@@ -279,6 +279,23 @@ def main_inference(model_path):
             csv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "live", "live_dataset.csv"))
 
         if os.path.exists(csv_path):
+            # Check if CSV file is not empty
+            csv_size = os.path.getsize(csv_path)
+            if csv_size == 0:
+                print(f"✗ Error: CSV file is empty: {csv_path}")
+                return {
+                    'predicted_word': None,
+                    'error': 'CSV file is empty'
+                }
+
+            # Log CSV file info
+            csv_modified_time = os.path.getmtime(csv_path)
+            import datetime
+            csv_modified_str = datetime.datetime.fromtimestamp(csv_modified_time).strftime('%Y-%m-%d %H:%M:%S')
+            print(f"→ Reading CSV: {csv_path}")
+            print(f"  Size: {csv_size} bytes")
+            print(f"  Last modified: {csv_modified_str}")
+
             try:
                 # Load new data (with average over all frames)
                 data_load_start = time.time()

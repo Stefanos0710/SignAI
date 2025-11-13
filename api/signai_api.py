@@ -123,7 +123,31 @@ def upload_and_translate():
             filename = os.path.splitext(filename)[0] + '.mp4'
 
         saved_video_path = os.path.join(UPLOAD_DIR, 'recorded_video.mp4')
+
+        # DELETE OLD FILES BEFORE PROCESSING NEW VIDEO
+        # Delete old video file if exists
+        if os.path.exists(saved_video_path):
+            try:
+                os.remove(saved_video_path)
+                print(f"✓ Deleted old video: {saved_video_path}")
+            except Exception as e:
+                print(f"[!] Could not delete old video: {e}")
+
+        # Delete old CSV file if exists
+        csv_output_path = os.path.join(CSV_DIR, 'live_dataset.csv')
+        if os.path.exists(csv_output_path):
+            try:
+                os.remove(csv_output_path)
+                print(f"✓ Deleted old CSV: {csv_output_path}")
+            except Exception as e:
+                print(f"[!] Could not delete old CSV: {e}")
+
+        # Save the new video file
         file.save(saved_video_path)
+
+        # Verify video was saved correctly
+        if not os.path.exists(saved_video_path) or os.path.getsize(saved_video_path) == 0:
+            return jsonify({'success': False, 'error': 'Failed to save video file'}), 500
         upload_time = time.time() - upload_start
 
         # Get video file size
