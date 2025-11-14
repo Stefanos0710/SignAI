@@ -1,0 +1,135 @@
+[Header]
+ProjectFileVersion = 1.1
+[General]
+Program name = SignAI - Desktop
+Program version = v0.1.0-alpha
+Windows XP = 0
+Windows Server 2003 = 0
+Windows Vista = 0
+Windows Server 2008 = 0
+Windows 7 = 1
+Windows 8 = 1
+Windows 10 = 1
+Windows Server 2016 = 0
+Windows Server 2019 = 0
+Windows Server 2022 = 0
+Windows 11 = 1
+DoNotCheckOS = 0
+Company name =
+Website = https://github.com/Stefanos0710/SignAI
+SFA = 0
+DFA = 1
+Comp = 1
+[Graphics]
+Wizard image = <main>
+Header image = <main>
+Show Label = 1
+VisualStylesEnabled = 1
+[Files]
+Installation path = <ProgramFiles>\<AppName>\
+Autcip = 1
+[Uninstall]
+Vwau = 0
+Website = https://
+Include uninstaller = 1
+Uninstaller filename = Uninstall SignAI - Desktop
+UseCustomDisplayIcon = 0
+CustomDisplayIcon = <InstallPath>\
+[Licence]
+Licence dialog = 1
+[Finish]
+Sart program = 1
+Reboot computer = 0
+Program = <InstallPath>\SignAI - Desktop.exe
+ProgramArguments =
+[Shortcuts]
+Allowtc = 0
+Shortcut path = <Company>\<AppName>
+[Serialoptions]
+Allows = 0
+Number = 1000
+Mask = #####-#####-#####-#####
+[SplashScreen]
+Image =
+Sound =
+Time = 2
+PlaySound = 0
+Allow = 0
+[Build]
+File = C:\Users\stefa\Desktop\SignAI_Setup.exe
+SetupIconPath = ..\icons\ancient.ico
+UninstallIconPath = ..\icons\ancient.ico
+CompressionMethod = 0
+CompressionLevel = 2
+[Updater]
+Allow = 0
+1 = <AppName>
+2 = <AppVersion>
+3 = http://
+4 = http://
+5 = http://
+6 = Update
+Language = 0
+RunProg =
+RunProgs = 0
+Execdlls = 0
+[Languages]
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+[Files/Dirs]
+C:\Users\stefa\Documents\GitHub\SignAI\app\dist\SignAI - Desktop.exe
+881.8 MB
+exe
+C:\Users\stefa\Documents\GitHub\SignAI\app\dist\data\
+N/A
+[Folder]
+C:\Users\stefa\Documents\GitHub\SignAI\app\dist\videos\
+N/A
+[Folder]
+C:\Users\stefa\Documents\GitHub\SignAI\app\dist\settings\
+N/A
+[Folder]
+[Licence_Begin]
+508
+{\rtf1\ansi\ansicpg1252\deff0\nouicompat\deflang1031{\fonttbl{\f0\fnil Arial;}}
+{\*\generator Riched20 10.0.26100}\viewkind4\uc1
+\pard\b\f0\fs20 Non-commercial License\b0\par
+\par
+\i This software is licensed for personal, non-commercial use only.\par
+\par
+You may modify the software for your own private use.\par
+\par
+You may NOT:\par
+- distribute, share, or publish the software or any modified versions,\par
+- use the software for commercial purposes.\par
+\par
+All rights reserved.\par
+}
+[Licence_End]
+[Registry]
+[Variables]
+[SCs]
+[IFP_End]
+[Serials]
+[Serials_End]
+[Commands]
+

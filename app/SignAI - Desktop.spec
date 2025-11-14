@@ -1,5 +1,4 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_data_files
 from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.utils.hooks import collect_all
 
@@ -27,37 +26,33 @@ tmp_ret = collect_all('tensorflow')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('keras')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('keras')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('flask')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
     ['C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\app.py'],
-    pathex=['C:\\Users\\stefa\\Documents\\GitHub\\SignAI', 'C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app'],
+    pathex=['C:\\Users\\stefa\\Documents\\GitHub\\SignAI'],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=['C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\builds'],
+    hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
-    optimize=2,
+    optimize=0,
 )
 pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
-    [('O', None, 'OPTION'), ('O', None, 'OPTION')],
+    [],
     exclude_binaries=True,
     name='SignAI - Desktop',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,
+    upx=True,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -71,7 +66,7 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=False,
+    upx=True,
     upx_exclude=[],
     name='SignAI - Desktop',
 )

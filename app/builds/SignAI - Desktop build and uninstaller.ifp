@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<InstallForgeProject>
+  <Metadata productVersion="1.5.0" projectFileVersion="2.0"/>
+  <ProductInformation>
+    <Name>SignAI - Desktop</Name>
+    <Version>v0.3.0-beta</Version>
+    <CompanyName/>
+    <WebURI>https://github.com/Stefanos0710/SignAI</WebURI>
+  </ProductInformation>
+  <InstallerConfiguration>
+    <Prerequisites>
+      <OperatingSystem check="true">
+        <WindowsXP>true</WindowsXP>
+        <WindowsServer2003>false</WindowsServer2003>
+        <WindowsVista>true</WindowsVista>
+        <WindowsServer2008>false</WindowsServer2008>
+        <Windows7>true</Windows7>
+        <Windows8>true</Windows8>
+        <Windows10>true</Windows10>
+        <WindowsServer2016>false</WindowsServer2016>
+        <WindowsServer2019>false</WindowsServer2019>
+        <WindowsServer2022>false</WindowsServer2022>
+        <Windows11>true</Windows11>
+      </OperatingSystem>
+    </Prerequisites>
+    <UserInterface>
+      <WizardImage filePath="&lt;main&gt;"/>
+      <HeaderImage filePath="&lt;main&gt;"/>
+      <Label isEnabled="true"/>
+      <VisualStyle isEnabled="true"/>
+    </UserInterface>
+    <InstallationFiles defaultInstallationPath="&lt;ProgramFiles&gt;\&lt;AppName&gt;\" isDefaultInstallationPathAlterable ="true">
+      <InstallationFile size="N/A" type="[Folder]">C:\Users\stefa\Documents\GitHub\SignAI\app\dist\SignAI - Desktop\</InstallationFile>
+      <InstallationFile size="N/A" type="[Folder]">C:\Users\stefa\Documents\GitHub\SignAI\app\dist\SignAI - Updater\</InstallationFile>
+    </InstallationFiles>
+    <Languages>
+      <Language>Deutsch</Language>
+      <Language>English</Language>
+    </Languages>
+    <Variables/>
+    <Commands/>
+    <Registry/>
+    <Shortcuts defaultPath="&lt;AppName&gt;\" isDefaultPathAlterable="false" isCreateStartmenuShortcutsForAllUsers="true" isCreateDesktopShortcutsForAllUsers="true"/>
+    <Serials isDialogEnabled="false" count="1000" mask ="#####-#####-#####-#####"/>
+    <SplashScreen isDialogEnabled="false" delayTime="2">
+      <Image filePath=""/>
+      <Sound isEnabled="false" filePath=""/>
+    </SplashScreen>
+    <License isDialogEnabled="true">
+      <Data>e1xydGYxXGFuc2lcYW5zaWNwZzEyNTJcZGVmZjBcbm91aWNvbXBhdFxkZWZsYW5nMTAzMXtcZm9udHRibHtcZjBcZm5pbFxmY2hhcnNldDAgQXJpYWw7fXtcZjFcZm5pbCBBcmlhbDt9fQ0Ke1xjb2xvcnRibCA7XHJlZDBcZ3JlZW4wXGJsdWUyNTU7fQ0Ke1wqXGdlbmVyYXRvciBSaWNoZWQyMCAxMC4wLjI2MTAwfVx2aWV3a2luZDRcdWMxIA0KXHBhcmRcY2YwXGZzMjAgUGxlYXNlIFx1bFxiIHJlYWQgXHVsbm9uZVxiMCB0aHJvdWdoIGl0IFx1bFxiIGJlZm9yZSBpbnN0YWxsaW5nXGlcZjFccGFyDQpccGFyDQpOb24tY29tbWVyY2lhbCBMaWNlbnNlIFx1bG5vbmVcaTBcZjBccGFyDQpccGFyDQpcYjAgVGhpcyBzb2Z0d2FyZSBpcyBsaWNlbnNlZCBmb3IgcGVyc29uYWwsIG5vbi1jb21tZXJjaWFsIHVzZSBvbmx5LlxwYXINClxwYXINClx1bCBZb3UgYXJlIHBlcm1pdHRlZCB0bzpcdWxub25lXHBhcg0KLSBNb2RpZnkgdGhlIHNvZnR3YXJlIGZvciB5b3VyIG93biBwcml2YXRlIHVzZS5ccGFyDQotIERpc3RyaWJ1dGUsIHNoYXJlLCBvciBwdWJsaXNoIHlvdXIgbW9kaWZpZWQgdmVyc2lvbiBvZiB0aGUgc29mdHdhcmUsIHByb3ZpZGVkIHlvdSBpbmNsdWRlIGEgY2xlYXIgYW5kIGNvbnNwaWN1b3VzIGxpbmsgb3IgcmVmZXJlbmNlIHRvIHRoZSBvcmlnaW5hbCBzb3VyY2U6IHt7XGZpZWxke1wqXGZsZGluc3R7SFlQRVJMSU5LIGh0dHBzOi8vZ2l0aHViLmNvbS9TdGVmYW5vczA3MTAvU2lnbkFJIH19e1xmbGRyc2x0e2h0dHBzOi8vZ2l0aHViLmNvbS9TdGVmYW5vczA3MTAvU2lnbkFJXHVsMFxjZjB9fX19XGYwXGZzMjAgLlxwYXINClxwYXINCllvdSBtYXkgTk9UOlxwYXINCi0gVXNlIHRoZSBzb2Z0d2FyZSBvciBhbnkgbW9kaWZpZWQgdmVyc2lvbnMgZm9yIGNvbW1lcmNpYWwgcHVycG9zZXMuXHBhcg0KLSBSZW1vdmUgb3Igb2JzY3VyZSB0aGUgb3JpZ2luYWwgY29weXJpZ2h0IGFuZCBsaWNlbnNlIG5vdGljZXMuXHBhcg0KXHBhcg0KQWxsIG90aGVyIHJpZ2h0cyBhcmUgcmVzZXJ2ZWQuXGYxXHBhcg0KfQ0KAA==</Data>
+    </License>
+    <Finish isRebootMachineEnabled="false">
+      <Program executableFilePath="&lt;InstallPath&gt;\SignAI - Desktop\SignAI - Desktop.exe" isLaunchEnabled="true" arguments=""/>
+    </Finish>
+  </InstallerConfiguration>
+  <UninstallerConfiguration isPackaged="true">
+    <UninstallerExecutableFileName>Uninstall SignAI - Desktop</UninstallerExecutableFileName>
+    <OpenWebURIAfterUninstallation isEnabled="false">https://</OpenWebURIAfterUninstallation>
+    <CustomDisplayIcon isEnabled="false" iconFilePath="&lt;InstallPath&gt;\"/>
+  </UninstallerConfiguration>
+  <VisualUpdateConfiguration isPackaged="false">
+    <ProductName>&lt;AppName&gt;</ProductName>
+    <ProductVersion>&lt;AppVersion&gt;</ProductVersion>
+    <Language>0</Language>
+    <UpdateScriptURIs>
+      <MainURI>https://</MainURI>
+      <FirstMirrorURI>https://</FirstMirrorURI>
+      <SecondMirrorURI>https://</SecondMirrorURI>
+    </UpdateScriptURIs>
+    <updateExecutableFileName>Update</updateExecutableFileName>
+    <proEditionLicenseKey/>
+    <Program executableFilePath="" isLaunchEnabled="false" isTerminationEnabled="false"/>
+  </VisualUpdateConfiguration>
+  <BuildConfiguration>
+    <SetupFilePath>C:\Users\stefa\Desktop\SignAI_Setup.exe</SetupFilePath>
+    <SetupIconPath>..\icons\ancient.ico</SetupIconPath>
+    <UninstallerIconPath>..\icons\ancient.ico</UninstallerIconPath>
+    <Compression method="0" level="2"/>
+    <CodeSigning isEnabled="false" signToolCommandLine="/n &quot;Subject&quot; /tr http://timestamp.digicert.com /td sha256 /fd sha256 &quot;&lt;ExecutableFilePath&gt;&quot;"/>
+  </BuildConfiguration>
+</InstallForgeProject>
