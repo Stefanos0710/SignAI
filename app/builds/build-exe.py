@@ -158,6 +158,12 @@ COLLECT_ALL_PKGS = [
     "tensorflow", "keras"
 ]
 
+# Collect api package as module
+COLLECT_SUBMODULES = [
+    "PySide6",
+    "api"
+]
+
 parser = argparse.ArgumentParser(description="PyInstaller build for SignAI Desktop")
 parser.add_argument("--dry-run", action="store_true", help="Just show the build command without executing it")
 parser.add_argument("--clean", action="store_true", help="delete dist/ and build/ directories before")
@@ -214,6 +220,9 @@ def build_command():
     if ICON_PATH:
         cmd.append(f"--icon={ICON_PATH}")
 
+    # get admin rights on windows
+    cmd.append("--uac-admin")
+
     # path to search for imports
     cmd.append(f"--paths={REPO_ROOT}")
 
@@ -227,6 +236,10 @@ def build_command():
     # hidden imports
     for hidden in HIDDEN_IMPORTS + OPTIONAL_HIDDEN:
         cmd.append(f"--hidden-import={hidden}")
+
+    # collect specific submodules
+    for pkg in COLLECT_SUBMODULES:
+        cmd.append(f"--collect-submodules={pkg}")
 
     # collect all packages, modules, data
     for pkg in COLLECT_ALL_PKGS:

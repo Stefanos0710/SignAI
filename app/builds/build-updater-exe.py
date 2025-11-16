@@ -47,6 +47,7 @@ def _rmtree(path: str):
             pass
     shutil.rmtree(path, onerror=onerror)
 
+
 parser = argparse.ArgumentParser(description='Build SignAI Updater EXE using PyInstaller')
 parser.add_argument('--onefile', action='store_true', help='Build as one-file executable (default is onedir)')
 parser.add_argument('--dry-run', action='store_true', help='Print the PyInstaller command and exit')
@@ -74,6 +75,9 @@ cmd.append("--onefile" if args.onefile else "--onedir")
 
 if ICON_PATH:
     cmd.append(f"--icon={ICON_PATH}")
+
+# get admin rights on windows
+cmd.append("--uac-admin")
 
 # Add repo path for external modules
 REPO_ROOT = os.path.abspath(os.path.join(BASE_DIR, '..'))

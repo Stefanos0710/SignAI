@@ -6,6 +6,8 @@ datas = [('C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\ui\\main_window.ui'
 binaries = []
 hiddenimports = ['PySide6', 'PySide6.QtCore', 'PySide6.QtGui', 'PySide6.QtWidgets', 'PySide6.QtUiTools', 'PySide6.QtXml', 'PySide6.QtNetwork', 'PySide6.QtSvg', 'cv2', 'mediapipe', 'numpy', 'requests', 'psutil', 'flask', 'werkzeug', 'jinja2', 'threading', 'tensorflow', 'keras', 'ml_dtypes', 'pandas', 'scipy', 'json', 'csv', 'resource_path', 'camera', 'videos', 'settings', 'api_call', 'api.signai_api', 'api.preprocessing_live_data', 'api.inference', 'flask_cors', 'flask_socketio', 'matplotlib', 'matplotlib.pyplot', 'matplotlib.ft2font']
 hiddenimports += collect_submodules('PySide6')
+hiddenimports += collect_submodules('api')
+hiddenimports += collect_submodules('PySide6')
 tmp_ret = collect_all('PySide6')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('mediapipe')
@@ -59,6 +61,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    uac_admin=True,
     icon=['C:\\Users\\stefa\\Documents\\GitHub\\SignAI\\app\\icons\\icon.png'],
 )
 coll = COLLECT(
