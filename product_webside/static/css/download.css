@@ -483,3 +483,45 @@ footer::before {
     border-bottom-color: var(--accent);
     text-decoration: none;
 }
+
+/* Coming Soon Styles */
+.coming-soon {
+    position: relative;
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.coming-soon::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: var(--radius);
+    z-index: 1;
+}
+
+.coming-soon-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 0.75rem 2rem;
+    border-radius: 50px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+    text-align: center;
+}
+
+.coming-soon p:not(.coming-soon-badge) {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin: 1rem 0;
+    text-align: center;
+}

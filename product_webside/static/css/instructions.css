@@ -299,15 +299,55 @@ section > .container > p {
 .about {
     background: linear-gradient(135deg, #f8f9fd 0%, #ffffff 100%);
     padding: 4rem 5%;
-    text-align: center;
 }
 
-.about h2 {
-    margin-bottom: 2rem;
+/* Coming Soon Section Styles */
+.coming-soon-section {
+    padding: 4rem 0;
+    scroll-margin-top: 80px;
+    background: linear-gradient(135deg, #f8f9fd 0%, #ffffff 100%);
 }
 
-.about p {
-    max-width: 800px;
-    margin: 0 auto 1.5rem;
+.coming-soon-message {
+    background: white;
+    padding: 3rem 2rem;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
     text-align: center;
+    max-width: 700px;
+    margin: 0 auto;
+    border: 2px solid var(--border);
+}
+
+.coming-soon-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 0.75rem 2rem;
+    border-radius: 50px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+}
+
+.coming-soon-message p:not(.coming-soon-badge) {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin: 1rem 0;
+}
+
+.coming-soon-message a {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.coming-soon-message a:hover {
+    color: var(--accent);
+    text-decoration: underline;
 }
