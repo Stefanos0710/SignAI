@@ -124,8 +124,27 @@ class Updater:
         print(f"Updater base dir: {self.base_dir}")
         print(f"Parent dir: {self.parent_dir}")
 
-        # Load environment variables from .env file
-        load_dotenv()
+        # load env variables from .env file
+        # try first base_dir, then parent dir (important for installation under "C:\\Program Files (x86)")
+        env_candidates = [
+            self.base_dir / ".env",
+            self.parent_dir / ".env",
+            Path(__file__).resolve().parent / ".env",
+        ]
+        loaded_any = False
+        for env_path in env_candidates:
+            try:
+                if env_path.exists():
+                    load_dotenv(env_path)
+                    print(f"Loaded .env from: {env_path}")
+                    loaded_any = True
+                    break
+            except Exception:
+                continue
+        if not loaded_any:
+            # Fallback: standard search for current dir
+            load_dotenv()
+            print("No explicit .env found, used default load_dotenv().")
 
         # Optional configuration file for repository
         repo_cfg = None
