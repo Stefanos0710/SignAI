@@ -29,6 +29,38 @@ def get_gloss(path, id):
     return None
 
 
+def create_dir_video(id, video_path, gloss, base_dir):
+    # make sure that there is a gloss
+    if not gloss:
+        # if there is not gloss, skip this entry
+        print(f"gloss is empty, skipping id {id}")
+        return
+
+    # data/raw_data dir
+    raw_data_dir = os.path.join(base_dir, "data", "raw_data")
+    os.makedirs(raw_data_dir, exist_ok=True)
+
+    folder_name = f"wlasl_{id}"
+    target_dir = os.path.join(raw_data_dir, folder_name)
+    os.makedirs(target_dir, exist_ok=True)
+
+    # build new videoname: gloss_id.mp4, z.B. BOOK_05237.mp4
+    safe_gloss = str(gloss).replace("/", "-").replace("\\", "-")
+    target_video_name = f"{safe_gloss}_{id}.mp4"
+    target_video_path = os.path.join(target_dir, target_video_name)
+
+    # copy video
+    if os.path.exists(video_path):
+        shutil.copy2(video_path, target_video_path)
+    else:
+        print(f"    didn´t found video: {video_path}")
+
+    # GLOSS.txt write file
+    gloss_file_path = os.path.join(target_dir, "GLOSS.txt")
+    with open(gloss_file_path, "w", encoding="utf-8") as gf:
+        gf.write(str(gloss))
+
+
 # introduction message
 print("=" * 80)
 print(" WLASL Dataset to Raw Data Converter")
@@ -45,8 +77,8 @@ if not valid:
     exit(1)
 
 # define paths
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-nslt = os.path.join(BASE_DIR, 'data', 'wlasl', f'nslt_{num_classes}.json')
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+nslt = os.path.join(BASE_DIR, "data", "wlasl", f"nslt_{num_classes}.json")
 class_list_path = os.path.join(BASE_DIR, "data", "wlasl", "wlasl_class_list.txt")
 
 # file count
@@ -68,7 +100,7 @@ for action_id, info in nslt_data.items():
     actions = info.get("action", [])
 
     # video path
-    video_path = os.path.join(BASE_DIR, 'data', 'wlasl', 'videos', f'{action_id}.mp4')
+    video_path = os.path.join(BASE_DIR, "data", "wlasl", "videos", f"{action_id}.mp4")
 
     # gloss
     gloss = None
@@ -77,6 +109,10 @@ for action_id, info in nslt_data.items():
         gloss = get_gloss(class_list_path, gloss_id)
 
     print(f"Path: {video_path}, Subset: {subset}, Actions: {actions}, Gloss: {gloss}")
+
+    # creating dir + file
+    create_dir_video(action_id, video_path, gloss, BASE_DIR)
+
     count += 1
 
 print(f"\n✓ Processed {count} entries from {nslt}")
