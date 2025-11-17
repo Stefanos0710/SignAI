@@ -36,6 +36,11 @@ def create_dir_video(id, video_path, gloss, base_dir):
         print(f"gloss is empty, skipping id {id}")
         return
 
+    # copy video nur, wenn die Datei existiert
+    if not os.path.exists(video_path):
+        print(f"    didn´t found video: {video_path} (skipping entry {id})")
+        return
+
     # data/raw_data dir
     raw_data_dir = os.path.join(base_dir, "data", "raw_data")
     os.makedirs(raw_data_dir, exist_ok=True)
@@ -49,11 +54,8 @@ def create_dir_video(id, video_path, gloss, base_dir):
     target_video_name = f"{safe_gloss}_{id}.mp4"
     target_video_path = os.path.join(target_dir, target_video_name)
 
-    # copy video
-    if os.path.exists(video_path):
-        shutil.copy2(video_path, target_video_path)
-    else:
-        print(f"    didn´t found video: {video_path}")
+    # copy video (hier existiert die Datei garantiert)
+    shutil.copy2(video_path, target_video_path)
 
     # GLOSS.txt write file
     gloss_file_path = os.path.join(target_dir, "GLOSS.txt")
