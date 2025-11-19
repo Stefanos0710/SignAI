@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 </head>
 <body>
 <nav id="navbar" class="navbar">
@@ -33,8 +34,8 @@
     <h1>SignAI</h1>
     <p>
         SignAI is an innovative AI-based application that bridges the communication gap
-        between the hearing and the deaf communities. By using advanced machine learning models,
-        SignAI can recognize sign language in real time – transforming gestures into spoken words and vice versa.
+        between the hearing and the deaf communities. By using advanced machine learning and deep learning techniques,
+        SignAI can recognize and translate sign language in real time from any device.
     </p>
     <div class="hero-buttons">
         <a href="#desktop" class="btn btn-primary">Get Started</a>
@@ -53,29 +54,71 @@
 
 <section id="about">
     <div class="container">
-        <h2>About</h2>
+        <div class="hero-content">
+            <div class="hero-text">
+                <h2>About SignAI</h2>
 
-        <h3 class="about-3">Our Mission</h3>
-        <p>
-            Our mission is to make communication accessible for everyone, no matter their language or ability.
-            SignAI bridges the gap between spoken and sign languages through advanced artificial intelligence.
-            By combining cutting-edge computer vision, natural language processing, and deep learning, SignAI can
-            understand and translate gestures, facial expressions, and context with remarkable accuracy.
-        </p>
+                <h3 class="about-3">Our Mission</h3>
+                <p>
+                    SignAI aims to make communication accessible for everyone. By combining advanced computer vision,
+                    deep learning architectures, and natural language processing, our AI bridges the gap between spoken
+                    and signed communication. We believe that every person deserves to be understood—regardless of
+                    language, background, or physical ability.
+                </p>
+                <p>
+                    Our long-term vision is a world where sign language is no longer a barrier. Whether in classrooms,
+                    workplaces, hospitals, or everyday interactions, SignAI seeks to provide seamless, real-time
+                    translation that empowers individuals and strengthens human connection.
+                </p>
+                <p>
+                    The first full-featured version is planned for January 2026, supporting approximately 20,000 words,
+                    advanced contextual understanding, and the ability to translate long and complex sentences with high
+                    accuracy. This release will be available on all major devices, including smartphones, tablets,
+                    laptops, and desktop systems.
+                </p>
 
-        <h3 class="about-3">Advanced Technology</h3>
-        <p>
-            Trained on tens of thousands of video samples from diverse, large-scale datasets, SignAI continues to
-            improve through ongoing research and user feedback. Its adaptive learning model enables it to recognize
-            subtle variations in regional sign languages and the personal signing styles of individuals.
-        </p>
+                <p style="margin-bottom:1.2em;"></p>
+                <div class="about-note">
+                    <span class="note-label">Note:</span>
+                    SignAI is still in early development and currently recognizes about 1,000 ASL words. At this stage,
+                    it translates mostly individual words rather than full sentences. As the system is still in its infancy,
+                    accuracy and vocabulary coverage are limited. Both will improve dramatically over time as the dataset grows,
+                    the model architecture evolves, and training becomes more extensive. In the near future,
+                    SignAI will be able to translate entire sentences with high accuracy. Users should therefore expect occasional inaccuracies,
+                    limited scope, and partial sentence recognition during the current prototype phase.
+                </div>
 
-        <h3 class="about-3">Building Bridges</h3>
-        <p>
-            Our goal goes beyond translation — we aim to build a world where communication barriers no longer exist.
-            Whether it's in education, public services, or daily life, SignAI empowers people to connect, understand,
-            and share their voices freely.
-        </p>
+
+                <h3 class="about-3">Advanced Technology</h3>
+                <p>
+                    Our AI is trained on tens of thousands of video samples from diverse and carefully curated datasets.
+                    Using state-of-the-art transformer models, spatio-temporal convolutional networks, LSTMs, Seq2Seq-Models, and attention
+                    mechanisms, SignAI can understand subtle hand shapes, movement transitions, and facial expressions.
+                    These components are essential features of sign languages and allow the system to capture meaning
+                    far more precisely than traditional gesture-recognition tools.
+                </p>
+                <p>
+                    The adaptive learning model is designed to recognize regional variations, personal signing styles,
+                    and different levels of signing speed. SignAI continuously improves through research, real-world
+                    usage data, and in future from user feedback. With every update, the system becomes faster, more accurate,
+                    and more capable. If you you are more interested about the technical details, visit our
+                    <a href="https://github.com/Stefanos0710/SignAI" class="about-link">Github page</a>.
+                </p>
+
+                <h3 class="about-3">Building Bridges</h3>
+                <p>
+                    Our goal goes far beyond translation. SignAI is built to support inclusive communication in
+                    education, healthcare, government services, and daily life. We want to empower individuals who rely
+                    on sign language, support interpreters, and provide hearing people with an easy way to understand
+                    and engage with the Deaf community.
+                </p>
+                <p>
+                    By breaking communication barriers, we foster equality, accessibility, and connection. SignAI is not
+                    just a tool—it is a step toward a more inclusive world where everyone can share their voice and be
+                    heard.
+                </p>
+            </div>
+        </div>
     </div>
 </section>
 

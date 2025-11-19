@@ -946,3 +946,81 @@ footer::before {
         text-align: center;
     }
 }
+
+/* About section styles moved from template */
+.about-note {
+    background: var(--background);
+    border-radius: 4px;
+    margin: 0.9em auto 0.6em auto;
+    padding: 0.6em 0.9em;
+    max-width: 100%;
+    color: var(--text-primary);
+    font-size: 0.96rem;
+    text-align: left;
+    border: 1px solid var(--border);
+    box-shadow: none;
+    border-left: 4px solid var(--accent);
+}
+.about-note .note-label {
+    font-weight: 600;
+    font-style: normal;
+    color: var(--accent);
+    margin-bottom: 0.12em;
+    display: block;
+    letter-spacing: 0.01em;
+    font-size: 1.02rem;
+}
+.about-link { color: var(--primary); text-decoration: underline; }
+
+section#about > .container,
+#about .container {
+    max-width: 1400px;
+    padding-left: 13rem !important;
+    padding-right: 2rem !important;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+}
+
+#about .hero-content,
+#about .hero-text {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+#about .hero-text {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.about-note { max-width: 100%; }
+
+@media (min-width: 1600px) {
+    section#about > .container, #about .container { max-width: 1600px; }
+}
+@media (max-width: 1000px) {
+    section#about > .container, #about .container {
+        max-width: 95vw;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+}
+
+#about .hero-text p,
+#about .hero-text p * {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+#about .hero-text h2,
+#about .hero-text h3,
+#about .hero-text .about-note {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+#about .hero-text, #about .hero-content {
+    text-align: left !important;
+    align-items: flex-start !important;
+}
