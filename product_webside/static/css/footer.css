@@ -1,13 +1,14 @@
+
 /* Footer */
 footer {
   background: linear-gradient(135deg, #4b5cfb, #3749d8);
   color: white;
   width: 100%;
   margin: 0;
-  padding: 30px 0 0 0;
+  padding: 60px 0 0 0;
   box-sizing: border-box;
   position: relative;
-  overflow-x: visible;
+  overflow-x: hidden;
 }
 
 footer::before {
@@ -22,39 +23,17 @@ footer::before {
 
 .footer-container {
   display: grid;
-  grid-template-columns: 1.6fr 0.9fr 0.9fr 0.9fr 0.7fr;
-  gap: 16px;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 30px;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 20px 30px 20px;
-}
-
-@media (max-width: 1400px) {
-  .footer-container {
-    grid-template-columns: 1.5fr 1fr 1fr 1fr 0.8fr;
-    gap: 20px;
-  }
+  padding: 0 40px 60px 40px;
 }
 
 @media (max-width: 1200px) {
   .footer-container {
-    grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
-    gap: 15px;
-    padding: 0 20px 50px 20px;
-  }
-}
-
-@media (max-width: 1024px) {
-  .footer-container {
-    grid-template-columns: 1.3fr 1fr 1fr 1fr 0.9fr;
-    gap: 12px;
-  }
-}
-
-@media (max-width: 900px) {
-  .footer-container {
     grid-template-columns: 1fr 1fr;
-    gap: 30px;
+    gap: 40px;
   }
 }
 
@@ -73,16 +52,16 @@ footer::before {
 
 .footer-section h2 {
   color: #fff;
-  font-size: 20px;
-  margin-bottom: 10px;
+  font-size: 28px;
+  margin-bottom: 15px;
   font-weight: 800;
   letter-spacing: -0.5px;
 }
 
 .footer-section h3 {
   color: #fff;
-  margin-bottom: 10px;
-  font-size: 13px;
+  margin-bottom: 20px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -91,11 +70,11 @@ footer::before {
 
 .footer-section p {
   color: rgba(255, 255, 255, 0.85);
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.8;
   max-width: none;
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
   word-wrap: break-word;
   overflow-wrap: break-word;
   hyphens: auto;
@@ -103,14 +82,13 @@ footer::before {
 
 .footer-section a {
   display: block;
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255, 255, 255, 0.8);
   text-decoration: none;
-  margin-bottom: 8px;
-  font-size: 13px;
-  transition: all 0.22s ease;
-  padding-left: 12px;
+  margin-bottom: 12px;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  padding-left: 20px;
   position: relative;
-  will-change: transform, color;
 }
 
 .footer-section a::before {
@@ -118,12 +96,12 @@ footer::before {
   position: absolute;
   left: 0;
   opacity: 0;
-  transition: all 0.22s ease;
+  transition: all 0.3s ease;
 }
 
 .footer-section a:hover {
-  color: rgba(255, 255, 255, 1) !important;
-  transform: translateX(6px);
+  color: #ffffff;
+  transform: translateX(8px);
   text-decoration: none;
 }
 
@@ -135,15 +113,15 @@ footer::before {
 .footer-bottom {
   text-align: center;
   margin: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 16px 20px;
-  background: rgba(0, 0, 0, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 30px 20px;
+  background: rgba(0, 0, 0, 0.15);
 }
 
 .footer-bottom p {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   color: rgba(255, 255, 255, 0.75);
   max-width: 100%;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
 }
