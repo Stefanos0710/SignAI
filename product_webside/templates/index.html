@@ -1,21 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>SignAI - Sign Language Translator</title>
-    {# Stylesheets #}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/desktop.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-</head>
-<body>
+
+
+{% extends 'base.html' %}
+
+{% block title %}SignAI - Sign Language Translator{% endblock %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}">
+{% block content %}
+
 <nav id="navbar" class="navbar">
     <div class="nav-title">SignAI</div>
     <div class="nav-links">
@@ -30,7 +20,6 @@
 </nav>
 
 <section id="home">
-{#    <div class="hero-badge">AI-Powered Translation</div>#}
     <h1>SignAI</h1>
     <p>
         SignAI is an innovative AI-based application that bridges the communication gap
@@ -39,7 +28,7 @@
     </p>
     <div class="hero-buttons">
         <a href="#desktop" class="btn btn-primary">Get Started</a>
-        <a href="#about" class="btn btn-secondary">Learn More</a>
+        <a href="#about" class="btn btn-primary">Learn More</a>
     </div>
 
     <!-- Bubble Elements -->
@@ -87,7 +76,6 @@
                     SignAI will be able to translate entire sentences with high accuracy. Users should therefore expect occasional inaccuracies,
                     limited scope, and partial sentence recognition during the current prototype phase.
                 </div>
-
 
                 <h3 class="about-3">Advanced Technology</h3>
                 <p>
@@ -137,11 +125,6 @@
                     detailed analytics, and the ability to save and review your translation history.
                     The intuitive interface makes it easy for both beginners and professionals to communicate effectively.
                 </p>
-{#                <div class="platform-switch" role="tablist" aria-label="Platform switch">#}
-{#                    <button class="platform active" data-os="win" role="tab" aria-selected="true">Windows</button>#}
-{#                    <button class="platform" data-os="mac" role="tab" aria-selected="false">macOS</button>#}
-{#                    <button class="platform" data-os="linux" role="tab" aria-selected="false">Linux</button>#}
-{#                </div>#}
 
                 <div class="download-row">
                     <a class="btn btn-download" href="/download#download-windows">Download for Windows</a>
@@ -188,6 +171,7 @@
                     Using your smartphone's camera and flash, the app delivers incredible results and enables
                     seamless communication anywhere.
                 </p>
+
                 <p>
                     The mobile app is designed with accessibility in mind, offering a clean and simple interface
                     that works in any lighting condition. Whether you're at home, at work, or on the go,
@@ -197,9 +181,7 @@
                     <strong>Status:</strong> The mobile app is currently under development for both Android and iOS. Stay tuned for updates!
                 </p>
 
-                <p style="margin-top: 1.5rem; font-size: 1rem; color: #666;">
-                    <em>Android and iOS versions coming soon</em>
-                </p>
+
             </div>
 
             <div class="device-container">
@@ -217,7 +199,6 @@
     </div>
 </section>
 
-{# in production change to an real email#}
 <section id="contact">
     <div class="container">
         <h2>Contact Us</h2>
@@ -294,13 +275,4 @@
     </div>
 </footer>
 
-{# Delete this in Produktion #}
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-
-{# JavaScript #}
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
-
-</body>
-</html>
+{% endblock %}

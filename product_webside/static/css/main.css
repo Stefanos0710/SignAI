@@ -63,7 +63,7 @@ a {
     transition: color 0.3s ease;
 }
 
-a:hover:not(.btn):not(.btn-primary):not(.btn-secondary):not(.btn-download) {
+a:hover:not(.btn):not(.btn-primary):not(.btn-secondary):not(.btn-download):not(.btn-contact) {
     color: #3749ff;
     text-decoration: underline;
 }

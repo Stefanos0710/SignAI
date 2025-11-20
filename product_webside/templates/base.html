@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}SignAI - Sign Language Translator{% endblock %}</title>
+
+    {# Primary favicon links - served from static #}
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icon/icon.png') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='icon/icon.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon/icon.png') }}">
+
+    {# Web app manifest #}
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+    {# SEO meta tags #}
+    <meta name="description" content="{% block meta_description %}SignAI — AI-powered sign language translator. Real-time sign language recognition and translation.{% endblock %}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#ffffff">
+
+    {# Microsoft tile #}
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="{{ url_for('static', filename='icon/icon.png') }}">
+
+    {# Canonical - set to index by default #}
+    <link rel="canonical" href="{{ url_for('index', _external=True) }}">
+
+    {# Open Graph / Social #}
+    <meta property="og:title" content="{% block og_title %}SignAI{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}SignAI — AI-powered sign language translator.{% endblock %}">
+    <meta property="og:image" content="{{ url_for('static', filename='icon/icon.png', _external=True) }}">
+    <meta property="og:type" content="website">
+
+    {# Twitter Card #}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{% block twitter_title %}SignAI{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}SignAI — AI-powered sign language translator.{% endblock %}">
+    <meta name="twitter:image" content="{{ url_for('static', filename='icon/icon.png', _external=True) }}">
+
+    {# Stylesheets - kept here so all pages inherit them #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/desktop.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    {% block content %}{% endblock %}
+
+    {# Global scripts #}
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

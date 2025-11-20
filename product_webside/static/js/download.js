@@ -1,7 +1,7 @@
 // Download page JavaScript - Fetch versions from GitHub and populate dropdowns
 // Using electron/electron as example repository since it has proper release assets
-const repoUrl = 'https://api.github.com/repos/electron/electron/releases';
-const repoName = 'electron/electron';
+const repoUrl = 'https://api.github.com/repos/Stefanos0710/SignAI/releases';
+const repoName = 'Stefanos0710/SignAI';
 
 // Platform file mappings - flexibler für verschiedene Dateinamen
 const platformFiles = {

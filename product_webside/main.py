@@ -21,6 +21,10 @@ def download():
 def instructions():
     return render_template("instructions.html")
 
+@app.route("/favicon.ico")
+def favicon():
+    return redirect(url_for('static', filename='icon/icon.png'))
+
 # start the server
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
