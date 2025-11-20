@@ -354,11 +354,15 @@ def update_loading_animation():
     try:
         loading_dots = (loading_dots + 1) % 4
         dots = '.' * loading_dots
+        info_text = (
+            f"AI is thinking{dots}\n"
+            "Please wait a moment, prediction may take a few seconds."
+        )
         if resultDisplay is not None and resultDisplay.isVisible():
             if hasattr(resultDisplay, 'setPlainText'):
-                resultDisplay.setPlainText('AI is thinking' + dots)
+                resultDisplay.setPlainText(info_text)
             else:
-                resultDisplay.setText('AI is thinking' + dots)
+                resultDisplay.setText(info_text)
     except Exception:
         pass
 
