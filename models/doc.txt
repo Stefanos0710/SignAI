@@ -1,0 +1,3 @@
+1 4 woed test 80 vid -> 20 per wordd
+-> bug fix
+2.wlasl 7k videos 1k vocabulary very low accuracy
