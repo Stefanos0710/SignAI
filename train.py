@@ -8,6 +8,9 @@ from typing import Tuple, List, Dict
 
 import numpy as np
 import tensorflow as tf
+import datetime
+import json
+
 from tensorflow.keras.layers import Input, LSTM, Bidirectional, Dense, Masking, Dropout
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
@@ -365,8 +368,78 @@ if __name__ == "__main__":
         class_weight=class_weight
     )
 
-    # save model in keras format
-    model.save("sign_classifier.keras")
-    import json
-    json.dump(label_index, open("labels.json", "w"))
+    # Ssave model + creation of model timestamped artifacts
+    models_dir = os.path.join(os.getcwd(), "models")
+    os.makedirs(models_dir, exist_ok=True)
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    model_filename = f"sign_classifier_{ts}.keras"
+    model_path = os.path.join(models_dir, model_filename)
+    model.save(model_path)
+
+    labels_path = os.path.join(models_dir, f"labels_{ts}.json")
+    with open(labels_path, "w", encoding="utf-8") as lf:
+        json.dump(label_index, lf, ensure_ascii=False)
+
+    history_path = os.path.join(models_dir, f"history_{ts}.json")
+    with open(history_path, "w", encoding="utf-8") as hf:
+        json.dump(history.history, hf)
+
+    logging.info(f"Saved model to: {model_path}")
+    logging.info(f"Saved labels to: {labels_path}")
+    logging.info(f"Saved history to: {history_path}")
+
+    # try to plot training curves
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+
+        acc = history.history.get('accuracy') or history.history.get('acc')
+        val_acc = history.history.get('val_accuracy') or history.history.get('val_acc')
+        loss = history.history.get('loss')
+        val_loss = history.history.get('val_loss')
+
+        fig, axs = plt.subplots(1, 2, figsize=(12, 4))
+        if acc is not None and val_acc is not None:
+            axs[0].plot(acc, label='train_accuracy')
+            axs[0].plot(val_acc, label='val_accuracy')
+            axs[0].set_title('Accuracy')
+            axs[0].legend()
+        else:
+            axs[0].text(0.5, 0.5, 'No accuracy data', ha='center')
+
+        if loss is not None and val_loss is not None:
+            axs[1].plot(loss, label='train_loss')
+            axs[1].plot(val_loss, label='val_loss')
+            axs[1].set_title('Loss')
+            axs[1].legend()
+        else:
+            axs[1].text(0.5, 0.5, 'No loss data', ha='center')
+
+        plt.tight_layout()
+        plot_path = os.path.join(models_dir, f"training_{ts}.png")
+        fig.savefig(plot_path)
+        plt.close(fig)
+        logging.info(f"Saved training plot to: {plot_path}")
+    except Exception as e:
+        logging.warning(f"Could not create training plot (matplotlib missing?): {e}")
+
+    # try to create model
+    try:
+        symlink_model = os.path.join(models_dir, "latest_sign_classifier.keras")
+        # remove existing quick-link
+        if os.path.exists(symlink_model):
+            try:
+                os.remove(symlink_model)
+            except Exception:
+                pass
+        # copy file
+        import shutil
+        shutil.copy2(model_path, symlink_model)
+        shutil.copy2(labels_path, os.path.join(models_dir, "labels.json"))
+    except Exception:
+        pass
+
     logging.info("Training finished successfully.")
+
