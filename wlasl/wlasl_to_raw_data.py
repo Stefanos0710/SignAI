@@ -190,13 +190,27 @@ for action_id, info in nslt_data.items():
             skipped += 1
             count += 1
             continue
-        # only accept exact match: the whole gloss (normalized) must equal one of the top words
-        normalized_gloss = " ".join(_normalize_word(t) for t in str(gloss).split())
-        if normalized_gloss not in top_words:
-             # skip this entry
-             skipped += 1
-             count += 1
-             continue
+        # mpa that gloss to the matched top-word with highest global frequency
+        tokens = [_normalize_word(t) for t in str(gloss).split() if _normalize_word(t)]
+        # find matching top-words in the gloss
+        matches = [t for t in tokens if t in top_words]
+        if not matches:
+            skipped += 1
+            count += 1
+            continue
+
+        # if multiple matches choose the one with highest global frequency  (from top_words_with_counts
+        if len(matches) == 1:
+            chosen = matches[0]
+        else:
+            # build a lookup for counts
+            count_lookup = {w: c for w, c in top_words_with_counts}
+            # sort matches by descending count
+            matches.sort(key=lambda x: count_lookup.get(x, 0), reverse=True)
+            chosen = matches[0]
+
+        # map the gloss to the chosen top-word
+        gloss = chosen
 
     print(f"Path: {video_path}, Subset: {subset}, Actions: {actions}, Gloss: {gloss}")
 
