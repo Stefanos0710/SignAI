@@ -677,7 +677,7 @@ if __name__ == "__main__":
         # configuration for model training
         config = {
             "train_data_folder": "data/train_data",
-            "version_model": 21,
+            "version_model": 28,
             "epochs": 500,
             "batch_size": 8,
             "validation_split": 0.2,
