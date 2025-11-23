@@ -28,6 +28,7 @@ from tensorflow.keras.regularizers import l1
 import concurrent.futures
 import warnings
 import pickle
+import random
 
 # logging configuration
 logging.basicConfig(
@@ -546,7 +547,7 @@ def build_seq2seq_model(
 
 def train_main(
         train_data_folder,
-        version_model=28,
+        version_model=30,
         epochs=200,
         batch_size=64,
         validation_split=0.2,
@@ -554,7 +555,9 @@ def train_main(
         embedding_dim=512,
         hidden_dim=1024,
         dropout_rate=0.3,
-        l1_reg=0.001
+        l1_reg=0.001,
+        augment=True,
+        augment_factor=2  # number of augmented samples to create per original (1 or 2)
 ):
     try:
 
@@ -576,6 +579,21 @@ def train_main(
         """
         # 1. Load data
         samples = load_data_from_folder(train_data_folder)
+
+        # optionally augment data (if augment=true)
+        if augment:
+            logging.info(f"Data augmentation enabled: generating {augment_factor} extra augmented variants per sample (original + extras)...")
+            augmented = []
+            sw_n = 2
+            for s in samples:
+                try:
+                    # max_augments expects total variants (including original), so add +1
+                    vars = augment_sample_variants(s, make_speed_warp_n=sw_n, max_augments=(augment_factor + 1))
+                    augmented.extend(vars)
+                except Exception as e:
+                    logging.warning(f"Augmentation failed for {s.get('source_file')}: {e}")
+            logging.info(f"Augmented samples: original={len(samples)} -> augmented_total={len(augmented)}")
+            samples = augmented
 
         # 2. create tokenizer
         tokenizer = build_tokenizer(samples)
@@ -711,6 +729,226 @@ def train_main(
         raise
 
 
+# data augmentation utilities
+def _pairs_view(arr: np.ndarray):
+    """Return view of arr as (T, N_pairs, 2) and number of pairs."""
+    T, F = arr.shape
+    n_pairs = F // 2
+    paired = arr[:, :n_pairs*2].reshape((T, n_pairs, 2)).copy()
+    return paired, n_pairs
+
+
+def _pairs_to_flat(paired: np.ndarray, orig_F: int):
+    """Convert paired (T, n_pairs, 2) back to flat (T, F) preserving original F by padding zeros if needed."""
+    T, n_pairs, _ = paired.shape
+    flat = paired.reshape((T, n_pairs*2))
+    if n_pairs*2 < orig_F:
+        padw = orig_F - n_pairs*2
+        flat = np.pad(flat, ((0,0),(0,padw)), constant_values=0.0)
+    return flat
+
+
+def jitter_frames(arr: np.ndarray, pct: float = 0.01):
+    """Apply jitter noise ±pct (relative) to coordinates.
+    pct: maximum absolute relative change (e.g., 0.01 for ±1%)."""
+    paired, n_pairs = _pairs_view(arr)
+    # relative noise per coordinate
+    noise = np.random.uniform(-pct, pct, size=paired.shape).astype(np.float32)
+    paired = paired * (1.0 + noise)
+    return _pairs_to_flat(paired, arr.shape[1])
+
+
+def scale_and_shift(arr: np.ndarray, scale_range=(0.97,1.03), shift_x_range=(0.01,0.03), shift_y_range=(0.01,0.02)):
+    """Apply scaling around center and random shifts in x/y (percent of range).
+    scale_range: (min,max)
+    shift ranges are fractions of data range."""
+    paired, n_pairs = _pairs_view(arr)
+    # compute center across all valid coords
+    xs = paired[:,:,0]
+    ys = paired[:,:,1]
+    # ignore zeros (masked) when computing ranges
+    x_valid = xs[np.abs(xs) > 0]
+    y_valid = ys[np.abs(ys) > 0]
+    if x_valid.size == 0 or y_valid.size == 0:
+        center_x = np.mean(xs)
+        center_y = np.mean(ys)
+        x_range = 1.0
+        y_range = 1.0
+    else:
+        center_x = np.mean(x_valid)
+        center_y = np.mean(y_valid)
+        x_range = x_valid.max() - x_valid.min() if x_valid.max() != x_valid.min() else 1.0
+        y_range = y_valid.max() - y_valid.min() if y_valid.max() != y_valid.min() else 1.0
+
+    s = np.random.uniform(scale_range[0], scale_range[1])
+
+    # scale around center
+    paired = (paired - np.array([center_x, center_y])) * s + np.array([center_x, center_y])
+
+    # shift
+    shift_x_pct = np.random.uniform(shift_x_range[0], shift_x_range[1])
+    shift_y_pct = np.random.uniform(shift_y_range[0], shift_y_range[1])
+
+    # choose direction randomly
+    shift_x = shift_x_pct * x_range * (1 if random.random() < 0.5 else -1)
+    shift_y = shift_y_pct * y_range * (1 if random.random() < 0.5 else -1)
+    paired[:,:,0] += shift_x
+    paired[:,:,1] += shift_y
+
+    return _pairs_to_flat(paired, arr.shape[1])
+
+
+def rotate_frames(arr: np.ndarray, deg_range=(-3.0, 3.0)):
+    paired, n_pairs = _pairs_view(arr)
+    theta = np.deg2rad(np.random.uniform(deg_range[0], deg_range[1]))
+    cos_t = np.cos(theta)
+    sin_t = np.sin(theta)
+
+    # center
+    xs = paired[:,:,0]
+    ys = paired[:,:,1]
+    valid_x = xs[np.abs(xs) > 0]
+    valid_y = ys[np.abs(ys) > 0]
+    if valid_x.size == 0 or valid_y.size == 0:
+        cx = np.mean(xs)
+        cy = np.mean(ys)
+    else:
+        cx = np.mean(valid_x)
+        cy = np.mean(valid_y)
+
+    # rotate each point
+    x_rel = paired[:,:,0] - cx
+    y_rel = paired[:,:,1] - cy
+    x_rot = x_rel * cos_t - y_rel * sin_t
+    y_rot = x_rel * sin_t + y_rel * cos_t
+    paired[:,:,0] = x_rot + cx
+    paired[:,:,1] = y_rot + cy
+
+    return _pairs_to_flat(paired, arr.shape[1])
+
+
+def mask_random_keypoints(arr: np.ndarray, min_mask=1, max_mask=2):
+    paired, n_pairs = _pairs_view(arr)
+    T = paired.shape[0]
+
+    for t in range(T):
+        k = random.randint(min_mask, max_mask)
+        idx = np.random.choice(n_pairs, size=k, replace=False)
+        paired[t, idx, :] = 0.0
+
+    return _pairs_to_flat(paired, arr.shape[1])
+
+
+# Temporal augmentations
+def temporal_dropout(arr: np.ndarray, pct_range=(0.05, 0.10)):
+    T = arr.shape[0]
+    pct = np.random.uniform(pct_range[0], pct_range[1])
+    n_drop = int(np.round(T * pct))
+
+    if n_drop <= 0:
+        return arr
+
+    idx = np.arange(T)
+    drop_idx = np.random.choice(idx, size=min(n_drop, T-1), replace=False)
+    keep_mask = np.ones(T, dtype=bool)
+    keep_mask[drop_idx] = False
+    new = arr[keep_mask]
+
+    if new.shape[0] == 0:
+        return arr
+
+    return new
+
+
+def temporal_duplicate(arr: np.ndarray, pct_range=(0.03, 0.05)):
+    T = arr.shape[0]
+    pct = np.random.uniform(pct_range[0], pct_range[1])
+    n_dup = int(np.round(T * pct))
+
+    if n_dup <= 0:
+        return arr
+
+    idx = np.arange(T)
+    dup_idx = np.random.choice(idx, size=min(n_dup, T), replace=False)
+    new_list = []
+
+    for i in range(T):
+        new_list.append(arr[i])
+        if i in dup_idx:
+            new_list.append(arr[i].copy())
+
+    return np.stack(new_list, axis=0)
+
+
+def speed_warp(arr: np.ndarray, factor_range=(0.95, 1.05)):
+    """Resample the sequence length by factor in factor_range using linear interpolation."""
+    T, F = arr.shape
+    factor = np.random.uniform(factor_range[0], factor_range[1])
+    new_T = max(1, int(np.round(T * factor)))
+
+    if new_T == T:
+        return arr.copy()
+
+    # original time positions
+    orig_t = np.linspace(0, 1, T)
+    new_t = np.linspace(0, 1, new_T)
+    new = np.zeros((new_T, F), dtype=np.float32)
+
+    for f in range(F):
+        new[:, f] = np.interp(new_t, orig_t, arr[:, f])
+
+    return new
+
+
+def augment_sample_variants(sample: Dict, make_speed_warp_n: int = 2, max_augments: int = 2):
+    """Generate augmented variants for a sample. Returns list including the original sample first."""
+    arr = sample['keypoints_sequence']
+    orig_F = arr.shape[1]
+    variants = []
+
+    # original
+    variants.append({'keypoints_sequence': arr.copy(), 'gloss': sample.get('gloss', ''), 'source_file': sample.get('source_file')})
+
+    # 1x jitter
+    v_jitter = jitter_frames(arr, pct=0.01)
+    v_jitter = mask_random_keypoints(v_jitter)
+    variants.append({'keypoints_sequence': v_jitter, 'gloss': sample.get('gloss', ''), 'source_file': sample.get('source_file') + '.aug_jitter'})
+
+    # 1x scale or shift + rotate
+    if random.random() < 0.5:
+        v_scale = scale_and_shift(arr)
+    else:
+        v_scale = scale_and_shift(arr)
+
+    v_scale = rotate_frames(v_scale, deg_range=(-3,3))
+    v_scale = mask_random_keypoints(v_scale)
+    variants.append({'keypoints_sequence': v_scale, 'gloss': sample.get('gloss', ''), 'source_file': sample.get('source_file') + '.aug_scale'})
+
+    # optional temporal augmentation (dropout + duplicate)
+    v_temp = arr.copy()
+    if random.random() < 0.9:
+        v_temp = temporal_dropout(v_temp)
+    if random.random() < 0.7:
+        v_temp = temporal_duplicate(v_temp)
+
+    # ensure dtype and shape
+    v_temp = v_temp.astype(np.float32)
+    variants.append({'keypoints_sequence': v_temp, 'gloss': sample.get('gloss', ''), 'source_file': sample.get('source_file') + '.aug_temp'})
+
+    # speed_warp 2..3 times
+    n_sw = make_speed_warp_n if make_speed_warp_n >= 2 else 2
+    for i in range(n_sw):
+        v_sw = speed_warp(arr)
+        # apply small jitter after warping
+        v_sw = jitter_frames(v_sw, pct=0.005)
+        variants.append({'keypoints_sequence': v_sw, 'gloss': sample.get('gloss', ''), 'source_file': sample.get('source_file') + f'.aug_speed{i+1}'})
+
+    # limit number of variants if requested
+    if max_augments > 0 and len(variants) > max_augments:
+        variants = variants[:max_augments]
+
+    return variants
+
 if __name__ == "__main__":
     try:
         # create directories if not exist
@@ -730,10 +968,13 @@ if __name__ == "__main__":
             "embedding_dim": 128,
             "hidden_dim": 256,
             "dropout_rate": 0.2,
-            "l1_reg": 0.0005
-        }
+            "l1_reg": 0.0005,
+            # Data augmentation: set augment_factor to 1 or 2 (number of extra augmented samples per original)
+            "augment": True,
+            "augment_factor": 2
+         }
 
-        # starting training
+         # starting training
         history = train_main(**config)
 
         # show training plots

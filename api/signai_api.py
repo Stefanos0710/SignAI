@@ -75,21 +75,92 @@ app = Flask(__name__)
 UPLOAD_DIR = writable_path(os.path.join('data', 'live', 'video'))
 CSV_DIR = writable_path(os.path.join('data', 'live'))
 
+# determinate model path
+env_model = os.environ.get('SIGNAI_MODEL_PATH') or os.environ.get('SIGNAI_MODEL')
+if env_model:
+    env_model_path = resource_path(env_model) if not os.path.isabs(env_model) else env_model
+    if os.path.exists(env_model_path):
+        MODEL_PATH = env_model_path
+        print(f"[API] Using model from SIGNAI_MODEL_PATH: {os.path.basename(MODEL_PATH)} -> {MODEL_PATH}")
+    else:
+        print(f"[API] SIGNAI_MODEL_PATH set but file not found: {env_model} (resolved: {env_model_path}). Ignoring env override.")
+        MODEL_PATH = None
+else:
+    MODEL_PATH = None
+
 model_candidate = None
+
+# get models 
 try:
-    candidate = resource_path(os.path.join('models', 'trained_model_v21.keras'))
-    if os.path.exists(candidate):
-        model_candidate = candidate
+    models_folder = resource_path('models')
+    # if resource_path returned a file path, get its directory
+    if os.path.isfile(models_folder):
+        models_folder = os.path.dirname(models_folder)
+    if os.path.isdir(models_folder):
+        import re
+        best = None
+        for fname in os.listdir(models_folder):
+            m = re.match(r'trained_model_v(\d+)\.keras$', fname)
+            if m:
+                ver = int(m.group(1))
+                if best is None or ver > best[0]:
+                    best = (ver, os.path.join(models_folder, fname))
+        if best:
+            model_candidate = best[1]
+        else:
+            # keep original preference for v28 checkpoints/classifier if present
+            candidates = [
+                os.path.join('models', 'classifier_v28.keras'),
+                os.path.join('models', 'checkpoint_v28_epoch_08.keras'),
+                os.path.join('models', 'checkpoint_v28_epoch_07.keras'),
+                os.path.join('models', 'checkpoint_v28_epoch_06.keras'),
+            ]
+            for c in candidates:
+                candidate_path = resource_path(c)
+                if os.path.exists(candidate_path):
+                    model_candidate = candidate_path
+                    break
 except Exception:
     model_candidate = None
 
-if model_candidate:
-    MODEL_PATH = model_candidate
-else:
-    # fallback to repo-location relative to this file
-    MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models', 'trained_model_v21.keras'))
+# if env override produced a valid MODEL_PATH, keep it; else apply discovered candidate
+if MODEL_PATH is None:
+    # Prioritize explicit v28 if available (user requested trained_model_v28)
+    try:
+        v28_path = resource_path(os.path.join('models', 'trained_model_v28.keras'))
+        if os.path.exists(v28_path):
+            MODEL_PATH = v28_path
+            print(f"[API] Prioritizing trained_model_v28.keras -> {MODEL_PATH}")
+        else:
+            if model_candidate:
+                MODEL_PATH = model_candidate
+                print(f"[API] Using model: {os.path.basename(MODEL_PATH)} -> {MODEL_PATH}")
+            else:
+                # fallback to legacy discovery (prefer v28 as fallback target)
+                try:
+                    candidate = resource_path(os.path.join('models', 'trained_model_v28.keras'))
+                    if os.path.exists(candidate):
+                        MODEL_PATH = candidate
+                    else:
+                        MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models', 'trained_model_v28.keras'))
+                except Exception:
+                    MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models', 'trained_model_v28.keras'))
+    except Exception:
+        # if anything goes wrong, fallback to previous logic
+        if model_candidate:
+            MODEL_PATH = model_candidate
+            print(f"[API] Using model: {os.path.basename(MODEL_PATH)} -> {MODEL_PATH}")
+        else:
+            try:
+                candidate = resource_path(os.path.join('models', 'trained_model_v28.keras'))
+                if os.path.exists(candidate):
+                    MODEL_PATH = candidate
+                else:
+                    MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models', 'trained_model_v28.keras'))
+            except Exception:
+                MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models', 'trained_model_v28.keras'))
 
-# Ensure required directories exist
+# ensure required directories exist
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(CSV_DIR, exist_ok=True)
 

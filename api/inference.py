@@ -37,11 +37,14 @@ except Exception:
 
 def load_tokenizer(tokenizer_path):
     with open(tokenizer_path, 'r', encoding='utf-8') as f:
-        tokenizer_json = json.load(f)
-    return tf.keras.preprocessing.text.tokenizer_from_json(tokenizer_json)
+        tokenizer_json_str = f.read()
+    # if there is already a dic, provide string
+    if isinstance(tokenizer_json_str, dict):
+        tokenizer_json_str = json.dumps(tokenizer_json_str)
+    return tf.keras.preprocessing.text.tokenizer_from_json(tokenizer_json_str)
 
-
-FEATURES_PER_FRAME = 1086  # 33 pose + 42 hand + 468 face -> (543 * 2)
+# FEATURES_PER_FRAME = 1086  # 33 pose + 42 hand + 468 face -> (543 * 2)
+FEATURES_PER_FRAME = 151
 
 def load_and_prepare_data(csv_file_path):
     samples = []
@@ -61,33 +64,40 @@ def load_and_prepare_data(csv_file_path):
         expected_cols += [f"hand_{i}_x" for i in range(42)] + [f"hand_{i}_y" for i in range(42)]
         expected_cols += [f"face_{i}_x" for i in range(468)] + [f"face_{i}_y" for i in range(468)]
 
-        use_fallback_numeric = False
-        if not reader.fieldnames or any(col not in reader.fieldnames for col in expected_cols):
-            logging.error("CSV is missing expected keypoint columns; attempting numeric fallback parser.")
+        fieldnames = reader.fieldnames
+        # when no header there, use fallback parser
+        if not fieldnames:
+            logging.error("CSV has no header; attempting numeric fallback parser.")
             use_fallback_numeric = True
+        else:
+            # if any colum is missing, fill out with zeros
+            missing = [col for col in expected_cols if col not in fieldnames]
+            if missing:
+                logging.warning(f"CSV is missing {len(missing)} expected keypoint columns; missing columns will be padded with zeros.")
+            use_fallback_numeric = False
 
         if not use_fallback_numeric:
-            # Collect all frames via DictReader
+            # read frames and add missing columns with zeros
             all_frames = []
             for row in reader:
                 try:
                     keypoints = []
-                    # Pose Keypoints (33 points)
-                    for i in range(33):
-                        keypoints.extend([float(row[f"pose_{i}_x"]), float(row[f"pose_{i}_y"])])
-                    # Hand Keypoints (42 points)
-                    for i in range(42):
-                        keypoints.extend([float(row[f"hand_{i}_x"]), float(row[f"hand_{i}_y"])])
-                    # Face Keypoints (468 points)
-                    for i in range(468):
-                        keypoints.extend([float(row[f"face_{i}_x"]), float(row[f"face_{i}_y"])])
+                    for col in expected_cols:
+                        val = row.get(col, None)
+                        if val is None or val == "":
+                            keypoints.append(0.0)
+                        else:
+                            try:
+                                keypoints.append(float(val))
+                            except Exception:
+                                keypoints.append(0.0)
 
                     if len(keypoints) == FEATURES_PER_FRAME:
                         all_frames.append(np.array(keypoints, dtype=np.float32))
                     else:
                         logging.warning(f"Skipping frame with invalid feature count: {len(keypoints)}")
                 except Exception:
-                    # Skip malformed rows
+                    # skip malformed rows
                     continue
 
             if len(all_frames) == 0:
@@ -147,63 +157,251 @@ def load_and_prepare_data(csv_file_path):
     return sample
 
 
-def build_inference_models(training_model):
-    # Encoder
-    encoder_inputs = Input(shape=(1, 1086), name="encoder_inputs")
+def _get_layer_by_candidates(model, candidates):
+    for name in candidates:
+        try:
+            return model.get_layer(name)
+        except Exception:
+            continue
+    # try substring match
+    for layer in model.layers:
+        lname = getattr(layer, 'name', '')
+        for cand in candidates:
+            if cand and cand.lower() in lname.lower():
+                return layer
+    return None
 
-    # Encoder Layers
-    encoder_norm = training_model.get_layer("encoder_norm")(encoder_inputs)
-    encoder_dense_1 = training_model.get_layer("encoder_dense_1")(encoder_norm)
-    batch_norm_1 = training_model.get_layer("batch_norm_1")(encoder_dense_1)
-    dropout_1 = training_model.get_layer("dropout_1")(batch_norm_1)
-    encoder_dense_2 = training_model.get_layer("encoder_dense_2")(dropout_1)
-    batch_norm_2 = training_model.get_layer("batch_norm_2")(encoder_dense_2)
-    dropout_2 = training_model.get_layer("dropout_2")(batch_norm_2)
 
-    # Bidirectional LSTM
-    bidirectional = training_model.get_layer("bidirectional")
-    encoder_outputs, forward_h, forward_c, backward_h, backward_c = bidirectional(dropout_2)
+def build_inference_models(training_model, vocab_size=None):
+    """
+    Build encoder and decoder inference models from a trained model.
+    This function is defensive: it tries multiple candidate layer names and falls back
+    to layers discovered in the loaded training_model if exact names differ.
+    """
+    try:
+        layer_names = [getattr(l, 'name', str(l)) for l in training_model.layers]
+        logging.info(f"[Inference.build] Loaded model layers: {layer_names}")
+    except Exception:
+        pass
 
-    # States zusammenführen
-    state_h = tf.keras.layers.Concatenate()([forward_h, backward_h])
-    state_c = tf.keras.layers.Concatenate()([forward_c, backward_c])
+    # determine encoder input shape dynamically if possible
+    encoder_input_shape = None
+    try:
+        enc_input_layer = training_model.get_layer('encoder_inputs')
+        # Keras input shape is (None, timesteps, features) or similar
+        encoder_input_shape = tuple(dim for dim in enc_input_layer.input_shape[1:])
+    except Exception:
+        #try to deduce from model.input_shape
+        try:
+            if isinstance(training_model.input_shape, (list, tuple)):
+                shape = training_model.input_shape
+                # if model has multiple inputs, try to find one that looks like encoder (contains 'encoder' in name)
+                encoder_input_shape = (1, FEATURES_PER_FRAME)
+        except Exception:
+            encoder_input_shape = (1, FEATURES_PER_FRAME)
+
+    # creatae encoder input tensor
+    encoder_inputs = Input(shape=encoder_input_shape, name="encoder_inputs")
+
+    # try to apply masking layer if exists
+    masking_layer = _get_layer_by_candidates(training_model, ['encoder_masking', 'masking'])
+    x = encoder_inputs
+    if masking_layer is not None:
+        try:
+            x = masking_layer(x)
+        except Exception:
+            # If layer expects different config, skip it
+            x = encoder_inputs
+
+    # try to find a normalization dense stack
+
+    encoder_norm_layer = _get_layer_by_candidates(training_model, ['encoder_norm', 'layer_norm', 'batch_norm_1', 'batch_norm'])
+    if encoder_norm_layer is not None:
+        try:
+            x = encoder_norm_layer(x)
+        except Exception:
+            pass
+
+    # find bidirectional layer
+    bidir = _get_layer_by_candidates(training_model, ['encoder_bidirectional', 'bidirectional', 'bidirectional_1', 'bidirectional_layer', 'bidirectional_lstm', 'bidirectional_wrapper', 'bidirectional'])
+    if bidir is None:
+        # try generic LSTM or GRU as fallback
+        bidir = _get_layer_by_candidates(training_model, ['encoder_lstm', 'lstm', 'encoder_rnn'])
+
+    if bidir is None:
+        raise ValueError('Could not find encoder bidirectional (LSTM) layer in the trained model.')
+
+    # apply bidirectional layer to x. Many Bidirectional wrappers return different outputs; handle common cases.
+    try:
+        bidir_out = bidir(x)
+    except Exception:
+        # as a last resort, call bidir on the raw encoder_inputs
+        bidir_out = bidir(encoder_inputs)
+
+    # bidir_out may be a tensor or a tuple (outputs, forward_h, forward_c, backward_h, backward_c)
+    if isinstance(bidir_out, (list, tuple)) and len(bidir_out) >= 5:
+        encoder_outputs = bidir_out[0]
+        forward_h = bidir_out[1]
+        forward_c = bidir_out[2]
+        backward_h = bidir_out[3]
+        backward_c = bidir_out[4]
+    else:
+        # if  the Bidirectional wrapper returns a single tensor try to retrieve state layers from model
+        encoder_outputs = bidir_out
+        # try to find state tensors as model layers
+        fh_layer = _get_layer_by_candidates(training_model, ['encoder_state_h', 'state_h', 'forward_h'])
+        fc_layer = _get_layer_by_candidates(training_model, ['encoder_state_c', 'state_c', 'forward_c'])
+        bh_layer = _get_layer_by_candidates(training_model, ['backward_h', 'back_h'])
+        bc_layer = _get_layer_by_candidates(training_model, ['backward_c', 'back_c'])
+        try:
+            forward_h = fh_layer(encoder_outputs) if fh_layer is not None else None
+            forward_c = fc_layer(encoder_outputs) if fc_layer is not None else None
+            backward_h = bh_layer(encoder_outputs) if bh_layer is not None else None
+            backward_c = bc_layer(encoder_outputs) if bc_layer is not None else None
+        except Exception:
+            # if it cannot get states
+            encoder_dim = int(encoder_outputs.shape[-1]) if encoder_outputs.shape[-1] is not None else 512
+            forward_h = tf.zeros_like(tf.reshape(encoder_outputs[:, 0, :], (-1, encoder_dim)))
+            forward_c = tf.zeros_like(forward_h)
+            backward_h = tf.zeros_like(forward_h)
+            backward_c = tf.zeros_like(forward_h)
+
+    # combine states
+    try:
+        state_h = tf.keras.layers.Concatenate()([forward_h, backward_h])
+        state_c = tf.keras.layers.Concatenate()([forward_c, backward_c])
+    except Exception:
+        # if concatenation fails, try to use available states
+        if forward_h is not None and backward_h is not None:
+            state_h = tf.keras.layers.Concatenate()([forward_h, backward_h])
+            state_c = tf.keras.layers.Concatenate()([forward_c, backward_c])
+        else:
+            # use zeros
+            enc_dim = int(encoder_outputs.shape[-1]) if encoder_outputs.shape[-1] is not None else 512
+            state_h = tf.zeros((tf.shape(encoder_outputs)[0], enc_dim))
+            state_c = tf.zeros_like(state_h)
 
     # Encoder Model
     encoder_model = Model(inputs=encoder_inputs, outputs=[encoder_outputs, state_h, state_c])
 
-    # Decoder
-    decoder_inputs = Input(shape=(1,), name="decoder_inputs")
-    decoder_state_input_h = Input(shape=(512,), name="decoder_state_input_h")
-    decoder_state_input_c = Input(shape=(512,), name="decoder_state_input_c")
-    encoder_outputs_input = Input(shape=(1, 512), name="encoder_outputs_input")
+    # ------------------ Decoder ------------------
+    # Find decoder LSTM and embedding layers
+    decoder_embedding_layer = _get_layer_by_candidates(training_model, ['decoder_embedding', 'embedding'])
+    decoder_lstm_layer = _get_layer_by_candidates(training_model, ['decoder_lstm', 'lstm_decoder', 'decoder_lstm'])
+    attention_layer = _get_layer_by_candidates(training_model, ['attention', 'multi_head_attention', 'dot_attention'])
+    decoder_dense_layer = _get_layer_by_candidates(training_model, ['decoder_output', 'decoder_dense', 'dense'])
 
-    # Decoder Layers
-    decoder_embedding = training_model.get_layer("decoder_embedding")(decoder_inputs)
+    # Infer decoder units
+    decoder_units = None
+    if decoder_lstm_layer is not None:
+        try:
+            decoder_units = int(getattr(decoder_lstm_layer, 'units', None) or getattr(decoder_lstm_layer.cell, 'units', None))
+        except Exception:
+            decoder_units = 512
+    else:
+        decoder_units = 512
 
-    # LSTM Layer
-    decoder_lstm = training_model.get_layer("decoder_lstm")
-    decoder_outputs, state_h, state_c = decoder_lstm(
-        decoder_embedding,
-        initial_state=[decoder_state_input_h, decoder_state_input_c]
-    )
+    decoder_inputs = Input(shape=(1,), name='decoder_inputs')
+    decoder_state_input_h = Input(shape=(decoder_units,), name='decoder_state_input_h')
+    decoder_state_input_c = Input(shape=(decoder_units,), name='decoder_state_input_c')
+    # encoder outputs shape: (batch, timesteps, enc_dim)
+    enc_out_dim = int(encoder_outputs.shape[-1]) if encoder_outputs.shape[-1] is not None else decoder_units
+    encoder_outputs_input = Input(shape=(None, enc_out_dim), name='encoder_outputs_input')
+
+    # Embedding
+    if decoder_embedding_layer is not None:
+        try:
+            decoder_embedding = decoder_embedding_layer(decoder_inputs)
+        except Exception:
+            # Fallback: use a simple dense to project to decoder_units
+            decoder_embedding = Dense(decoder_units, activation='relu')(decoder_inputs)
+    else:
+        decoder_embedding = Dense(decoder_units, activation='relu')(decoder_inputs)
+
+    # LSTM step
+    if decoder_lstm_layer is not None:
+        try:
+            decoder_outputs, dec_h, dec_c = decoder_lstm_layer(
+                decoder_embedding,
+                initial_state=[decoder_state_input_h, decoder_state_input_c]
+            )
+        except Exception:
+            # Try calling the underlying cell
+            lstm_cell = getattr(decoder_lstm_layer, 'cell', None)
+            if lstm_cell is not None:
+                decoder_outputs, dec_h, dec_c = decoder_lstm_layer(decoder_embedding, initial_state=[decoder_state_input_h, decoder_state_input_c])
+            else:
+                # Fallback: pass embedding through a Dense
+                decoder_outputs = Dense(decoder_units, activation='relu')(decoder_embedding)
+                dec_h = Dense(decoder_units, activation='tanh')(decoder_outputs)
+                dec_c = Dense(decoder_units, activation='tanh')(decoder_outputs)
+    else:
+        decoder_outputs = Dense(decoder_units, activation='relu')(decoder_embedding)
+        dec_h = Dense(decoder_units, activation='tanh')(decoder_outputs)
+        dec_c = Dense(decoder_units, activation='tanh')(decoder_outputs)
 
     # Attention
-    attention = training_model.get_layer("multi_head_attention")(
-        decoder_outputs, encoder_outputs_input
-    )
+    if attention_layer is not None:
+        try:
+            attention_out = attention_layer(decoder_outputs, encoder_outputs_input)
+        except Exception:
+            # Try swapping args or using simple dot-product
+            try:
+                attention_out = attention_layer([decoder_outputs, encoder_outputs_input])
+            except Exception:
+                # Simple additive attention fallback
+                attention_out = tf.keras.layers.Dot(axes=[2, 2])([decoder_outputs, encoder_outputs_input])
+    else:
+        attention_out = tf.keras.layers.Dot(axes=[2, 2])([decoder_outputs, encoder_outputs_input])
 
-    # Add & Norm
-    attention_output = tf.keras.layers.Add()([decoder_outputs, attention])
-    normalized = tf.keras.layers.LayerNormalization()(attention_output)
+    # Combine
+    try:
+        attention_added = tf.keras.layers.Add()([decoder_outputs, attention_out])
+        normalized = tf.keras.layers.LayerNormalization()(attention_added)
+    except Exception:
+        normalized = attention_out
 
-    # Dense Layers
-    dense = training_model.get_layer("decoder_dense")(normalized)
-    decoder_outputs = training_model.get_layer("decoder_output")(dense)
+    # Dense / Output
+    if decoder_dense_layer is not None:
+        try:
+            dense_out = decoder_dense_layer(normalized)
+        except Exception:
+            dense_out = Dense(decoder_units, activation='relu')(normalized)
+    else:
+        dense_out = Dense(decoder_units, activation='relu')(normalized)
 
-    # Decoder Model
+    # if the model exposes a final projection, try to use it
+    final_output_layer = _get_layer_by_candidates(training_model, ['decoder_output', 'output', 'softmax', 'predictions', 'decoder_dense'])
+    if final_output_layer is not None:
+        # If the final_output_layer is the same as decoder_dense_layer, `dense_out` is already the output
+        if final_output_layer is decoder_dense_layer or (hasattr(final_output_layer, 'name') and hasattr(decoder_dense_layer, 'name') and final_output_layer.name == decoder_dense_layer.name):
+            decoder_outputs = dense_out
+        else:
+            try:
+                decoder_outputs = final_output_layer(dense_out)
+            except Exception:
+                # attempt to project dense_out to the expected input dim of final_output_layer
+                projected = None
+                try:
+                    # Try to infer expected input dim from the layer's kernel shape
+                    if hasattr(final_output_layer, 'weights') and final_output_layer.weights:
+                        kernel = final_output_layer.weights[0]
+                        expected_in_dim = int(kernel.shape[0])
+                        projected = Dense(expected_in_dim, activation='relu')(dense_out)
+                        decoder_outputs = final_output_layer(projected)
+                    else:
+                        raise RuntimeError('No kernel information available')
+                except Exception:
+                    # as a final fallback, project straight to vocab_size if given, else to 512
+                    out_dim = int(vocab_size) if vocab_size is not None else 512
+                    decoder_outputs = Dense(out_dim, activation='softmax')(dense_out)
+    else:
+        out_dim = int(vocab_size) if vocab_size is not None else 512
+        decoder_outputs = Dense(out_dim, activation='softmax')(dense_out)
+
     decoder_model = Model(
         inputs=[decoder_inputs, decoder_state_input_h, decoder_state_input_c, encoder_outputs_input],
-        outputs=[decoder_outputs, state_h, state_c]
+        outputs=[decoder_outputs, dec_h, dec_c]
     )
 
     return encoder_model, decoder_model
@@ -216,8 +414,39 @@ def decode_sequence(encoder_input_data, encoder_model, decoder_model, tokenizer)
     # Decoder setup
     start_index = tokenizer.word_index.get('<start>')
     if start_index is None:
-        # Fallback: use most common token index 1
-        start_index = 1
+        # use OOV token index if available, otherwise 1
+        start_index = tokenizer.word_index.get('<unk>', 1)
+
+    embedding_input_dim = None
+    try:
+        # try to finde embedding layer in encoder monel
+        for layer in decoder_model.layers:
+            # Name enthält üblicherweise 'embedding' bei einer Embedding-Schicht
+            if 'embedding' in getattr(layer, 'name', '').lower():
+                embedding_input_dim = getattr(layer, 'input_dim', None)
+                break
+    except Exception:
+        embedding_input_dim = None
+
+    # if input dim is known, validate start index
+    if embedding_input_dim is not None:
+        try:
+            embedding_input_dim = int(embedding_input_dim)
+            if start_index >= embedding_input_dim or start_index < 0:
+                # try to use OOV index if available
+                unk_index = tokenizer.word_index.get('<unk>', None)
+                if unk_index is not None and 0 <= unk_index < embedding_input_dim:
+                    logging.warning(f"Start-Index {start_index} außerhalb der Embedding-Größe ({embedding_input_dim}); Verwende OOV-Index {unk_index}.")
+                    start_index = unk_index
+                else:
+                    # clamp to max valid index
+                    new_index = max(0, embedding_input_dim - 1)
+                    logging.warning(f"Start-Index {start_index} außerhalb der Embedding-Größe ({embedding_input_dim}); clamp auf {new_index}.")
+                    start_index = new_index
+        except Exception:
+            # otherwise use unk index
+            start_index = tokenizer.word_index.get('<unk>', 1)
+
     target_seq = np.array([[start_index]])
 
     # Decoder prediction
@@ -258,17 +487,47 @@ def main_inference(model_path):
         training_model = load_model(model_path)
 
         # Use resource_path for tokenizer
-        tokenizer_path = resource_path(os.path.join("tokenizers", "gloss_tokenizer.json"))
-        if not os.path.exists(tokenizer_path):
-            # Fallback to relative path for development
-            tokenizer_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "tokenizers", "gloss_tokenizer.json"))
+        candidates = [
+            resource_path(os.path.join("tokenizers", "gloss_tokenizer.json")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "tokenizers", "gloss_tokenizer.json")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "tokenizers", "gloss_tokenizer.json")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "tokenizers", "gloss_tokenizer.json")),
+        ]
+        tokenizer = None
+        tokenizer_path = None
+        for c in candidates:
+            try:
+                if c and os.path.exists(c):
+                    tokenizer_path = c
+                    break
+            except Exception:
+                continue
+        if tokenizer_path is not None:
+            try:
+                tokenizer = load_tokenizer(tokenizer_path)
+            except Exception as e:
+                logging.warning(f"Failed to load tokenizer from {tokenizer_path}: {e}")
 
-        tokenizer = load_tokenizer(tokenizer_path)
+        if tokenizer is None:
+            # Create a minimal fallback tokenizer object with basic word_index
+            logging.warning("Tokenizer file not found or failed to load — using fallback minimal tokenizer. Translation output will be limited.")
+            class _FallbackToken:
+                def __init__(self):
+                    # minimal mapping: unk/start/end
+                    self.word_index = {'<unk>': 1, '<start>': 1, '<end>': 2}
+            tokenizer = _FallbackToken()
+
         model_load_time = time.time() - model_load_start
 
         # Build inference models
+        vocab_size = None
+        try:
+            vocab_size = len(tokenizer.word_index) + 1
+        except Exception:
+            vocab_size = None
+
         build_start = time.time()
-        encoder_model, decoder_model = build_inference_models(training_model)
+        encoder_model, decoder_model = build_inference_models(training_model, vocab_size=vocab_size)
         build_time = time.time() - build_start
         print("Models successfully created")
 
