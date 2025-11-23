@@ -498,6 +498,7 @@ def greedy_decode(encoder_input_data, encoder_model, decoder_model, tokenizer, m
     target_seq = np.array([[start_index]], dtype=np.int32)
     decoded_tokens = []
     last_probs = None
+    per_step_max = []
 
     for _ in range(max_len):
         try:
@@ -522,10 +523,34 @@ def greedy_decode(encoder_input_data, encoder_model, decoder_model, tokenizer, m
             prob_vec = probs[0, -1, :]
         except Exception:
             # If shape unexpected, try flatten
-            prob_vec = np.ravel(probs[0]) if hasattr(probs, '__iter__') else np.array(probs).ravel()
+            try:
+                prob_vec = np.ravel(probs[0]) if hasattr(probs, '__iter__') else np.array(probs).ravel()
+            except Exception:
+                prob_vec = None
 
-        last_probs = prob_vec
-        next_id = int(np.argmax(prob_vec))
+        if prob_vec is None:
+            break
+
+        # normalize safely and store per-step max
+        norm = _safe_normalize_probs(prob_vec)
+        if norm is not None:
+            per_step_max.append(float(np.max(norm)))
+            last_probs = norm
+        else:
+            # fallback: try to softmax logits
+            try:
+                logits = np.asarray(prob_vec, dtype=np.float64)
+                logits = logits - np.max(logits)
+                ex = np.exp(logits)
+                sm = ex / np.sum(ex)
+                sm = sm.astype(np.float32)
+                per_step_max.append(float(np.max(sm)))
+                last_probs = sm
+            except Exception:
+                per_step_max.append(0.0)
+                last_probs = None
+
+        next_id = int(np.argmax(last_probs)) if last_probs is not None else int(np.argmax(prob_vec))
 
         if end_index is not None and next_id == end_index:
             break
@@ -535,18 +560,82 @@ def greedy_decode(encoder_input_data, encoder_model, decoder_model, tokenizer, m
 
     sentence = " ".join(decoded_tokens).strip()
 
-    # build a simple probabilities dict from last_probs
-    probabilities = {}
-    if last_probs is not None:
-        try:
-            vocab_len = last_probs.shape[-1]
-            for word, idx in tokenizer.word_index.items():
-                if 0 <= idx < vocab_len and word not in ['<start>', '<end>']:
-                    probabilities[word] = float(last_probs[idx] * 100.0)
-        except Exception:
-            pass
+    # return normalized last_probs vector and per-step-max list for confidence calculation
+    return sentence, last_probs, per_step_max
 
-    return sentence, probabilities
+
+# --- Helper utilities for probability handling and confidence ---
+
+def _safe_normalize_probs(vec):
+    """Safely normalize a 1-D vector to a probability distribution (sum==1).
+    Returns None when normalization is not possible.
+    """
+    try:
+        if vec is None:
+            return None
+
+        v = np.asarray(vec, dtype=np.float64).ravel()
+
+        if v.size <= 1:
+            return None
+
+        s = float(np.sum(v))
+
+        if np.isfinite(s) and s > 0:
+            return (v / s).astype(np.float32)
+
+        logits = v - np.max(v)
+        ex = np.exp(logits)
+        s2 = float(np.sum(ex))
+
+        if not np.isfinite(s2) or s2 <= 0:
+            return None
+
+        return (ex / s2).astype(np.float32)
+
+    except Exception:
+        return None
+
+
+def compute_sequence_confidence(per_step_max_probs):
+    """Compute a sequence-level confidence in percent from per-step max-probabilities (0..1).
+    Uses the mean of valid per-step max values and returns 0..100.
+    """
+    try:
+        if not per_step_max_probs:
+            return 0.0
+        arr = np.asarray(per_step_max_probs, dtype=np.float64)
+        arr = arr[np.isfinite(arr)]
+        if arr.size == 0:
+            return 0.0
+        mean = float(np.clip(np.mean(arr), 0.0, 1.0))
+        return mean * 100.0
+    except Exception:
+        return 0.0
+
+
+def build_top_predictions_from_last_probs(last_probs, tokenizer, top_k=5):
+    """Return top-k word/conf pairs from a normalized last_probs vector (1D, sums to 1).
+    Returns list of dicts {'word':..., 'confidence': ...} with confidence in percent.
+    """
+    try:
+        if last_probs is None:
+            return []
+        probs = _safe_normalize_probs(last_probs)
+        if probs is None:
+            return []
+        vocab_len = int(probs.shape[-1])
+        # get top indices
+        top_idx = np.argsort(probs)[-top_k:][::-1]
+        out = []
+        idx_to_word = getattr(tokenizer, 'index_word', {}) or {}
+        for i in top_idx:
+            w = idx_to_word.get(int(i), '<unk>')
+            conf = float(np.clip(probs[int(i)], 0.0, 1.0) * 100.0)
+            out.append({'word': w, 'confidence': conf})
+        return out
+    except Exception:
+        return []
 
 def main_inference(model_path):
     try:
@@ -645,31 +734,33 @@ def main_inference(model_path):
                 #     decoder_model,
                 #     tokenizer
                 # )
-                predicted_sentence, probabilities = greedy_decode(encoder_input_data, encoder_model, decoder_model, tokenizer, max_len=50)
+                # Use greedy decode which returns (sentence, last_probs_vector, per_step_max_list)
+                predicted_sentence, last_probs_vec, per_step_max_list = greedy_decode(encoder_input_data, encoder_model, decoder_model, tokenizer, max_len=50)
                 predicted_word = predicted_sentence
                 inference_time = time.time() - inference_start
 
                 total_time = time.time() - start_time
 
                 if predicted_word:
-                    # Sort predictions by probability
-                    sorted_predictions = sorted(probabilities.items(), key=lambda x: x[1], reverse=True)
-                    top_predictions = sorted_predictions[:5]  # Top 5
-
-                    confidence = probabilities.get(predicted_word, 0.0)
+                    # Build top predictions from the last normalized probability vector
+                    top_predictions = build_top_predictions_from_last_probs(last_probs_vec, tokenizer, top_k=5)
+                    # Compute sequence confidence from per-step max probabilities
+                    confidence = compute_sequence_confidence(per_step_max_list)
 
                     # Return detailed results
                     return {
+                        # backward-compatible keys
                         'predicted_word': predicted_word,
+                        # Friendly keys expected by the desktop app
+                        'translation': predicted_word,
+                        'model': os.path.basename(model_path) if model_path else None,
                         'confidence': round(confidence, 2),
-                        'top_predictions': [
-                            {'word': word, 'confidence': round(prob, 2)}
-                            for word, prob in top_predictions
-                        ],
+                        'top_predictions': top_predictions,
                         'timing': {
-                            'total_time': round(total_time, 3),
+                            'total_processing_time': round(total_time, 3),
                             'model_load_time': round(model_load_time, 3),
                             'build_time': round(build_time, 3),
+                            'preprocessing_time': round(data_load_time, 3),
                             'data_load_time': round(data_load_time, 3),
                             'inference_time': round(inference_time, 3)
                         }
@@ -677,12 +768,15 @@ def main_inference(model_path):
                 else:
                     return {
                         'predicted_word': None,
+                        'translation': '',
+                        'model': os.path.basename(model_path) if model_path else None,
                         'confidence': 0.0,
                         'top_predictions': [],
                         'timing': {
-                            'total_time': round(total_time, 3),
+                            'total_processing_time': round(total_time, 3),
                             'model_load_time': round(model_load_time, 3),
                             'build_time': round(build_time, 3),
+                            'preprocessing_time': round(data_load_time, 3),
                             'data_load_time': round(data_load_time, 3),
                             'inference_time': round(inference_time, 3)
                         }
