@@ -477,6 +477,76 @@ def decode_sequence(encoder_input_data, encoder_model, decoder_model, tokenizer)
 
     return predicted_word, all_probabilities
 
+def greedy_decode(encoder_input_data, encoder_model, decoder_model, tokenizer, max_len=15):
+
+    # Encoder
+    enc_outs = encoder_model.predict(encoder_input_data, verbose=0)
+    # Erwartet: [encoder_outputs, state_h, state_c]
+    if isinstance(enc_outs, (list, tuple)) and len(enc_outs) >= 3:
+        encoder_outputs, state_h, state_c = enc_outs[0], enc_outs[1], enc_outs[2]
+    else:
+        # fallback: assume entire output is encoder_outputs, create zero states
+        encoder_outputs = enc_outs
+        enc_dim = int(encoder_outputs.shape[-1]) if encoder_outputs.shape[-1] is not None else 512
+        state_h = np.zeros((encoder_outputs.shape[0], enc_dim), dtype=np.float32)
+        state_c = np.zeros_like(state_h)
+
+    # Sstart end token indices
+    start_index = tokenizer.word_index.get('<start>', tokenizer.word_index.get('<unk>', 1))
+    end_index = tokenizer.word_index.get('<end>', None)
+
+    target_seq = np.array([[start_index]], dtype=np.int32)
+    decoded_tokens = []
+    last_probs = None
+
+    for _ in range(max_len):
+        try:
+            outputs = decoder_model.predict([target_seq, state_h, state_c, encoder_outputs], verbose=0)
+        except Exception:
+            try:
+                outputs = decoder_model.predict([target_seq, state_h, state_c], verbose=0)
+            except Exception:
+                outputs = decoder_model.predict([target_seq], verbose=0)
+
+        # parse outputs: (probs, new_h, new_c) or probs only
+        if isinstance(outputs, (list, tuple)) and len(outputs) >= 3:
+            probs = outputs[0]
+            state_h, state_c = outputs[1], outputs[2]
+        elif isinstance(outputs, (list, tuple)) and len(outputs) == 1:
+            probs = outputs[0]
+        else:
+            probs = outputs
+
+        # probs shape expected: (batch, seq_len, vocab)
+        try:
+            prob_vec = probs[0, -1, :]
+        except Exception:
+            # If shape unexpected, try flatten
+            prob_vec = np.ravel(probs[0]) if hasattr(probs, '__iter__') else np.array(probs).ravel()
+
+        last_probs = prob_vec
+        next_id = int(np.argmax(prob_vec))
+
+        if end_index is not None and next_id == end_index:
+            break
+
+        decoded_tokens.append(tokenizer.index_word.get(next_id, '<unk>'))
+        target_seq = np.array([[next_id]], dtype=np.int32)
+
+    sentence = " ".join(decoded_tokens).strip()
+
+    # build a simple probabilities dict from last_probs
+    probabilities = {}
+    if last_probs is not None:
+        try:
+            vocab_len = last_probs.shape[-1]
+            for word, idx in tokenizer.word_index.items():
+                if 0 <= idx < vocab_len and word not in ['<start>', '<end>']:
+                    probabilities[word] = float(last_probs[idx] * 100.0)
+        except Exception:
+            pass
+
+    return sentence, probabilities
 
 def main_inference(model_path):
     try:
@@ -569,12 +639,14 @@ def main_inference(model_path):
 
                 # Make prediction for the entire sequence
                 inference_start = time.time()
-                predicted_word, probabilities = decode_sequence(
-                    encoder_input_data,
-                    encoder_model,
-                    decoder_model,
-                    tokenizer
-                )
+                # predicted_word, probabilities = decode_sequence(
+                #     encoder_input_data,
+                #     encoder_model,
+                #     decoder_model,
+                #     tokenizer
+                # )
+                predicted_sentence, probabilities = greedy_decode(encoder_input_data, encoder_model, decoder_model, tokenizer, max_len=50)
+                predicted_word = predicted_sentence
                 inference_time = time.time() - inference_start
 
                 total_time = time.time() - start_time
