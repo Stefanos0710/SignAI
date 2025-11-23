@@ -17,12 +17,13 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import io
+import re
 from typing import List, Dict, Union, Tuple
 import time
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, Reshape
+from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, Reshape, Masking, Bidirectional, Concatenate, Embedding, AdditiveAttention
 from tensorflow.keras.regularizers import l1
 import concurrent.futures
 import warnings
@@ -35,7 +36,9 @@ logging.basicConfig(
 )
 
 # expected number of features per frame
-EXPECTED_FEATURES = 1086
+EXPECTED_FEATURES = 151
+# minimal accepted numeric values in a parsed frame (flexible fallback)
+MIN_ACCEPTED_FEATURES = 50
 
 # silence specific DeprecationWarning noise that originates from csv parsing of some files
 warnings.filterwarnings("ignore", message="string or file could not be read to its end due to unmatched data")
@@ -99,9 +102,24 @@ def _parse_csv_text(file_name: str, text: str, used_encoding: str = 'utf-8') -> 
         tried_seps.extend([',', ';', ' ', '\t'])
         for sep in tried_seps:
             try:
-                # np.fromstring isvery fast for preprocessing
-                vals = np.fromstring(line, sep=sep, dtype=np.float32)
-                if vals.size > 0:
+                # np.fromstring is very fast for purely-numeric lines but fails when lines start with strings
+                # try simple numeric extraction using splitting and converting tokens to float
+                if sep in [',',';','\t',' ']:
+                    toks = re.split(r'[{},\t ]+'.format(re.escape(sep)), line) if sep != ' ' else re.split(r'\s+', line)
+                else:
+                    toks = re.split(re.escape(sep), line)
+                num_vals = []
+                for t in toks:
+                    try:
+                        if t is None:
+                            continue
+                        vv = float(t)
+                        num_vals.append(vv)
+                    except Exception:
+                        # skip non-numeric tokens (e.g., Video_Name, Gloss)
+                        continue
+                if len(num_vals) > 0:
+                    vals = np.array(num_vals, dtype=np.float32)
                     break
             except Exception:
                 vals = None
@@ -109,32 +127,51 @@ def _parse_csv_text(file_name: str, text: str, used_encoding: str = 'utf-8') -> 
             skipped_lines += 1
             continue
 
-        if vals.size >= EXPECTED_FEATURES:
-            frame = vals[:EXPECTED_FEATURES].astype(np.float32)
+        # accept frames with at least a minimal number of numeric features
+        if vals.size >= (EXPECTED_FEATURES if EXPECTED_FEATURES and EXPECTED_FEATURES > 0 else MIN_ACCEPTED_FEATURES):
+            # if EXPECTED_FEATURES is set and larger than actual, we'll trim/pad later in build_encoder_input
+            frame = vals[:EXPECTED_FEATURES].astype(np.float32) if (EXPECTED_FEATURES and vals.size >= EXPECTED_FEATURES) else vals.astype(np.float32)
             if np.isnan(frame).any() or np.isinf(frame).any():
                 frame = np.nan_to_num(frame, nan=0.0, posinf=0.0, neginf=0.0)
             rows.append(frame)
         else:
+            # if not enough numeric tokens, skip
             skipped_lines += 1
             continue
 
     # if no rows found, try pandas fallback
     if len(rows) == 0:
         try:
-            df = pd.read_csv(io.StringIO(text), sep=None, engine='python', encoding=used_encoding or 'utf-8', header=None, on_bad_lines='skip')
+            df = pd.read_csv(io.StringIO(text), sep=None, engine='python', encoding=used_encoding or 'utf-8', header=0, on_bad_lines='skip')
+            # attempt to keep only numeric columns: coerce and drop all-NaN columns
             df_numeric = df.apply(pd.to_numeric, errors='coerce')
+            # drop columns that are completely NaN
+            df_numeric = df_numeric.loc[:, df_numeric.notna().any(axis=0)]
+            if df_numeric.shape[1] == 0:
+                return None, (file_name, 'pandas_no_numeric_columns')
+
             fallback_rows = []
             for i in range(df_numeric.shape[0]):
                 vals = df_numeric.iloc[i].values
-                if np.isnan(vals).all():
+                # keep only non-nan numeric tokens (this will remove text columns like Video_Name/Gloss)
+                good = vals[~np.isnan(vals)]
+                if good.size == 0:
                     continue
-                vals = np.nan_to_num(vals, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
-                if vals.size >= EXPECTED_FEATURES:
-                    fallback_rows.append(vals[:EXPECTED_FEATURES])
+                good = np.nan_to_num(good, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+                if good.size >= MIN_ACCEPTED_FEATURES:
+                    fallback_rows.append(good)
+                else:
+                    # allow rows that match the majority width later by padding - still collect them
+                    fallback_rows.append(good)
+
             if len(fallback_rows) == 0:
                 return None, (file_name, 'no_valid_frames_after_pandas')
-            rows = fallback_rows
-            logging.info(f"Pandas fallback succeeded for {file_name}: extracted {len(rows)} frames")
+
+            # make all rows the same width by padding with zeros to the max width found in this file
+            maxw = max(r.size for r in fallback_rows)
+            padded = [np.pad(r, (0, maxw - r.size), 'constant', constant_values=0.0) for r in fallback_rows]
+            rows = padded
+            logging.info(f"Pandas fallback succeeded for {file_name}: extracted {len(rows)} frames with width {maxw}")
         except Exception as e:
             return None, (file_name, f'pandas_fallback_error:{str(e)}')
 
@@ -143,14 +180,16 @@ def _parse_csv_text(file_name: str, text: str, used_encoding: str = 'utf-8') -> 
     except Exception as e:
         return None, (file_name, f'stack_error:{str(e)}')
 
-    if arr.shape[1] > EXPECTED_FEATURES:
+    # if EXPECTED_FEATURES was set and arr has more columns, trim; if fewer, keep - upstream will handle differing dims
+    if EXPECTED_FEATURES and arr.shape[1] > EXPECTED_FEATURES:
         arr = arr[:, :EXPECTED_FEATURES]
-    if arr.shape[1] < EXPECTED_FEATURES:
-        return None, (file_name, f'feature_dim_mismatch:{arr.shape}')
+    if EXPECTED_FEATURES and arr.shape[1] < EXPECTED_FEATURES:
+        # don't fail here: return actual dim and let later steps trim/pad across dataset
+        logging.warning(f"File {file_name} has {arr.shape[1]} features < EXPECTED_FEATURES ({EXPECTED_FEATURES}). Using {arr.shape[1]} features for this sample.")
 
-    # Try to find a glossin header gloss
+    # Try to find a gloss in header or first columns
     gloss_text = os.path.splitext(file_name)[0]
-    if 'gloss' in text.lower():
+    if 'gloss' in text.lower() or 'Gloss' in text[:200]:
         try:
             sample_df = pd.read_csv(io.StringIO(text), nrows=1)
             gloss_col = next((c for c in sample_df.columns if str(c).lower() == 'gloss'), None)
@@ -436,67 +475,72 @@ def build_decoder_data(all_samples, tokenizer):
 
 def build_seq2seq_model(
         max_frames, num_features, vocab_size,
-        embedding_dim=128,
-        hidden_dim=256,
-        dropout_rate=0.2,
-        l1_reg=0.0005
+        embedding_dim=64,
+        encoder_units=128,
+        decoder_units=256,
+        dropout_rate=0.3,
+        recurrent_dropout_rate=0.1
 ):
     """
-    Build a sequence-to-sequence model that maps frame sequences to token sequences.
+    Build the sequence-to-sequence model using the requested architecture.
 
-    The encoder accepts variable-length sequences of `num_features` per frame and uses a
-    bidirectional LSTM to create context states. The decoder uses an Embedding layer
-    followed by an LSTM and an additive attention mechanism to attend over encoder outputs.
-    A final dense layer with softmax produces token probabilities over `vocab_size` classes.
-
-    Parameters:
-        max_frames: maximum frame length (not strictly required by this builder if masking is used).
-        num_features: number of features per frame.
-        vocab_size: size of the target vocabulary (including padding and special tokens).
-
-    Returns:
-        A Keras Model instance that takes [encoder_inputs, decoder_inputs] and outputs token logits.
+    Encoder: Input(shape=(None, num_features)) -> Masking -> Bidirectional(LSTM(encoder_units, return_sequences=True, return_state=True,...))
+    Decoder: Input(shape=(None,)) -> Embedding(vocab_size, embedding_dim) -> LSTM(decoder_units, return_sequences=True, return_state=True, initial_state=[state_h, state_c])
+    Attention: AdditiveAttention between decoder outputs and encoder outputs, then Concatenate and Dense softmax to produce token probabilities.
     """
-    # use tf.keras.layers. directly, that no additional top-level imports are needed
-    encoder_inputs = tf.keras.Input(shape=(None, num_features), name="encoder_inputs")
+    # encoder
+    encoder_inputs = Input(shape=(None, num_features), name="encoder_inputs")
+    x = Masking(mask_value=0.0, name="encoder_masking")(encoder_inputs)
 
-    # mask paddings (0.0)
-    masked = tf.keras.layers.Masking(mask_value=0.0, name="encoder_masking")(encoder_inputs)
-
-    # bidirectional LSTM
-    bi_lstm = tf.keras.layers.Bidirectional(
-        tf.keras.layers.LSTM(hidden_dim, return_sequences=True, return_state=True),
-        name="encoder_bidirectional_lstm"
+    encoder_lstm = Bidirectional(
+        LSTM(
+            encoder_units,
+            return_sequences=True,
+            return_state=True,
+            dropout=dropout_rate,
+            recurrent_dropout=recurrent_dropout_rate,
+        ),
+        name="encoder_bidirectional"
     )
 
-    # enc_outputs_and_states: (outputs, f_h, f_c, b_h, b_c)
-    enc_outputs_and_states = bi_lstm(masked)
-    encoder_outputs = enc_outputs_and_states[0]
+    encoder_outputs_and_states = encoder_lstm(x)
+    # encoder_outputs_and_states: (outputs, f_h, f_c, b_h, b_c)
+    encoder_outputs = encoder_outputs_and_states[0]
+    f_h = encoder_outputs_and_states[1]
+    f_c = encoder_outputs_and_states[2]
+    b_h = encoder_outputs_and_states[3]
+    b_c = encoder_outputs_and_states[4]
 
-    # states from h and c
-    state_h = tf.keras.layers.Concatenate(name="encoder_state_h")([enc_outputs_and_states[1], enc_outputs_and_states[3]])
-    state_c = tf.keras.layers.Concatenate(name="encoder_state_c")([enc_outputs_and_states[2], enc_outputs_and_states[4]])
-    encoder_states = [state_h, state_c]
+    state_h = Concatenate(name="encoder_state_h")([f_h, b_h])
+    state_c = Concatenate(name="encoder_state_c")([f_c, b_c])
 
     # decoder
-    decoder_inputs = tf.keras.Input(shape=(None,), name="decoder_inputs")
+    decoder_inputs = Input(shape=(None,), name="decoder_inputs")
+    decoder_embedding = Embedding(vocab_size, embedding_dim, mask_zero=True, name="decoder_embedding")(decoder_inputs)
 
-    # mask_zero=True makes that padding token 0 is masked
-    decoder_embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim, mask_zero=True, name="decoder_embedding")(decoder_inputs)
-    decoder_lstm = tf.keras.layers.LSTM(hidden_dim * 2, return_sequences=True, return_state=True, name="decoder_lstm")
-    decoder_outputs, _, _ = decoder_lstm(decoder_embedding, initial_state=encoder_states)
+    decoder_lstm = LSTM(
+        decoder_units,
+        return_sequences=True,
+        return_state=True,
+        dropout=dropout_rate,
+        recurrent_dropout=recurrent_dropout_rate,
+        name="decoder_lstm"
+    )
 
-    # attention between encoder and decoder
-    attention = tf.keras.layers.AdditiveAttention(name="attention")
-    context = attention([decoder_outputs, encoder_outputs])
-    concat = tf.keras.layers.Concatenate(name="decoder_concat")([decoder_outputs, context])
+    decoder_outputs, _, _ = decoder_lstm(
+        decoder_embedding,
+        initial_state=[state_h, state_c]
+    )
 
-    # finall dense layer
-    decoder_dense = tf.keras.layers.Dense(vocab_size, activation="softmax", name="decoder_dense")
-    final_outputs = decoder_dense(concat)
+    # attention
+    attention = AdditiveAttention(name="attention")([decoder_outputs, encoder_outputs])
 
-    # return the whole model
-    model = tf.keras.Model([encoder_inputs, decoder_inputs], final_outputs, name="seq2seq_model_with_masking")
+    decoder_combined = Concatenate(axis=-1, name="decoder_concat")([decoder_outputs, attention])
+
+    decoder_dense = Dense(vocab_size, activation="softmax", name="decoder_dense")
+    final_outputs = decoder_dense(decoder_combined)
+
+    model = tf.keras.Model([encoder_inputs, decoder_inputs], final_outputs, name="seq2seq_requested_arch")
     return model
 
 
@@ -554,10 +598,11 @@ def train_main(
             max_frames=input_sequence_length,
             num_features=input_feature_dim,
             vocab_size=target_vocab_size,
-            embedding_dim=embedding_dim,
-            hidden_dim=hidden_dim,
+            embedding_dim=64,
+            encoder_units=128,
+            decoder_units=256,
             dropout_rate=dropout_rate,
-            l1_reg=l1_reg
+            recurrent_dropout_rate=0.1
         )
 
         # Sanity-check: model-output-dimension equals target vocab size
