@@ -735,7 +735,7 @@ def main_inference(model_path):
                 #     tokenizer
                 # )
                 # Use greedy decode which returns (sentence, last_probs_vector, per_step_max_list)
-                predicted_sentence, last_probs_vec, per_step_max_list = greedy_decode(encoder_input_data, encoder_model, decoder_model, tokenizer, max_len=50)
+                predicted_sentence, last_probs_vec, per_step_max_list = greedy_decode(encoder_input_data, encoder_model, decoder_model, tokenizer, max_len=15)
                 predicted_word = predicted_sentence
                 inference_time = time.time() - inference_start
 
