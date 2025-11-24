@@ -9,53 +9,22 @@
 
 </div>
 
-SignAI is an experimental sign language recognition and translation system that uses machine learning to interpret German Sign Language (DGS) (and soon ASL = American Sign Language) in real time and present gloss-style translations. This repository contains code for the recognition engine, frontend UI, and training/inference tooling.
+SignAI is an sign language recognition and translation system that uses machine learning to interpret German Sign Language (DGS) (and soon ASL = American Sign Language) in real time and present gloss-style translations. This repository contains code for the recognition engine, frontend UI, and training/inference tooling.
 
 Note: This project is actively developed. v1.0.0 is the first stable major release but still depends on local resources and specific permissions in some environments. See Known Issues & Roadmap for planned improvements.
 
 ---
 
-## Table of contents
+## Note for Moonshot tester
+PLease install the version from the main webside https://www.signai.dev and follow the steps below to get started quickly.
 
-- [Quick Links](#quick-links)  
-- [Highlights (v1.0.0)](#highlights-v100)  
-- [Requirements](#requirements)  
-- [Installation (End user)](#installation-end-user)  
-- [Quick Start (Developer / Local Run)](#quick-start-developer--local-run)  
-- [Usage & Tips](#usage--tips)  
-- [Technical Details & Model Notes](#technical-details--model-notes)  
-- [Known Issues & Workarounds](#known-issues--workarounds)  
-- [Roadmap](#roadmap)  
-- [Contributing](#contributing)  
-- [License](#license)  
-- [Support & Reporting Bugs](#support--reporting-bugs)  
-- [Acknowledgements & Media](#acknowledgements--media)
 
----
 
-## Quick Links
-
-- Website / Downloads: https://www.signai.dev/download  
-- Issues & support: https://github.com/Stefanos0710/SignAI/issues
-- Releases: https://github.com/Stefanos0710/SignAI/releases
-
----
-
-## Highlights (v1.0.0)
-
-- New DGS model with a vocabulary of over 800 words.  
-- Sentence-level translation support for sequences up to 15 words (gloss-style German output).  
-- Improved finetuning pipeline and inference performance.  
-- Hardened admin-access controls (admin privileges are currently required for some operations; planned to be relaxed).  
-- UX improvements for camera handling and clearer first-run behavior.  
-- Baseline training metrics (compressed-training setup): Training accuracy ≈ 30%, Validation accuracy ≈ 25%.
-
----
 
 ## Requirements
 
-- Supported platforms: Windows, macOS, Linux (installer available per OS)  
-- Webcam (or video input) required for live recognition  
+- Supported platforms: Windows (soon also for macOS, Linux, Android and IOS)
+- Webcam required for live recognition  
 - Disk space: At least 5 GB free (models and caches may need more)  
 - Python 3.8+ (for development & building from source)  
 - Recommended: GPU (for local training or fast inference), but CPU-only inference is supported
@@ -92,12 +61,75 @@ The instructions below assume you want to run or develop SignAI locally from sou
    - macOS / Linux: source .venv/bin/activate
 3. Install dependencies:
    pip install -r requirements.txt
-4. Start the app in dev mode (example — adjust command to your project layout):
+4. Start the app in dev mode :
    - Option A (Python): python -m signai.app
-   - Option B (Docker): docker-compose up --build
+
 5. Open the frontend (if applicable) at http://localhost:8000 or as indicated by the startup logs.
 
 Note: Exact run commands may vary depending on your branch or local structure. Check README sections inside subfolders (server/, frontend/) for specific commands.
+
+---
+
+## Models and AI
+
+- Model artifacts: see the `models/` folder. Saved Keras models (checkpoints and final models) and training history JSON files are stored there (e.g. `checkpoint_v28_epoch_01.keras`, `checkpoint_v29_epoch_04.keras`, `history_*.json`).
+
+- Training scripts and workflow:
+  - `train.py` and `train-seq2seq.py` implement the main training loops for classification and sequence-to-sequence tasks. They load preprocessed data, build or load a model from `model.py`, configure augmentation, losses, optimizers, and perform training with checkpointing and history logging.
+  - Typical training steps: load features -> create dataset -> compile model -> train with callbacks (ModelCheckpoint, CSV/JSON history) -> save final model and history.
+
+- Model structure (high level):
+  - Input: sequences of per-frame feature vectors (keypoints or embedding vectors). Shape example: (time_steps, num_features).
+  - Temporal encoder: the model processes the time dimension with temporal layers (e.g. stacked 1D conv / Bi-LSTM / Transformer blocks) to capture motion and temporal patterns.
+  - Head(s): for classification models a dense + softmax head predicts a single label per sequence; for seq2seq models an encoder-decoder (with attention) predicts token sequences (glosses/translations).
+  - The exact architecture is defined in `model.py`. When modifying the architecture, ensure input shape and checkpoint compatibility.
+
+- Metrics & outputs:
+  - Training logs record loss and accuracy (or token-level and sequence-level metrics for seq2seq). Use the recorded `history_*.json` files to plot training and validation curves.
+  - Evaluation scripts or test notebooks can compute confusion matrices, per-class accuracy, and qualitative inference examples.
+
+- How to run training (quick):
+  1. Prepare data (run preprocessing).
+  2. Activate virtual environment and install requirements.
+  3. Run: `python train.py [--config my_config.yaml]` or `python train-seq2seq.py` depending on task.
+
+- Example image placeholders (replace with real plots):
+  - ADD PIC HERE — Model v28 training loss / accuracy plot
+
+  - ADD PIC HERE — Model v29 training loss / accuracy plot
+
+  - ADD PIC HERE — Classification confusion matrix or example inference visualization
+
+---
+
+## Preprocessing of data
+
+This section explains the preprocessing pipeline and the expected input format for training and live inference.
+
+- Key scripts:
+  - `preprocessing_train_data.py`: prepares training data from raw videos/frames. Typical steps include frame sampling, keypoint extraction, normalization, sequence length handling (padding/truncation), and saving features in a training-ready format (e.g. .npz or TFRecord).
+  - `preprecessing_livedata_web.py` and `api/preprocessing_live_data.py`: lightweight preprocessing for live camera or API inputs. These ensure live inputs match the feature format used during training.
+  - `check_dataset.py` and `test_parse_data.py`: validation tools to inspect and verify datasets and feature files.
+
+- Data format and conventions:
+  - A sequence is typically a time-ordered array of keypoint vectors per frame: (time_steps, num_features).
+  - Coordinate normalization: convert absolute pixel coordinates to a normalized space (relative to person or frame), optionally scale/center and remove outliers.
+  - Frame sampling: resample or sample fixed frame rates to create consistent sequence lengths.
+  - Padding/truncation: shorter sequences are zero-padded; longer sequences are truncated or sampled to the fixed input length.
+  - Labels: classification uses a single label per sequence; seq2seq uses a tokenized target sequence (gloss tokens).
+
+- Recommended workflow:
+  1. Collect raw videos/frames under `data/`.
+  2. Run `preprocessing_train_data.py` to produce feature files.
+  3. Inspect outputs with `check_dataset.py`.
+  4. Train using `train.py` or `train-seq2seq.py`.
+
+- Reproducibility tips:
+  - Record preprocessing settings (keypoint detector version, frame rate, normalization method) in config files and keep them with corresponding model checkpoints and histories.
+  - Version the generated feature files and history outputs together with the model checkpoints for reproducible experiments.
+
+- Image placeholder:
+  - ADD PIC HERE — Example of a preprocessed sequence (visualization of keypoints across frames)
 
 ---
 
@@ -154,8 +186,7 @@ Planned focus areas for subsequent major releases:
     - Combining multiple datasets
     - Large-scale synthetic data generation & augmentation
 - Expand vocabulary coverage (targeting thousands of words over time).
-- Reduce admin access requirements and improve security model.
-- Improve robustness to camera interference and cross-platform quirks.
+- General improvements to UI/UX based on user feedback.
 - Introduce natural-language rendering (grammatical sentence generation from glosses).
 
 ---
@@ -177,70 +208,31 @@ How to contribute
    - Any performance or security considerations
 7. Address review feedback and iterate until the PR is ready to merge.
 
-Coding guidelines
-- Follow the existing style in the repo (PEP8 for Python).
-- Add or update unit/integration tests for functional changes.
-- Keep large data or model artifacts out of commits — use model hosting or release assets for large files.
-
-Issue reporting
-- Search existing issues before opening a new one.
-- Provide reproducible steps, platform/OS info, and logs where relevant.
-- Use labels if suggested (bug, enhancement, urgent).
-
-If you are making larger changes (architecture, model training pipeline):
-- Open a draft issue or RFC first describing the design and gather feedback from maintainers.
-
-Code of Conduct
-- Please follow the project's Code of Conduct (see CODE_OF_CONDUCT.md if available). Be respectful and constructive.
-
 ---
 
-## How to customize or extend
-
-- Configuration: Check model and runtime options. Back up your configuration before changes.
-- Add models: Place new model files into models/. See docs/ for model packaging format.
-- Fine-tuning: Use the training scripts in the training/ folder. Large-scale training requires substantial compute — consider cloud GPUs or cluster resources.
-- Frontend changes: The web UI is in frontend/. Edit HTML/CSS/JS there.
-
-If you want to propose a change to the app behavior or default configuration, open a PR with a clear description and, if applicable, a migration guide.
-
----
 
 ## License
 
 This project is distributed under the license described in the LICENSE file in the repository root. The repo currently uses a non-commercial license badge—please check LICENSE for exact terms and permitted usage.
 
-If you need a different licensing arrangement (e.g., commercial use, enterprise license), please contact the maintainers via issues or by the contact information in the repo.
+If you need a different licensing arrangement (e.g., commercial use, enterprise license), please contact us via issues or by the contact information in the repo below.
 
 ---
-
-## Support & reporting bugs
-
-- Create issues at: https://github.com/Stefanos0710/SignAI/issues  
-- Include:
-  - OS and version (Windows/macOS/Linux)
-  - Application version (v1.0.0)
-  - Steps to reproduce
-  - Logs (if available) and screenshots/video of the camera feed behavior
-  - Hardware info (CPU/GPU, webcam model)
-
-For urgent or large-scale collaboration (dataset sharing, compute access), please open an issue titled "Collaboration / Compute Request" and describe your proposal.
-
----
-
-## Acknowledgements & Media
-
-### Awards
-- 🥈 2nd Place — Jugend forscht 2025
 
 ### Media Coverage
-- Featured coverage in Süddeutsche Zeitung: (https://www.sueddeutsche.de/muenchen/freising/flughafen-muenchen-jugend-forscht-li.3209469)  
+- Featured coverage in Süddeutsche Zeitung: (https://www.sueddeutsche.de/muenchen/freising/flughafen-muenchen-jugend-forscht-li.3209469)
 - Mentioned in several local newspapers and regional outlets — thanks to local journalists and community supporters for coverage.
-
 ---
 
-## Credits & Thanks
+### Contact
 
-Thanks to all contributors, testers and early adopters. Special thanks to those who helped with data collection, annotation, and testing during the beta phase.
+Got questions or need help? Choose the most appropriate channel below.
 
----
+- General inquiries, partnerships, press, and collaborations  
+  [hello@signai.dev](mailto:hello@signai.dev)
+
+- Support, installation issues, and troubleshooting  
+  [support@signai.dev](mailto:support@signai.dev)  
+  Preferred: please open an issue first at https://github.com/Stefanos0710/SignAI/issues and include steps to reproduce, and any logs or screenshots.
+
+If you need to report a security vulnerability or sensitive data issue, mark the message clearly and we will prioritize acknowledgement.
