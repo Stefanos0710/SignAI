@@ -2,41 +2,68 @@
 
 # SignAI — Sign Language Translator
 
-[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)  
-[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.12-orange.svg)](https://www.tensorflow.org/)  
-[![License: Non-Commercial](https://img.shields.io/badge/License-Non%20Commercial-red.svg)](LICENSE)  
-[![Last Updated](https://img.shields.io/badge/last%20updated-2025--11--24-green.svg)](https://github.com/Stefanos0710/SignAI/commits/main)
+<div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+
+  <!-- Tech / Versions -->
+  <a href="https://www.python.org/downloads/">
+    <img src="https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white" alt="Python Version">
+  </a>
+  <a href="https://www.tensorflow.org/">
+    <img src="https://img.shields.io/badge/TensorFlow-2.12-orange?logo=tensorflow&logoColor=white" alt="TensorFlow">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-Non%20Commercial-red?logo=github&logoColor=white" alt="License: Non-Commercial">
+  </a>
+
+  <!-- Hackatime Badge -->
+  <a href="https://hackatime-badge.hackclub.com/U090BP84F7F/SignAI">
+    <img src="https://hackatime-badge.hackclub.com/U090BP84F7F/SignAI" alt="Hackatime Badge">
+  </a>
+
+  <!-- Website -->
+  <a href="https://signai.dev">
+    <img src="https://img.shields.io/badge/Website-signai.dev-brightgreen?logo=google-chrome&logoColor=white" alt="Website">
+  </a>
+
+  <!-- Tools / Hosting -->
+<a href="https://vercel.com/">
+  <img src="https://img.shields.io/badge/Hosting-Vercel-black?logo=vercel&logoColor=white" alt="Vercel">
+</a>
+
 
 </div>
 
-SignAI is an experimental sign language recognition and translation system that uses machine learning to interpret German Sign Language (DGS) in real time and produce gloss-style translations. This repository contains the recognition engine, frontend UI, preprocessing & training pipelines, and inference tooling.
 
-Primary languages: Python (core), CSS/HTML/JavaScript (frontend).
+</div>
+
+SignAI is an experimental sign language recognition and translation system that uses machine learning to interpret German Sign Language (DGS) in real time and produce gloss-style translations. This repository contains the recognition engine, frontend UI, the product webside, preprocessing & training pipelines, and inference tooling.
+
+Primary languages: Python (core, app), CSS/HTML/JavaScript (frontend for web).
 
 > Note: v1.0.0 is the first stable major release. The project is actively developed and some operational aspects (admin privileges, resource requirements) are still being refined. See Known Issues & Roadmap for details.
 
 ---
 
-## Table of contents
+## Table of Contents
 
-- [Quick links](#quick-links)  
-- [Highlights (v1.0.0)](#highlights-v100)  
-- [Requirements](#requirements)  
-- [Installation (end user)](#installation-end-user)  
-- [Quick start (developer / local run)](#quick-start-developer--local-run)  
-- [Models & AI](#models--ai)  
-  - [Model artifacts and training workflow](#model-artifacts-and-training-workflow)  
-  - [Seq2Seq architecture (detailed)](#seq2seq-architecture-detailed)  
-  - [Training visualizations](#training-visualizations)  
-- [Preprocessing](#preprocessing)  
-- [Usage & tips](#usage--tips)  
-- [Technical notes & baseline metrics](#technical-notes--baseline-metrics)  
-- [Known issues & workarounds](#known-issues--workarounds)  
-- [Roadmap](#roadmap)  
-- [Contributing](#contributing)  
-- [License](#license)  
-- [Media & acknowledgements](#media--acknowledgements)  
-- [Contact](#contact)
+1. [Quick links](#quick-links)
+2. [Highlights (v1.0.0)](#highlights-v100)
+3. [Requirements](#requirements)
+4. [Installation (end user)](#installation-end-user)
+5. [Quick start (developer / local run)](#quick-start-developer--local-run)
+6. [Models & AI](#models--ai)
+- 6.1. [Model artifacts and training workflow](#model-artifacts-and-training-workflow)
+ - 6.2. [Seq2Seq architecture (detailed)](#seq2seq-architecture-detailed)
+- 6.3. [Training visualizations](#training-visualizations)
+7. [Preprocessing](#preprocessing)
+8. [Usage & tips](#usage--tips)
+9. [Technical notes & baseline metrics](#technical-notes--baseline-metrics)
+10. [Known issues & workarounds](#known-issues--workarounds)
+11. [Roadmap](#roadmap)
+12. [Contributing](#contributing)
+13. [License](#license)
+14. [Media & acknowledgements](#media--acknowledgements)
+15. [Contact](#contact)
 
 ---
 
@@ -93,19 +120,19 @@ Security note
 ## Quick start (developer / local run)
 
 1. Clone the repository:
-   git clone https://github.com/Stefanos0710/SignAI.git
+   ```bash git clone https://github.com/Stefanos0710/SignAI.git```
 2. Create & activate a virtual environment:
    python -m venv .venv
-   - Windows: .venv\Scripts\activate
-   - macOS / Linux: source .venv/bin/activate
+   - Windows: ```bash .venv\Scripts\activate ```
+   - macOS / Linux: ```bash source .venv/bin/activate```
 3. Install dependencies:
-   pip install -r requirements.txt
+   ```bash pip install -r requirements.txt```
 4. Start the app (development mode):
-   cd app
-   python app.py
+   ```bash cd app```
+   ```bash python app.py```
 
 For training:
-- Use `python train.py` for single-word classification or `python train-seq2seq.py` for sentence-level training (see Models & AI).
+- Use ```bash python train.py``` for single-word classification or ```bash python train-seq2seq.py``` for sentence-level training (see Models & AI).
 
 ---
 
@@ -150,7 +177,7 @@ Design rationale and training notes are documented in MODEL_ARCHITECTURE.md and 
 
 ### Training visualizations
 
-Below are example training history plots and diagnostics (replace with updated figures from `models/` if available):
+Below are example training history plots and diagnostics:
 
 - Training history (example run — mode 28):  
 <img width="1200" height="400" alt="training_history_v28" src="https://github.com/user-attachments/assets/801ccbc6-f84f-4d26-840a-45ad8466db8d" />
@@ -178,7 +205,7 @@ Below are example training history plots and diagnostics (replace with updated f
   3. Inspect features with `check_dataset.py`.  
   4. Train with `train.py` or `train-seq2seq.py`.
 
-Example visualization (keypoint & pose preprocessing example using MediaPipe / Holistic output):  
+Example visualization (keypoint & pose preprocessing example using MediaPipe):  
 <img width="850" height="958" alt="MediaPipe-Holistic-API" src="https://github.com/user-attachments/assets/1f0fa089-ae88-4ec1-8423-557f37a89cd5" />
 
 ---
@@ -241,7 +268,7 @@ Planned next steps and goals:
 We welcome contributions:
 
 1. Star the repo.  
-2. Fork and create a branch: `git checkout -b feat/my-change`  
+2. Fork and create a branch: ```bash git checkout -b feat/my-change```
 3. Add tests and documentation for changes.  
 4. Run the test suite and linters.  
 5. Open a Pull Request with a clear description, test instructions and any migration notes.
@@ -265,9 +292,7 @@ See the LICENSE file in the repository root. The project currently uses a non-co
 
 ## Contact
 
-- General / partnerships / press: [hello@signai.dev](mailto:hello@signai.dev)  
-- Support / troubleshooting: [support@signai.dev](mailto:support@signai.dev) — preferred: open an issue first at https://github.com/Stefanos0710/SignAI/issues with reproduction steps and logs.
-
-If you report a security vulnerability, mark the message “SECURITY” and include reproduction steps; security reports are prioritized.
+- General / partnerships / press / collaborations: [hello@signai.dev](mailto:hello@signai.dev) — I'm open to collabs, creative projects, and partnerships.  
+- Support / troubleshooting: [support@signai.dev](mailto:support@signai.dev) — preferred: open an issue first at [GitHub Issues](https://github.com/Stefanos0710/SignAI/issues) with reproduction steps and logs.
 
 ---
