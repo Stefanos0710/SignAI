@@ -271,7 +271,3 @@ See the LICENSE file in the repository root. The project currently uses a non-co
 If you report a security vulnerability, mark the message “SECURITY” and include reproduction steps; security reports are prioritized.
 
 ---
-
-If you want, I can:
-- open a PR with this README update (include images in `docs/assets/`), or  
-- produce a compact release-readme variant for the Releases page.
