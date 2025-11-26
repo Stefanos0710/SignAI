@@ -179,10 +179,10 @@ Design rationale and training notes are documented in MODEL_ARCHITECTURE.md and 
 
 Below are example training history plots and diagnostics:
 
-- Training history (example run — mode 28):  
+- Training history (example run — mode 28) with dataset https://www.kaggle.com/datasets/mariusschmidtmengin/phoenixweather2014t-3rd-attempt:  
 <img width="1200" height="400" alt="training_history_v28" src="https://github.com/user-attachments/assets/801ccbc6-f84f-4d26-840a-45ad8466db8d" />
 
-- Training history (example run — model 29):  
+- Training history (example run — model 29) with dataset https://www.kaggle.com/datasets/mariusschmidtmengin/phoenixweather2014t-3rd-attempt:  
 <img width="1200" height="400" alt="training_history_v29" src="https://github.com/user-attachments/assets/130e6ee7-dbac-455e-bbeb-dffee992ed28" />
 
 - Classification training snapshot:  
