@@ -27,12 +27,21 @@ or with --onefile:
 
 """
 
+RUNTIME_HOOK = os.path.join(os.path.dirname(__file__), "runtime_qt_plugin_path.py")
+
 APP_NAME = "SignAI - Desktop"
 ENTRY_FILE = "app.py"  # is at the app/app.py level
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # .../app
 REPO_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))  # project root for api package
-DIST_DIR = os.path.join(BASE_DIR, "dist")
-BUILD_DIR = os.path.join(BASE_DIR, "build")
+
+# Default output directory for built artifacts. Allow override via env var SIGNAI_DIST_DIR.
+# Per user request set default to D:\\SIgnAI2 so PyInstaller output goes there.
+DIST_DIR = os.environ.get('SIGNAI_DIST_DIR', r'D:\SIgnAI2')
+DIST_DIR = os.path.abspath(DIST_DIR)
+# Use subfolders under DIST_DIR for the pyinstaller work/spec folders
+BUILD_DIR = os.path.join(DIST_DIR, "build")
+SPEC_DIR = os.path.join(DIST_DIR, "spec")
+
 TARGET_ONEDIR = os.path.join(DIST_DIR, APP_NAME)
 TARGET_ONEFILE = os.path.join(DIST_DIR, f"{APP_NAME}.exe")
 
@@ -50,6 +59,8 @@ DATA_ITEMS = [
     (os.path.join(BASE_DIR, "settings", "settings.json"), "settings"),
     # Tokenizer & Modelle
     (os.path.join(REPO_ROOT, "tokenizers", "gloss_tokenizer.json"), "tokenizers"),
+    # ensure the app-level settings.py is included in the build (helps with dynamic imports)
+    (os.path.join(BASE_DIR, "settings.py"), "."),
 ]
 # get models from models folder
 MODELS_DIR = os.path.join(REPO_ROOT, "models")
@@ -208,7 +219,8 @@ def build_command():
         "--noconfirm",
         "--clean",
         f"--name={APP_NAME}",
-        "--windowed",
+        "--console"
+        # Do not use --windowed so that the console is visible (GUI window will still show).
     ]
 
     # onedir against onefile mode
@@ -220,11 +232,20 @@ def build_command():
     if ICON_PATH:
         cmd.append(f"--icon={ICON_PATH}")
 
-    # get admin rights on windows
+    # get admin rights on windows  (fürs Debuggen kannst du das auch mal rausnehmen)
     cmd.append("--uac-admin")
 
     # path to search for imports
     cmd.append(f"--paths={REPO_ROOT}")
+
+    # Explicitly set dist/work/spec paths so output lands in the desired DIST_DIR
+    cmd.append(f"--distpath={DIST_DIR}")
+    cmd.append(f"--workpath={BUILD_DIR}")
+    cmd.append(f"--specpath={SPEC_DIR}")
+
+    # 👉 Runtime-Hook anhängen
+    if os.path.exists(RUNTIME_HOOK):
+        cmd.append(f"--runtime-hook={RUNTIME_HOOK}")
 
     # add data files
     for src, dest in DATA_ITEMS:
@@ -251,6 +272,9 @@ def build_command():
     for exc in EXCLUDES:
         cmd.append(f"--exclude-module={exc}")
 
+    for pkg in COLLECT_ALL_PKGS:
+        cmd.append(f"--collect-all={pkg}")
+
     # entry point
     entry_path = os.path.join(BASE_DIR, ENTRY_FILE)
     cmd.append(entry_path)
@@ -265,6 +289,7 @@ def main():
     print(f"Repo base path:      {REPO_ROOT}")
     print(f"Icon:             {ICON_PATH or '(no Icon found)'}")
     print(f"Mode:            {'ONEFILE' if args.onefile else 'ONEDIR'}")
+    print(f"Dist output dir: {DIST_DIR}")
 
     if args.clean:
         clean()

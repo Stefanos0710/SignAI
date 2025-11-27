@@ -16,6 +16,52 @@ recorded videos will be saved in app/videos/history/{timestamp}_video.mp4
 
 import sys, os, io, traceback, types, socket, subprocess, platform, time
 
+# ---------------------------------------------------------------------------
+# Qt Plugin path fix for PyInstaller builds
+# Must run BEFORE any PySide6 imports
+# ---------------------------------------------------------------------------
+def fix_qt_plugin_path():
+    """
+    Ensure that Qt (PySide6) can find its platform plugins (especially qwindows.dll)
+    in a PyInstaller-frozen application on other Windows PCs.
+    """
+    # Nur im gefrorenen Zustand relevant
+    if not getattr(sys, "frozen", False):
+        return
+
+    # Basisordner der EXE / _MEIPASS
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(sys.executable)
+
+    # Kandidaten, je nach PyInstaller-Version/collect-all Layout
+    candidates = [
+        os.path.join(base, "PySide6", "plugins"),
+        os.path.join(base, "_internal", "PySide6", "plugins"),
+    ]
+
+    plugins = next((p for p in candidates if os.path.isdir(p)), None)
+    if not plugins:
+        print("[QT FIX] No PySide6 plugin directory found in frozen app.")
+        return
+
+    platforms = os.path.join(plugins, "platforms")
+
+    os.environ["QT_PLUGIN_PATH"] = plugins
+    if os.path.isdir(platforms):
+        os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = platforms
+
+    print("[QT FIX] QT_PLUGIN_PATH set to:", plugins)
+    if os.path.isdir(platforms):
+        print("[QT FIX] QT_QPA_PLATFORM_PLUGIN_PATH set to:", platforms)
+
+# Fix ausführen, bevor PySide6 importiert wird
+fix_qt_plugin_path()
+
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QWidget, QToolButton, QMessageBox, QCheckBox, \
+    QPlainTextEdit, QTextEdit
+from PySide6.QtUiTools import QUiLoader
+from PySide6.QtCore import QFile, QTimer, Qt, QThread, Signal, QIODevice, QCoreApplication
+
 APP_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) and hasattr(sys, 'executable') else os.path.dirname(os.path.abspath(__file__))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
@@ -40,33 +86,33 @@ if not (getattr(sys, 'frozen', False) and hasattr(sys, 'executable')):
         except Exception:
             pass
 
-# Essential packages (install only in dev, not in frozen)
-ESSENTIAL_PACKAGES = {
-    'numpy': '1.26.4',
-    'protobuf': '4.25.8',
-    'ml-dtypes': '0.3.1',
-    'tensorflow': '2.16.2',
-    'mediapipe': '0.10.21'
-}
-def _ensure_packages():
-    import importlib, subprocess
-    missing = []
-    for pkg, ver in ESSENTIAL_PACKAGES.items():
-        try:
-            importlib.import_module(pkg.replace('-', '_'))
-        except Exception:
-            missing.append((pkg, ver))
-    if not missing:
-        return
-    print("[Bootstrap] Installing missing packages:", ', '.join(f"{p}=={v}" for p,v in missing))
-    for pkg, ver in missing:
-        try:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', f'{pkg}=={ver}'])
-        except Exception as e:
-            print(f"[Bootstrap] Failed to install {pkg}: {e}")
-
-if not getattr(sys, 'frozen', False):
-    _ensure_packages()
+# # Essential packages (install only in dev, not in frozen)
+# ESSENTIAL_PACKAGES = {
+#     'numpy': '1.26.4',
+#     'protobuf': '4.25.8',
+#     'ml-dtypes': '0.3.1',
+#     'tensorflow': '2.16.2',
+#     'mediapipe': '0.10.21'
+# }
+# def _ensure_packages():
+#     import importlib, subprocess
+#     missing = []
+#     for pkg, ver in ESSENTIAL_PACKAGES.items():
+#         try:
+#             importlib.import_module(pkg.replace('-', '_'))
+#         except Exception:
+#             missing.append((pkg, ver))
+#     if not missing:
+#         return
+#     print("[Bootstrap] Installing missing packages:", ', '.join(f"{p}=={v}" for p,v in missing))
+#     for pkg, ver in missing:
+#         try:
+#             subprocess.check_call([sys.executable, '-m', 'pip', 'install', f'{pkg}=={ver}'])
+#         except Exception as e:
+#             print(f"[Bootstrap] Failed to install {pkg}: {e}")
+#
+# if not getattr(sys, 'frozen', False):
+#     _ensure_packages()
 
 # resource_path + writable_path (with stub if missing)
 try:
@@ -74,8 +120,15 @@ try:
     print('[Bootstrap] resource_path module loaded.')
 except Exception as _e_rp_import:
     print('[Bootstrap] resource_path missing, create stub:', _e_rp_import)
+    def _base_dir() -> str:
+        if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
+            return os.path.dirname(sys.executable)
+        return os.path.dirname(os.path.abspath(__file__))
+    def _user_data_dir() -> str:
+        local = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+        return os.path.join(local, "SignAI")
     def resource_path(relative_path: str) -> str:
-        base = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) and hasattr(sys, 'executable') else os.path.dirname(os.path.abspath(__file__))
+        base = _base_dir()
         full = os.path.join(base, relative_path)
         if os.path.exists(full):
             return full
@@ -86,7 +139,11 @@ except Exception as _e_rp_import:
                 return alt
         return full
     def writable_path(relative_path: str) -> str:
-        base = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) and hasattr(sys, 'executable') else os.path.dirname(os.path.abspath(__file__))
+        # Use per-user dir when frozen to avoid permission issues on other PCs
+        if getattr(sys, 'frozen', False) and hasattr(sys, 'executable'):
+            base = _user_data_dir()
+        else:
+            base = _base_dir()
         full = os.path.join(base, relative_path)
         parent = os.path.dirname(full)
         if parent:
@@ -153,7 +210,7 @@ try:
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QWidget, QToolButton, QMessageBox, QCheckBox, QPlainTextEdit, QTextEdit
     from PySide6.QtUiTools import QUiLoader
-    from PySide6.QtCore import QFile, QTimer, Qt, QThread, Signal, QIODevice
+    from PySide6.QtCore import QFile, QTimer, Qt, QThread, Signal, QIODevice, QCoreApplication
 except Exception as _e_qt_init:
     print('[Fatal] Qt imports failed:', _e_qt_init)
     traceback.print_exc()
@@ -224,6 +281,7 @@ else:
 
 try:
     from api_call import API
+    print("Step3 - api_call")
 except Exception as e:
     print('[Error] api_call import failed:', e)
     class API:
@@ -233,11 +291,29 @@ except Exception as e:
 # =========================
 # App init
 # =========================
+
+# Force software OpenGL for GPUs ohne passende Treiber und set share flag before QApplication
+os.environ.setdefault("QT_OPENGL", "software")
+try:
+    QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
+    QCoreApplication.setAttribute(Qt.AA_UseSoftwareOpenGL, True)
+except Exception as _e_attr:
+    print("[Warn] Could not set Qt attributes:", _e_attr)
+
 app = QApplication(sys.argv)
 loader = QUiLoader()
+print(f"step4 - starting app {app}")
 
-settings = Settings()
-history_videos = HistoryVideos()
+try:
+    print("Step1 - settings")
+    settings = Settings()
+    history_videos = HistoryVideos()
+    print(f"Settings loaded: debug={getattr(settings, 'debug', None)}, history={getattr(settings, 'history', None)}")
+except Exception as _e_settings:
+    print("[Fatal] Settings init failed:", _e_settings)
+    traceback.print_exc()
+    QMessageBox.critical(None, "SignAI", f"Settings initialisation failed:\n{_e_settings}")
+    sys.exit(1)
 
 # Load UI
 ui_file_path = resource_path("ui/main_window.ui")
@@ -253,6 +329,7 @@ ui_file.close()
 if window is None:
     print('[Fatal] UI loader returned None.')
     sys.exit(1)
+print(f"step5 - ui loaded {window}")
 
 # Icon
 try:
@@ -309,13 +386,23 @@ if os.path.exists(style_path):
     except Exception as e:
         print('[Warn] Could not load style.qss:', e)
 
-# Cameras
-available_cams = findcams()
-print(f"[Camera] Available: {available_cams}")
-camera_number = 0
-camerafeed = CameraFeed(videofeedlabel, cam_number=available_cams[camera_number]) if available_cams else None
-if not available_cams and videofeedlabel:
-    videofeedlabel.setText("No working cameras found!")
+# Cameras (defensive: never crash if driver/backend spins)
+try:
+    print("Step2 - videos")
+    available_cams = findcams()
+    print(f"[Camera] Available: {available_cams}")
+    camera_number = 0
+    camerafeed = CameraFeed(videofeedlabel, cam_number=available_cams[camera_number]) if available_cams else None
+    if not available_cams and videofeedlabel:
+        videofeedlabel.setText("No working cameras found!")
+except Exception as _e_cam:
+    available_cams = []
+    camera_number = 0
+    camerafeed = None
+    if videofeedlabel:
+        videofeedlabel.setText("Camera initialisation failed.")
+    print("[Fatal] Camera init crashed:", _e_cam)
+    traceback.print_exc()
 
 camera = None
 pressed = 0
@@ -640,6 +727,7 @@ app.aboutToQuit.connect(cleanup)
 # Run Application
 # =========================
 window.show()
+print("Step - start running app")
 try:
     exit_code = app.exec()
     print(f"[Shutdown] Qt Event loop exited with code {exit_code}")
@@ -648,3 +736,4 @@ except Exception as _e_loop:
     print('[Fatal] Crash in event loop:', _e_loop)
     traceback.print_exc()
     sys.exit(1)
+

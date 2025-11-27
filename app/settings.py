@@ -33,6 +33,7 @@ class Settings:
                 settings = json.load(f)
                 self.debug = settings.get("debug", False)
                 self.history = settings.get("history", True)
+                print("Step1 - settings")
             print(f"Settings loaded: debug={self.debug}, history={self.history}")
         except (FileNotFoundError, json.JSONDecodeError):
             # Use defaults if file doesn't exist or is corrupted

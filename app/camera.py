@@ -30,6 +30,27 @@ from resource_path import writable_path
 os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
 os.environ["OPENCV_LOG_LEVEL"] = "OFF"
 
+# Preferred backends order (DSHOW -> MSMF -> ANY) with graceful fallback
+BACKENDS = [
+    getattr(cv2, "CAP_DSHOW", 700),
+    getattr(cv2, "CAP_MSMF", 1400),
+    getattr(cv2, "CAP_ANY", 0),
+]
+
+
+def _open_capture(cam_number: int):
+    """Try to open a camera using a list of backends, returning the first working VideoCapture."""
+    for be in BACKENDS:
+        try:
+            cap = cv2.VideoCapture(cam_number, be)
+            if cap and cap.isOpened():
+                return cap
+            if cap:
+                cap.release()
+        except Exception as e:
+            print(f"[Camera] backend {be} failed for cam {cam_number}: {e}")
+    return None
+
 class Camera:
     def __init__(self, camera_id=0, resolution=(640, 480), fps=30, camera_feed=None):
         self.camera_id = camera_id
@@ -63,9 +84,9 @@ class Camera:
         time.sleep(0.3)
 
         # Setup camera
-        self.cap = cv2.VideoCapture(self.camera_id, cv2.CAP_DSHOW)
+        self.cap = _open_capture(self.camera_id)
 
-        if not self.cap.isOpened():
+        if not self.cap or not self.cap.isOpened():
             print(f"Error: Cannot open camera {self.camera_id}")
             if self.camera_feed:
                 self.camera_feed.resume()
@@ -237,7 +258,7 @@ class CameraFeed:
     def __init__(self, label, cam_number=0):
         self.label = label
         self.cam_number = cam_number
-        self.cam = cv2.VideoCapture(self.cam_number, cv2.CAP_DSHOW)  # Use DirectShow on Windows
+        self.cam = _open_capture(self.cam_number)
         self.timer = None
         self.is_running = False
         self.is_paused = False
@@ -323,8 +344,8 @@ class CameraFeed:
         time.sleep(0.3)
 
         # Reopen camera
-        self.cam = cv2.VideoCapture(self.cam_number, cv2.CAP_DSHOW)
-        if not self.cam.isOpened():
+        self.cam = _open_capture(self.cam_number)
+        if not self.cam or not self.cam.isOpened():
             self.label.setText(f"Error: Cannot reopen camera {self.cam_number}")
             return
 
@@ -355,15 +376,38 @@ class CameraFeed:
         self.is_running = False
         self.is_paused = False
 
+def _probe_camera(index: int, backend, timeout_sec: float = 1.5) -> bool:
+    """Probe a camera index with a backend; return True if a frame can be read quickly."""
+    import time
+    cap = cv2.VideoCapture(index, backend)
+    if not cap or not cap.isOpened():
+        return False
+    start = time.time()
+    ret = False
+    for _ in range(5):
+        ret, _frame = cap.read()
+        if ret:
+            break
+        if time.time() - start > timeout_sec:
+            break
+        time.sleep(0.1)
+    cap.release()
+    return bool(ret)
+
+
 def findcams(max_cams=3):
-    """Find available cameras. Reduced default to 3 to avoid unnecessary scanning."""
+    """Find available cameras quickly without hanging on bad drivers."""
     available_cams = []
     for i in range(max_cams):
-        cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)  # Use DirectShow on Windows
-        if cap.isOpened():
-            # Test if camera can actually grab frames
-            ret, _ = cap.read()
-            if ret:
-                available_cams.append(i)
-            cap.release()
+        found = False
+        for be in BACKENDS:
+            try:
+                if _probe_camera(i, be):
+                    available_cams.append(i)
+                    found = True
+                    break
+            except Exception as e:
+                print(f"[Camera] probe failed for index {i} backend {be}: {e}")
+        if not found:
+            print(f"[Camera] index {i} not usable")
     return available_cams
