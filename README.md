@@ -286,8 +286,10 @@ See the LICENSE file in the repository root. The project currently uses a non-co
 
 ## Media & acknowledgements
 
-- 🥈 2nd Place — Jugend forscht 2025  
-- Featured coverage in Süddeutsche Zeitung and several local/regional outlets (links in repository).
+- 🥈 2nd Place
+- Jugend forscht 2024/2025:  Featured coverage in [Süddeutsche Zeitung](https://www.sueddeutsche.de/muenchen/freising/flughafen-muenchen-jugend-forscht-li.3209469) and several local/regional outlets. 
+  
+
 
 ---
 
