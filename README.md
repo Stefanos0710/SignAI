@@ -36,11 +36,11 @@
 
 </div>
 
-SignAI is an experimental sign language recognition and translation system that uses machine learning to interpret German Sign Language (DGS) in real time and produce gloss-style translations. This repository contains the recognition engine, frontend UI, the product webside, preprocessing & training pipelines, and inference tooling.
+SignAI is an sign language recognition and translation system that uses machine learning to interpret German Sign Language (DGS) in real time and produce gloss-style translations. This repository contains the recognition engine, frontend UI, the product webside, preprocessing & training pipelines, and inference tooling.
 
 Primary languages: Python (core, app), CSS/HTML/JavaScript (frontend for web).
 
-> Note: v1.0.0 is the first stable major release. The project is actively developed and some operational aspects (admin privileges, resource requirements) are still being refined. See Known Issues & Roadmap for details.
+> Note: v1.1.0 is the first fully working release. The project is actively developed and some operational aspects (admin privileges, resource requirements) are still being refined. See Known Issues & Roadmap for details.
 
 ---
 
