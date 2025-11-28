@@ -114,6 +114,7 @@ Troubleshooting
 
 Security note
 - Some operations in this release may require administrator privileges (installation, camera access, certain model management tasks). Future releases will reduce these requirements or provide safer alternatives.
+- If a console apears, do *not* close it, because it would also close the main app, and it shows bugs or more translation details ect.
 
 ---
 
