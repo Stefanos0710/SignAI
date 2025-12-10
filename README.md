@@ -86,12 +86,6 @@ Primary languages: Python (core, app), CSS/HTML/JavaScript (frontend for web).
 
 ---
 
-## Note for Moonshot tester
-
-Please install the latest release from https://www.signai.dev and follow the Quick Start steps below for a fast setup.
-
----
-
 ## Requirements
 
 - Supported platforms: Windows (primary). macOS, Linux, Android and iOS builds planned.  
