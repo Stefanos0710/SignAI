@@ -38,13 +38,14 @@ def join_gloss_field(gloss_field):
     return ' '.join(norm_tokens)
 
 
-# path to gzip pickle and video base
-gzip_path = r"C:\Users\stefa\Documents\GitHub\SignAI\data\PHOENIX-Weather-2014T-compressed\phoenix14t.pami0.train.annotations_only.gzip"
-video_base = r"C:\Users\stefa\Documents\GitHub\SignAI\data\PHOENIX-Weather-2014T-compressed\videos_phoenix\videos"
-
 # get base directory
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-raw_data_dir = os.path.join(BASE_DIR, "data", "raw_data_phoenix")
+
+# path to gzip pickle and video base (using relative paths from BASE_DIR)
+gzip_path = os.path.join(BASE_DIR, "data", "PHOENIX-Weather-2014T-compressed", "phoenix14t.pami0.train.annotations_only.gzip")
+video_base = os.path.join(BASE_DIR, "data", "PHOENIX-Weather-2014T-compressed", "videos_phoenix", "videos")
+
+raw_data_dir = os.path.join(BASE_DIR, "data", "raw_data")
 os.makedirs(raw_data_dir, exist_ok=True)
 
 # load gzip pickle
@@ -71,8 +72,8 @@ for i, entry in enumerate(obj):
         missing_videos += 1
         continue
 
-    # dir for samples
-    folder_name = f"train_data"
+    # dir for samples (each video gets its own folder with unique name)
+    folder_name = f"{name}"
     target_dir = os.path.join(raw_data_dir, folder_name)
     os.makedirs(target_dir, exist_ok=True)
 
