@@ -542,7 +542,7 @@ def process_single_video(task):
 def main():
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        input_videos_folder = os.path.join(base_dir, "data", "raw_data")
+        input_videos_folder = os.path.join(base_dir, "data", "raw_data", "train")
         output_videos_folder = os.path.join(base_dir, "data", "train_data")
 
         try:
