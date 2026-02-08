@@ -179,19 +179,26 @@ if __name__ == "__main__":
     download_duration = start_extract - start_download
     extract_duration = time.time() - start_extract
 
-    # calc size
-    dataset_size = (os.path.getsize("SignAlphaSet/data/SignAlphaSet/SignAlphaSet") / (1024 * 1024)) + (os.path.getsize("SignAlphaSet/data/ASL_dynamic/ASL_dynamic") / (1024 * 1024))
+    def get_folder_size_mb(folder):
+        total = 0
+        for root, _, files in os.walk(folder):
+            for f in files:
+                total += os.path.getsize(os.path.join(root, f))
+        return total / (1024 * 1024)
 
-    # num of files
-    num_files = sum(len(files) for _, _, files in os.walk(dataset_folder))
 
-    # print summary + end message
+    data_root = "SignAlphaSet/data"
+    dataset_size = get_folder_size_mb(data_root)
+    num_files = sum(len(files) for _, _, files in os.walk(data_root))
+
+    # print summary and stats
     print("\n" + "="*70)
     print("  Download & Extraction Completed!  ")
     print("="*70)
-    print(f"Dataset Folder      : {dataset_folder}")
-    print(f"Downloaded File     : {out}")
-    print(f"File Size           : {dataset_size:.2f} MB")
+    print(f"Dataset Root Folder : {data_root}")
+    print(f"ASL_dynamic Folder  : {os.path.join(data_root, 'ASL_dynamic')}")
+    print(f"SignAlphaSet Folder : {os.path.join(data_root, 'SignAlphaSet')}")
+    print(f"Total Size          : {dataset_size:.2f} MB")
     print(f"Download Duration   : {download_duration:.1f} seconds")
     print(f"Extraction Duration : {extract_duration:.1f} seconds")
     print(f"Number of files     : {num_files}")
