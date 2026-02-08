@@ -1579,7 +1579,7 @@ if __name__ == "__main__":
             "l1_reg": 0.0005,
             "augment": False, # NOTE: Currently, this does not respect the validation split properly and leads the model to overfit by seeing augmented versions of validation samples during training
             "augment_factor": 2,
-            "architecture": "transformer" # Either baseline or multi_attention or transformer
+            "architecture": "multi_attention" # Either baseline or multi_attention or transformer
         }
 
          # starting training
