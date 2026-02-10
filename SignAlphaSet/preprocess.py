@@ -1,5 +1,12 @@
-import logging
 import os
+
+os.environ["MEDIAPIPE_DISABLE_GPU"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
+import cv2
+import numpy as np
+import mediapipe as mp
+import logging
 import time
 import cv2
 import numpy as np
@@ -25,11 +32,14 @@ hands = mp_hands.Hands(
     static_image_mode=True,
     max_num_hands=1,
     min_detection_confidence=0.7,
-    model_complexity=2
+    model_complexity=1
 )
 
 # folder of the alphabet-dataset
 dataset_folder = "SignAlphaSet/data/SignAlphaSet/SignAlphaSet"
+
+# list of failed files
+failed_files = []
 
 # extract keypoints from image
 def extract_keypoints(image_path):
@@ -62,7 +72,12 @@ def extract_keypoints(image_path):
 
 # center the keypoints
 def center_keypoints(keypoints):
-    pass
+    # get wrist keypoint (landmark 0) => (0, 0, 0)
+    wrist_keypoint = keypoints[0]
+    centered_keypoints = keypoints - wrist_keypoint
+
+    # return the centered keypoints
+    return centered_keypoints
 
 # normalize the keypoints
 def normalize_keypoints(keypoints):
@@ -89,10 +104,17 @@ if __name__ == "__main__":
             for file_name in files:
                 # extract keypoints from current image
                 tmp_keypoints = extract_keypoints(os.path.join(class_path, file_name))
-                print(os.path.join(class_path, file_name))
+
+                # check if keypoints are fine
+                if tmp_keypoints is None:
+                    logging.warning(f"Skipping file '{file_name}' in class '{class_name}' due to keypoint extraction failure.")
+                    failed_files.append((class_name, file_name, os.path.join(class_path, file_name)))
+                    continue
 
                 # center the keypoints
                 tmp_keypoints = center_keypoints(tmp_keypoints)
+                print(os.path.join(class_path, file_name))
+                print(tmp_keypoints)
 
                 # normalize the keypoints
                 tmp_keypoints = normalize_keypoints(tmp_keypoints)
