@@ -3,6 +3,11 @@ import tensorflow as tf
 from tensorflow import keras
 import logging
 import os
+import json
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import re
 
 # set random seeds for reproducibility
 import keras
@@ -11,13 +16,29 @@ keras.utils.set_random_seed(42)
 # logging configuration
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s | %(levelname)s | %(message)s',
+    datefmt='%H:%M:%S'
 )
 
 # paths to the preprocessed dataset
 train_data_path = "SignAlphaSet/data/processed_dataset/train_data.npz"
 val_data_path = "SignAlphaSet/data/processed_dataset/val_data.npz"
 test_data_path = "SignAlphaSet/data/processed_dataset/test_data.npz"
+
+models_dir = "SignAlphaSet/models"
+logs_dir = "SignAlphaSet/logs"
+checkpoints_dir = os.path.join(models_dir, "checkpoints")
+
+def get_next_version(models_root):
+    pattern = re.compile(r"signalphaset_v(\d+)\.keras$")
+    max_version = 0
+    if not os.path.isdir(models_root):
+        return 1
+    for name in os.listdir(models_root):
+        match = pattern.match(name)
+        if match:
+            max_version = max(max_version, int(match.group(1)))
+    return max_version + 1
 
 def load_data(path_to_data):
     # load the dataset file
@@ -44,7 +65,7 @@ def build_model(
     dense_units=64,
     dropout_rate=0.3
 ):
-    # THESIS: With only 63 input values, a GNN is too complex; a small CNN + LSTM + softmax is enough for fast real-time classification.
+    # small cnn + lstm is enough for fast real-time classification
     inputs = keras.Input(shape=input_shape, name="keypoints")
     x = keras.layers.Masking(mask_value=0.0, name="masking")(inputs)
 
@@ -99,7 +120,9 @@ def train_model(
     model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
     # callbacks for early stop, checkpoints, and logs
-    os.makedirs("models", exist_ok=True)
+    os.makedirs(models_dir, exist_ok=True)
+    os.makedirs(checkpoints_dir, exist_ok=True)
+    os.makedirs(logs_dir, exist_ok=True)
     callbacks = [
         tf.keras.callbacks.EarlyStopping(
             monitor="val_loss",
@@ -108,14 +131,17 @@ def train_model(
             min_delta=0.001
         ),
         tf.keras.callbacks.ModelCheckpoint(
-            filepath=f"models/signalphaset_checkpoint_v{version_model}_epoch_{{epoch:02d}}.keras",
+            filepath=os.path.join(
+                checkpoints_dir,
+                f"signalphaset_checkpoint_v{version_model}_epoch_{{epoch:02d}}.keras"
+            ),
             save_best_only=True,
             monitor="val_loss",
             mode="min",
             verbose=1
         ),
         tf.keras.callbacks.TensorBoard(
-            log_dir=f"./logs/signalphaset_v{version_model}",
+            log_dir=os.path.join(logs_dir, f"signalphaset_v{version_model}"),
             histogram_freq=1,
             write_graph=True,
             update_freq="epoch"
@@ -132,7 +158,7 @@ def train_model(
         shuffle=True
     )
 
-    model_save_path = f"models/signalphaset_v{version_model}.keras"
+    model_save_path = os.path.join(models_dir, f"signalphaset_v{version_model}.keras")
     model.save(model_save_path)
     logging.info(f"Model saved to: {model_save_path}")
 
@@ -141,6 +167,40 @@ def train_model(
         logging.info(f"Test results: {results}")
 
     return history
+
+def save_label_map(labels, output_path):
+    # create a simple id to label map
+    unique_labels = sorted(set(int(v) for v in labels))
+    label_map = {str(i): str(i) for i in unique_labels}
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(label_map, f, ensure_ascii=True, indent=2)
+
+def save_training_plot(history, output_path):
+    # plot loss and accuracy curves
+    metrics = history.history
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    if "loss" in metrics:
+        axes[0].plot(metrics["loss"], label="train")
+    if "val_loss" in metrics:
+        axes[0].plot(metrics["val_loss"], label="val")
+    axes[0].set_title("loss")
+    axes[0].set_xlabel("epoch")
+    axes[0].set_ylabel("loss")
+    axes[0].legend()
+
+    if "accuracy" in metrics:
+        axes[1].plot(metrics["accuracy"], label="train")
+    if "val_accuracy" in metrics:
+        axes[1].plot(metrics["val_accuracy"], label="val")
+    axes[1].set_title("accuracy")
+    axes[1].set_xlabel("epoch")
+    axes[1].set_ylabel("acc")
+    axes[1].legend()
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
 
 if __name__ == "__main__":
     # load data
@@ -151,14 +211,25 @@ if __name__ == "__main__":
     input_shape = train_keypoints.shape[1:]
     num_classes = int(np.max(train_labels)) + 1
 
+    version_model = get_next_version(models_dir)
+
     # Build and train model
     model = build_model(input_shape=input_shape, num_classes=num_classes)
-    train_model(
+    history = train_model(
         model,
         train_keypoints,
         train_labels,
         val_keypoints,
         val_labels,
         test_keypoints,
-        test_labels
+        test_labels,
+        version_model=version_model
     )
+
+    label_map_path = os.path.join(models_dir, f"signalphaset_label_map_v{version_model}.json")
+    save_label_map(train_labels, label_map_path)
+    logging.info(f"Label map saved to: {label_map_path}")
+
+    plot_path = os.path.join(models_dir, f"signalphaset_training_curves_v{version_model}.png")
+    save_training_plot(history, plot_path)
+    logging.info(f"Training plot saved to: {plot_path}")
