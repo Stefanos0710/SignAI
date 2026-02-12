@@ -3,35 +3,64 @@ import json
 import base64
 import numpy as np
 import cv2
-import mediapipe as mp
+# Force CPU for TensorFlow to avoid conflicts/hangs
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 import tensorflow as tf
+import mediapipe as mp
 from flask import Flask, logging, render_template, request, jsonify
 import logging
 
 # Create the Flask application
 app = Flask(__name__)
 
-# paths to the model and label files
-model_path = "SignAlphaSet\models\signalphaset_v1.keras"
-labels_path = "SignAlphaSet\models\signalphaset_label_map_v1.json"
+# -------------------------------------------------------------
+# 1. ROBUST PATH SETUP
+# -------------------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, '..', 'models', 'signalphaset_v1.keras')
+# Path to the raw dataset to get class names
+DATASET_DIR = os.path.join(BASE_DIR, '..', 'data', 'SignAlphaSet', 'SignAlphaSet') 
 
-# try to load model
-try:
-    model = tf.keras.models.load_model(model_path)
-    print("Model loaded successfully.")
-except Exception as e:
-    print(f"Error loading model: {e}")
+print("="*50)
+print(f"DEBUG: Starting App")
+print(f"DEBUG: Model Path: {MODEL_PATH}")
 
-# try to load labels
+# -------------------------------------------------------------
+# 2. LOAD RESOURCES & LABELS
+# -------------------------------------------------------------
+model = None
+if os.path.exists(MODEL_PATH):
+    try:
+        model = tf.keras.models.load_model(MODEL_PATH)
+        print("SUCCESS: Model loaded.")
+    except Exception as e:
+        print(f"ERROR: Could not load model: {e}")
+else:
+    print(f"CRITICAL ERROR: Model file NOT found at {MODEL_PATH}")
+
+# --- FIX FOR LABELS: Load from folder names directly ---
 idx_to_label = {}
 try:
-    with open(labels_path, 'r') as f:
-        label_map = json.load(f)
-        # invert the label map to get index to label mapping
-        idx_to_label = {v: k for k, v in label_map.items()}
-    print(f"Labels loaded: {len(idx_to_label)} classes")
+    if os.path.exists(DATASET_DIR):
+        # The model was trained on sorted folder names
+        classes = sorted(os.listdir(DATASET_DIR))
+        # Create map: 0 -> "A", 1 -> "B", etc.
+        idx_to_label = {i: name for i, name in enumerate(classes)}
+        print(f"SUCCESS: Loaded {len(idx_to_label)} labels from dataset folder.")
+        print(f"DEBUG: First few labels: {list(idx_to_label.values())[:5]}")
+    else:
+        # Fallback if dataset folder is missing (e.g. on deployment)
+        # Try to guess A-Z if we have 26 classes
+        print(f"WARNING: Dataset folder not found at {DATASET_DIR}")
+        import string
+        letters = list(string.ascii_uppercase)
+        idx_to_label = {i: letter for i, letter in enumerate(letters)}
+        print("DEBUG: Using fallback A-Z labels.")
+
 except Exception as e:
-    print(f"Error loading labels: {e}")
+    print(f"ERROR: Could not load labels: {e}")
+
+print("="*50)
 
 # ----------------------------
 # Initialization of MediaPipe Hands (from process.py)
@@ -48,17 +77,15 @@ hands = mp_hands.Hands(
 # ----------------------------
 # Extract keypoints from image (from process.py)
 # ----------------------------
-def extract_keypoints(image_path):
-    image = cv2.imread(image_path)
+def extract_keypoints(image):
+    # image ist hier bereits ein NumPy Array (kein Pfad mehr!)
     if image is None:
-        logging.warning(f"Could not read image: {image_path}")
         return None, "read_failed"
 
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = hands.process(image_rgb)
 
     if not results.multi_hand_landmarks:
-        logging.warning(f"No hand detected in image: {image_path}")
         return None, "no_hand"
 
     hand = results.multi_hand_landmarks[0]
@@ -82,14 +109,16 @@ def normalize_keypoints(keypoints):
     middle_finger_tip = keypoints[12]
     scale = np.linalg.norm(middle_finger_tip - wrist_keypoint)
     if scale < 1e-8:
-        logging.warning("Distance too small, skipping normalization.")
+        # logging.warning("Distance too small, skipping normalization.")
         return keypoints
     normalized_keypoints = keypoints / scale
     return normalized_keypoints
 
-def preprocess_keypoints(image_path):
+def preprocess_keypoints(image):
     # 1. Extract keypoints
-    keypoints = extract_keypoints(image_path)
+    keypoints, error = extract_keypoints(image)
+    if error:
+        return None
 
     # 2. Center keypoints
     centered_keypoints = center_keypoints(keypoints)
@@ -100,12 +129,51 @@ def preprocess_keypoints(image_path):
     # 4. Reshape for model input
     input_data = np.expand_dims(normalized_keypoints, axis=0)
 
-    return normalized_keypoints
+    return input_data
 
 # Define a route for the home page
 @app.route('/')
 def home():
     return render_template('index.html')
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    if model is None:
+        return jsonify({'error': 'Model not loaded', 'prediction': 'Error'}), 500
+
+    data = request.json
+    if 'image' not in data:
+        return jsonify({'error': 'No image received'}), 400
+
+    try:
+        # A. Decode image from Base64
+        image_data = data['image'].split(',')[1] 
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        # B. Preprocessing
+        input_data = preprocess_keypoints(image)
+
+        if input_data is None:
+            return jsonify({'prediction': 'No Hand', 'confidence': 0.0})
+
+        # C. Prediction
+        prediction = model.predict(input_data, verbose=0)
+        predicted_idx = np.argmax(prediction[0])
+        confidence = float(np.max(prediction[0]))
+        
+        # Get label from our fixed map
+        predicted_label = idx_to_label.get(predicted_idx, f"Class {predicted_idx}")
+
+        return jsonify({
+            'prediction': predicted_label,
+            'confidence': confidence
+        })
+
+    except Exception as e:
+        print(f"Prediction error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # Run the application
 if __name__ == '__main__':

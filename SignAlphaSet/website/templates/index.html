@@ -1,2 +1,35 @@
-<h1>SignAI - Single Word Recognition</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SignAI Live Prediction</title>
+</head>
+<body>
+
+    <h1>SignAI Live Classifier</h1>
+    
+    <div>
+        <button onclick="startCamera()">Start Camera</button>
+        <button onclick="stopCamera()">Stop Camera</button>
+    </div>
+
+    <div id="container">
+        <!-- use smaller res for faster recognision -->
+        <video id="video" width="640" height="480" autoplay playsinline></video>
+        
+        <div id="overlay">
+            <div id="result">Waiting...</div>
+            <div id="confidence"></div>
+        </div>
+    </div>
+    
+    <div id="status">Ready</div>
+
+    <!-- Hidden canvas to capture frames -->
+    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+
+    <!-- Load main.js-->
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
 
