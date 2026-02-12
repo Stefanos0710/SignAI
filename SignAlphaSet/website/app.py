@@ -3,8 +3,10 @@ import json
 import base64
 import numpy as np
 import cv2
+
 # Force CPU for TensorFlow to avoid conflicts/hangs
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 import tensorflow as tf
 import mediapipe as mp
 from flask import Flask, logging, render_template, request, jsonify
@@ -18,12 +20,14 @@ app = Flask(__name__)
 # -------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, '..', 'models', 'signalphaset_v1.keras')
+
 # Path to the raw dataset to get class names
 DATASET_DIR = os.path.join(BASE_DIR, '..', 'data', 'SignAlphaSet', 'SignAlphaSet') 
 
-print("="*50)
-print(f"DEBUG: Starting App")
-print(f"DEBUG: Model Path: {MODEL_PATH}")
+logging.basicConfig(level=logging.INFO)
+logging.info("="*50)
+logging.info(f"Starting App")
+logging.info(f"Model Path: {MODEL_PATH}")
 
 # -------------------------------------------------------------
 # 2. LOAD RESOURCES & LABELS
@@ -32,35 +36,34 @@ model = None
 if os.path.exists(MODEL_PATH):
     try:
         model = tf.keras.models.load_model(MODEL_PATH)
-        print("SUCCESS: Model loaded.")
+        logging.info("Model loaded.")
     except Exception as e:
-        print(f"ERROR: Could not load model: {e}")
+        logging.error(f"Could not load model: {e}")
 else:
-    print(f"CRITICAL ERROR: Model file NOT found at {MODEL_PATH}")
+    logging.critical(f"Model file NOT found at {MODEL_PATH}")
 
-# --- FIX FOR LABELS: Load from folder names directly ---
+# load and map class labels from dataset folder
 idx_to_label = {}
 try:
     if os.path.exists(DATASET_DIR):
         # The model was trained on sorted folder names
         classes = sorted(os.listdir(DATASET_DIR))
-        # Create map: 0 -> "A", 1 -> "B", etc.
+        # create map: 0 -> "A", 1 -> "B", etc.
         idx_to_label = {i: name for i, name in enumerate(classes)}
-        print(f"SUCCESS: Loaded {len(idx_to_label)} labels from dataset folder.")
-        print(f"DEBUG: First few labels: {list(idx_to_label.values())[:5]}")
+        logging.info(f"Loaded {len(idx_to_label)} labels from dataset folder.")
+        logging.debug(f"First few labels: {list(idx_to_label.values())[:5]}")
+
     else:
-        # Fallback if dataset folder is missing (e.g. on deployment)
-        # Try to guess A-Z if we have 26 classes
-        print(f"WARNING: Dataset folder not found at {DATASET_DIR}")
+        logging.warning(f"Dataset folder not found at {DATASET_DIR}")
         import string
         letters = list(string.ascii_uppercase)
         idx_to_label = {i: letter for i, letter in enumerate(letters)}
-        print("DEBUG: Using fallback A-Z labels.")
+        logging.debug("Using fallback A-Z labels.")
 
 except Exception as e:
-    print(f"ERROR: Could not load labels: {e}")
+    logging.error(f"Could not load labels: {e}")
 
-print("="*50)
+logging.info("="*50)
 
 # ----------------------------
 # Initialization of MediaPipe Hands (from process.py)
@@ -78,7 +81,6 @@ hands = mp_hands.Hands(
 # Extract keypoints from image (from process.py)
 # ----------------------------
 def extract_keypoints(image):
-    # image ist hier bereits ein NumPy Array (kein Pfad mehr!)
     if image is None:
         return None, "read_failed"
 
@@ -109,7 +111,7 @@ def normalize_keypoints(keypoints):
     middle_finger_tip = keypoints[12]
     scale = np.linalg.norm(middle_finger_tip - wrist_keypoint)
     if scale < 1e-8:
-        # logging.warning("Distance too small, skipping normalization.")
+        logging.warning("Distance too small, skipping normalization.")
         return keypoints
     normalized_keypoints = keypoints / scale
     return normalized_keypoints
@@ -117,6 +119,7 @@ def normalize_keypoints(keypoints):
 def preprocess_keypoints(image):
     # 1. Extract keypoints
     keypoints, error = extract_keypoints(image)
+
     if error:
         return None
 
@@ -146,19 +149,19 @@ def predict():
         return jsonify({'error': 'No image received'}), 400
 
     try:
-        # A. Decode image from Base64
+        # 1. Decode image from Base64
         image_data = data['image'].split(',')[1] 
         image_bytes = base64.b64decode(image_data)
         nparr = np.frombuffer(image_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # B. Preprocessing
+        # 2. Preprocessing
         input_data = preprocess_keypoints(image)
 
         if input_data is None:
             return jsonify({'prediction': 'No Hand', 'confidence': 0.0})
 
-        # C. Prediction
+        # 3. Prediction
         prediction = model.predict(input_data, verbose=0)
         predicted_idx = np.argmax(prediction[0])
         confidence = float(np.max(prediction[0]))
@@ -172,7 +175,7 @@ def predict():
         })
 
     except Exception as e:
-        print(f"Prediction error: {e}")
+        logging.error(f"Prediction error: {e}")
         return jsonify({'error': str(e)}), 500
 
 # Run the application
