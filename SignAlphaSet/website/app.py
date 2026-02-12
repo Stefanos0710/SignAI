@@ -9,7 +9,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import tensorflow as tf
 import mediapipe as mp
-from flask import Flask, logging, render_template, request, jsonify
+from flask import Flask, logging, render_template, request, jsonify, send_from_directory
 import logging
 
 # Create the Flask application
@@ -23,6 +23,9 @@ MODEL_PATH = os.path.join(BASE_DIR, '..', 'models', 'signalphaset_v1.keras')
 
 # Path to the raw dataset to get class names
 DATASET_DIR = os.path.join(BASE_DIR, '..', 'data', 'SignAlphaSet', 'SignAlphaSet') 
+
+# path to the dictionary images
+PICTURES_DIR = os.path.join(BASE_DIR, 'pic')
 
 logging.basicConfig(level=logging.INFO)
 logging.info("="*50)
@@ -137,7 +140,14 @@ def preprocess_keypoints(image):
 # Define a route for the home page
 @app.route('/')
 def home():
-    return render_template('index.html')
+    labels = list(idx_to_label.values())
+    return render_template('index.html', labels=labels)
+
+@app.route('/dataset_img/<label>')
+def dataset_img(label):
+    filename = f"{label}{".png"}"
+    if os.path.exists(os.path.join(PICTURES_DIR, filename)):
+            return send_from_directory(PICTURES_DIR, filename)
 
 @app.route('/predict', methods=['POST'])
 def predict():

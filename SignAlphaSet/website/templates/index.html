@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>SignAI Live Prediction</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
@@ -27,6 +28,21 @@
 
     <!-- Hidden canvas to capture frames -->
     <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+
+    <!-- Sign Dictionary Section -->
+    <div id="dictionary-section">
+        <h2>Sign Language Dictionary</h2>
+        <div class="dictionary-grid">
+            {% for label in labels %}
+            <div class="sign-card">
+                <div class="sign-image">
+                    <img src="{{ url_for('dataset_img', label=label) }}" alt="Sign for {{ label }}" loading="lazy">
+                </div>
+                <div class="sign-label">{{ label }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 
     <!-- Load main.js-->
     <script src="{{ url_for('static', filename='main.js') }}"></script>
