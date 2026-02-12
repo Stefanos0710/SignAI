@@ -145,9 +145,12 @@ def home():
 
 @app.route('/dataset_img/<label>')
 def dataset_img(label):
-    filename = f"{label}{".png"}"
-    if os.path.exists(os.path.join(PICTURES_DIR, filename)):
-            return send_from_directory(PICTURES_DIR, filename)
+    # Check for png first, then jpg
+    for ext in ['.png', '.jpg']:
+        filename = f"{label}{ext}"
+        if os.path.exists(os.path.join(PICTURES_DIR, filename)):
+             return send_from_directory(PICTURES_DIR, filename)
+    return "", 404
 
 @app.route('/predict', methods=['POST'])
 def predict():
