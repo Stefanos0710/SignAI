@@ -85,17 +85,27 @@ hands = mp_hands.Hands(
 # ----------------------------
 def extract_keypoints(image):
     if image is None:
-        return None, "read_failed"
+        return None, "read_failed", {}
 
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = hands.process(image_rgb)
 
     if not results.multi_hand_landmarks:
-        return None, "no_hand"
+        return None, "no_hand", {}
 
     hand = results.multi_hand_landmarks[0]
     keypoints = np.array([(lm.x, lm.y, lm.z) for lm in hand.landmark], dtype=np.float32)
-    return keypoints, None
+    
+    # Get Handedness info
+    handedness_info = {}
+    if results.multi_handedness:
+        h_class = results.multi_handedness[0].classification[0]
+        handedness_info = {
+            'label': h_class.label,
+            'score': float(h_class.score)
+        }
+
+    return keypoints, None, handedness_info
 
 # ----------------------------
 # Center the keypoints (from process.py)
@@ -115,27 +125,40 @@ def normalize_keypoints(keypoints):
     scale = np.linalg.norm(middle_finger_tip - wrist_keypoint)
     if scale < 1e-8:
         logging.warning("Distance too small, skipping normalization.")
-        return keypoints
+        return keypoints, 1.0
     normalized_keypoints = keypoints / scale
-    return normalized_keypoints
+    return normalized_keypoints, scale
 
-def preprocess_keypoints(image):
+def preprocess_keypoints(image, debug=False):
     # 1. Extract keypoints
-    keypoints, error = extract_keypoints(image)
+    if debug:
+        pass
+
+    keypoints, error, hand_info = extract_keypoints(image)
 
     if error:
-        return None
+        return None, None, None, {}
 
     # 2. Center keypoints
     centered_keypoints = center_keypoints(keypoints)
 
     # 3. Normalize keypoints
-    normalized_keypoints = normalize_keypoints(centered_keypoints)
+    normalized_keypoints, scale = normalize_keypoints(centered_keypoints)
 
     # 4. Reshape for model input
     input_data = np.expand_dims(normalized_keypoints, axis=0)
+    
+    extra_info = {
+        'handedness': hand_info,
+        'scale_factor': float(scale),
+        'input_shape': input_data.shape
+    }
 
-    return input_data
+    # If debug is on, return intermediate data too
+    if debug:
+        return input_data, keypoints, normalized_keypoints, extra_info
+        
+    return input_data, None, None, extra_info
 
 # Define a route for the home page
 @app.route('/')
@@ -152,8 +175,11 @@ def dataset_img(label):
              return send_from_directory(PICTURES_DIR, filename)
     return "", 404
 
+import time
+
 @app.route('/predict', methods=['POST'])
 def predict():
+    start_time = time.time()
     if model is None:
         return jsonify({'error': 'Model not loaded', 'prediction': 'Error'}), 500
 
@@ -161,31 +187,99 @@ def predict():
     if 'image' not in data:
         return jsonify({'error': 'No image received'}), 400
 
+    debug_mode = data.get('debug', False)
+
     try:
         # 1. Decode image from Base64
+        decode_start = time.time()
         image_data = data['image'].split(',')[1] 
         image_bytes = base64.b64decode(image_data)
         nparr = np.frombuffer(image_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        decode_time = (time.time() - decode_start) * 1000
 
         # 2. Preprocessing
-        input_data = preprocess_keypoints(image)
+        prep_start = time.time()
+        input_data, raw_kps, norm_kps, extra_info = preprocess_keypoints(image, debug=debug_mode)
+        prep_time = (time.time() - prep_start) * 1000
 
         if input_data is None:
             return jsonify({'prediction': 'No Hand', 'confidence': 0.0})
 
         # 3. Prediction
-        prediction = model.predict(input_data, verbose=0)
-        predicted_idx = np.argmax(prediction[0])
-        confidence = float(np.max(prediction[0]))
+        inference_start = time.time()
+        prediction = model.predict(input_data, verbose=0)[0]
+        inference_time = (time.time() - inference_start) * 1000
+        
+        predicted_idx = np.argmax(prediction)
+        confidence = float(np.max(prediction))
         
         # Get label from our fixed map
         predicted_label = idx_to_label.get(predicted_idx, f"Class {predicted_idx}")
 
-        return jsonify({
+        response = {
             'prediction': predicted_label,
             'confidence': confidence
-        })
+        }
+
+        if debug_mode:
+            # Get Top 5 Predictions
+            # argsort returns indices that sort the array, we take last 5 and reverse
+            top_5_indices = prediction.argsort()[-5:][::-1]
+            top_5 = []
+            for idx in top_5_indices:
+                top_5.append({
+                    'label': idx_to_label.get(idx, str(idx)),
+                    'confidence': float(prediction[idx])
+                })
+            
+            response['top_5'] = top_5
+            
+            # Format numbers for cleanliness
+            h_label = extra_info['handedness'].get('label', 'Unknown')
+            h_score = extra_info['handedness'].get('score', 0.0)
+            
+            response['meta'] = {
+                'handedness': f"{h_label} ({h_score*100:.1f}%)",
+                'scale': f"{extra_info['scale_factor']:.4f}",
+                'input_shape': str(extra_info['input_shape'])
+            }
+
+            response['timing'] = {
+                'decode': f"{decode_time:.1f}ms",
+                'preprocess': f"{prep_time:.1f}ms",
+                'inference': f"{inference_time:.1f}ms",
+                'total': f"{(time.time() - start_time) * 1000:.1f}ms"
+            }
+
+        if debug_mode and raw_kps is not None:
+            # Create the hand cutout
+            # Use lower quality for speed if needed, but cutout is small anyway
+            h, w, _ = image.shape
+            x_min, y_min = np.min(raw_kps[:, :2], axis=0)
+            x_max, y_max = np.max(raw_kps[:, :2], axis=0)
+            
+            # Convert to pixels and add padding
+            pad = 20
+            x1 = max(0, int(x_min * w) - pad)
+            y1 = max(0, int(y_min * h) - pad)
+            x2 = min(w, int(x_max * w) + pad)
+            y2 = min(h, int(y_max * h) + pad)
+            
+            cutout = image[y1:y2, x1:x2]
+            
+            # Encode cutout to base64
+            # Use very low quality for speed (30)
+            _, buffer = cv2.imencode('.jpg', cutout, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+            cutout_b64 = base64.b64encode(buffer).decode('utf-8')
+            
+            response['debug_info'] = {
+                'raw_landmarks': raw_kps.tolist(),
+               # 'norm_landmarks': norm_kps.tolist(), # Skip sending this to save bandwidth
+                'hand_cutout': f"data:image/jpeg;base64,{cutout_b64}"
+            }
+
+        return jsonify(response)
 
     except Exception as e:
         logging.error(f"Prediction error: {e}")

@@ -9,18 +9,62 @@
 
     <h1>SignAI Live Classifier</h1>
     
-    <div>
+    <div class="controls">
         <button onclick="startCamera()">Start Camera</button>
         <button onclick="stopCamera()">Stop Camera</button>
+        <label class="toggle-switch">
+            <input type="checkbox" id="debug-toggle" onchange="toggleDebug()">
+            <span class="slider"></span>
+            Debug Mode
+        </label>
     </div>
 
-    <div id="container">
-        <!-- use smaller res for faster recognision -->
-        <video id="video" width="640" height="480" autoplay playsinline></video>
-        
-        <div id="overlay">
-            <div id="result">Waiting...</div>
-            <div id="confidence"></div>
+    <div class="app-layout">
+        <!-- Main Video Area -->
+        <div id="container">
+            <video id="video" width="640" height="480" autoplay playsinline></video>
+            <canvas id="landmarks" width="640" height="480" style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
+            
+            <div id="overlay">
+                <div id="result">Waiting...</div>
+                <div id="confidence"></div>
+            </div>
+        </div>
+
+        <!-- Debug Area -->
+        <div id="debug-panel" style="display:none;">
+            <h3>Debug Center</h3>
+            
+            <div class="debug-grid">
+                <!-- Visuals -->
+                <div class="debug-col">
+                    <div class="debug-card">
+                        <h4>Hand Cutout</h4>
+                        <img id="hand-cutout" alt="No Hand">
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="debug-col">
+                     <div class="debug-card">
+                        <h4>Performance</h4>
+                        <ul id="timing-stats" class="stats-list">
+                            <li>Waiting for data...</li>
+                        </ul>
+                    </div>
+                    <div class="debug-card">
+                        <h4>Hand Meta</h4>
+                        <ul id="meta-stats" class="stats-list">
+                            <li>-</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="debug-card full-width">
+                <h4>Top 5 Predictions</h4>
+                <div id="top5-list"></div>
+            </div>
         </div>
     </div>
     

@@ -82,12 +82,154 @@ div:has(> button) {
     border-radius: var(--radius);
     box-shadow: var(--shadow-lg);
     max-width: 100%;
-    width: 960px; /* Video width + padding */
+    width: auto; /* Let content dictate width */
     display: flex;
     justify-content: center;
     align-items: center;
     flex-direction: column;
+}
+
+.app-layout {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2rem;
+    width: 100%;
+    max-width: 1400px;
     margin-bottom: 2rem;
+}
+
+#debug-panel {
+    background: var(--surface);
+    padding: 1rem;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    width: 320px;
+    height: 480px; /* Match video height */
+    overflow-y: auto; /* Scroll only if really needed on small screens */
+    border: 1px solid var(--border);
+    display: none;
+    flex-direction: column;
+}
+
+#debug-panel h3 {
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.25rem;
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+
+.debug-grid {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.debug-col {
+    flex: 1;
+}
+
+.debug-card {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.debug-card h4 {
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+#hand-cutout {
+    width: 100%;
+    height: 80px; /* Fixed height for compactness */
+    object-fit: contain;
+    background: #000;
+    border-radius: 4px;
+}
+
+.stats-list {
+    list-style: none;
+    font-size: 0.75rem;
+}
+
+.stats-list li {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2px;
+}
+
+.stats-list span {
+    font-weight: 600;
+    color: var(--primary-dark);
+}
+
+/* Top 5 List */
+#top5-list {
+    font-size: 0.8rem;
+}
+
+.top5-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.bar-container {
+    flex-grow: 1;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 3px;
+    margin: 0 8px;
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+}
+
+.prob-text {
+    width: 35px;
+    text-align: right;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+#debug-json {
+    background: #1e293b;
+    color: #a5b4fc;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.collapsed h4 {
+    cursor: pointer;
+}
+
+.collapsed h4:hover {
+    color: var(--primary);
+}
+
+#landmarks {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
 }
 
 #video {
@@ -96,6 +238,7 @@ div:has(> button) {
     border-radius: calc(var(--radius) - 4px);
     background-color: #000;
     display: block;
+    max-width: 640px; 
 }
 
 /* Overlay / Results */
