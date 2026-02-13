@@ -7,6 +7,7 @@ import numpy as np
 import mediapipe as mp
 import logging
 import time
+import shutil
 
 # ----------------------------
 # Logging Setup
@@ -89,11 +90,99 @@ def normalize_keypoints(keypoints):
     normalized_keypoints = keypoints / scale
     return normalized_keypoints
 
+
+def mirror_keypoints(keypoints):
+    mirrored = keypoints.copy()
+    mirrored[:, 0] *= -1.0
+    mirrored[0] = 0.0
+    return mirrored
+
+
+def augment_keypoints_light(keypoints, rng):
+    augmented = keypoints.copy()
+    non_wrist = augmented[1:].copy()
+
+    # rotation max +/- 5 degrees in x/y
+    angle = np.deg2rad(rng.uniform(-5.0, 5.0))
+    cos_a = np.cos(angle)
+    sin_a = np.sin(angle)
+    rotation_matrix = np.array([[cos_a, -sin_a], [sin_a, cos_a]], dtype=np.float32)
+
+    # light scaling
+    scale = rng.uniform(0.92, 1.08)
+
+    # light translation in normalized coordinate space
+    tx = rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.03)
+    ty = rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.03)
+
+    xy = non_wrist[:, :2]
+    xy = (xy @ rotation_matrix.T) * scale
+    xy += np.array([tx, ty], dtype=np.float32)
+    non_wrist[:, :2] = xy
+    non_wrist[:, 2] *= scale
+
+    # small gaussian noise, excluding wrist (origin)
+    noise = rng.normal(0.0, 0.01, size=non_wrist.shape).astype(np.float32)
+    non_wrist += noise
+
+    augmented[1:] = non_wrist
+    augmented[0] = 0.0
+    return augmented
+
+
+def augment_train_dataset(X_train, y_train, total_dataset_size, augmentation_ratio=0.20, random_seed=42):
+    rng = np.random.default_rng(random_seed)
+
+    # 1) Mirror all train samples -> train set is doubled
+    X_mirror = np.array([mirror_keypoints(sample) for sample in X_train], dtype=np.float32)
+    y_mirror = y_train.copy()
+
+    X_train_base = np.concatenate([X_train, X_mirror], axis=0)
+    y_train_base = np.concatenate([y_train, y_mirror], axis=0)
+
+    # 2) Add additional augmented samples equal to 20% of total dataset size
+    target_augmented_count = int(round(total_dataset_size * augmentation_ratio))
+    if target_augmented_count <= 0:
+        return X_train_base, y_train_base
+
+    sampled_idx = rng.integers(0, len(X_train_base), size=target_augmented_count)
+    X_extra = []
+    y_extra = []
+
+    for idx in sampled_idx:
+        X_extra.append(augment_keypoints_light(X_train_base[idx], rng))
+        y_extra.append(y_train_base[idx])
+
+    X_extra = np.array(X_extra, dtype=np.float32)
+    y_extra = np.array(y_extra, dtype=np.int64)
+
+    X_train_final = np.concatenate([X_train_base, X_extra], axis=0)
+    y_train_final = np.concatenate([y_train_base, y_extra], axis=0)
+
+    shuffle_idx = np.arange(len(X_train_final))
+    rng.shuffle(shuffle_idx)
+    X_train_final = X_train_final[shuffle_idx]
+    y_train_final = y_train_final[shuffle_idx]
+
+    return X_train_final, y_train_final
+
 # ----------------------------
 # Split dataset into train, val, test and save as npz files
 # ----------------------------
-def create_dataset(X, y, output_folder="SignAlphaSet/data/processed_dataset", train_ratio=0.8, val_ratio=0.1, test_ratio=0.1):
-    # create output folder if not exists
+def create_dataset(
+    X,
+    y,
+    output_folder="SignAlphaSet/data/processed_dataset",
+    train_ratio=0.8,
+    val_ratio=0.1,
+    test_ratio=0.1,
+    train_augmentation_ratio=0.20,
+    augmentation_seed=42
+):
+    # ensure fresh output folder for full reprocessing
+    if os.path.exists(output_folder):
+        logging.info(f"Existing processed dataset found. Removing folder: {output_folder}")
+        shutil.rmtree(output_folder)
     os.makedirs(output_folder, exist_ok=True)
 
     # shuffle first
@@ -110,13 +199,27 @@ def create_dataset(X, y, output_folder="SignAlphaSet/data/processed_dataset", tr
     X_val, y_val = X[train_end:val_end], y[train_end:val_end]
     X_test, y_test = X[val_end:], y[val_end:]
 
+    # Augmentation only for training split:
+    # - mirror all training samples (2x)
+    # - add extra augmented samples equal to 20% of total dataset size
+    X_train, y_train = augment_train_dataset(
+        X_train,
+        y_train,
+        total_dataset_size=N,
+        augmentation_ratio=train_augmentation_ratio,
+        random_seed=augmentation_seed
+    )
+
     # save as npz in output folder
     np.savez_compressed(os.path.join(output_folder, "train_data.npz"), X=X_train, y=y_train)
     np.savez_compressed(os.path.join(output_folder, "val_data.npz"), X=X_val, y=y_val)
     np.savez_compressed(os.path.join(output_folder, "test_data.npz"), X=X_test, y=y_test)
 
     logging.info(f"Datasets saved in folder: {output_folder}")
-    logging.info(f"Train samples: {len(X_train)}, Val samples: {len(X_val)}, Test samples: {len(X_test)}")
+    logging.info(
+        f"Train samples: {len(X_train)} (mirrored all + {int(round(N * train_augmentation_ratio))} augmented), "
+        f"Val samples: {len(X_val)}, Test samples: {len(X_test)}"
+    )
 
 
 # ----------------------------
@@ -172,7 +275,7 @@ if __name__ == "__main__":
                 class_failed += 1
                 continue
 
-            # center and normalize
+            # center and normalize 
             start = time.perf_counter()
             tmp_keypoints = center_keypoints(tmp_keypoints)
             center_time += time.perf_counter() - start
