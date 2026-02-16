@@ -9,6 +9,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import re
 
+NUM_LANDMARKS = 21
+COORD_DIMS = 3
+BASE_KEYPOINT_FEATURES = NUM_LANDMARKS * COORD_DIMS
+
 # set random seeds for reproducibility
 import keras
 keras.utils.set_random_seed(42)
@@ -56,6 +60,39 @@ def load_data(path_to_data):
     # log the number of samples loaded
     logging.info(f"Loaded data from {path_to_data} with {len(keypoints)} samples.")
     return keypoints, labels    
+
+
+def adapt_features_for_model(keypoints, split_name):
+    keypoints = np.asarray(keypoints, dtype=np.float32)
+
+    if keypoints.ndim == 3 and keypoints.shape[1:] == (NUM_LANDMARKS, COORD_DIMS):
+        logging.info(
+            f"{split_name}: Using keypoints as-is with shape {keypoints.shape}."
+        )
+        return keypoints
+
+    if keypoints.ndim == 2 and keypoints.shape[1] >= BASE_KEYPOINT_FEATURES:
+        extra_feature_count = keypoints.shape[1] - BASE_KEYPOINT_FEATURES
+        model_keypoints = keypoints[:, :BASE_KEYPOINT_FEATURES].reshape(-1, NUM_LANDMARKS, COORD_DIMS)
+        logging.info(
+            f"{split_name}: Detected flattened samples with {keypoints.shape[1]} features "
+            f"({BASE_KEYPOINT_FEATURES} keypoint features + {extra_feature_count} extra). "
+            f"Using keypoint part for CNN+LSTM input: {model_keypoints.shape}."
+        )
+        return model_keypoints
+
+    raise ValueError(
+        f"{split_name}: Unexpected keypoint shape {keypoints.shape}. "
+        f"Expected (N,21,3) or (N,F) with F>={BASE_KEYPOINT_FEATURES}."
+    )
+
+
+def prepare_labels(labels, split_name):
+    labels = np.asarray(labels).astype(np.int64)
+    if labels.ndim != 1:
+        labels = labels.reshape(-1)
+    logging.info(f"{split_name}: Labels shape {labels.shape}, dtype {labels.dtype}.")
+    return labels
 
 def build_model(
     input_shape,
@@ -207,6 +244,23 @@ if __name__ == "__main__":
     train_keypoints, train_labels = load_data(train_data_path)
     val_keypoints, val_labels = load_data(val_data_path)
     test_keypoints, test_labels = load_data(test_data_path)
+
+    # adapt preprocess_v3 output to model input format without changing architecture
+    train_keypoints = adapt_features_for_model(train_keypoints, "train")
+    val_keypoints = adapt_features_for_model(val_keypoints, "val")
+    test_keypoints = adapt_features_for_model(test_keypoints, "test")
+
+    train_labels = prepare_labels(train_labels, "train")
+    val_labels = prepare_labels(val_labels, "val")
+    test_labels = prepare_labels(test_labels, "test")
+
+    if train_keypoints.shape[1:] != val_keypoints.shape[1:] or train_keypoints.shape[1:] != test_keypoints.shape[1:]:
+        raise ValueError(
+            "Train/Val/Test input shapes do not match: "
+            f"train={train_keypoints.shape[1:]}, "
+            f"val={val_keypoints.shape[1:]}, "
+            f"test={test_keypoints.shape[1:]}"
+        )
 
     input_shape = train_keypoints.shape[1:]
     num_classes = int(np.max(train_labels)) + 1
