@@ -9,8 +9,6 @@ import logging
 import time
 import shutil
 
-
-
 """
 v3 TODOS:
     - Dataset Balance: Ensure all classes have the same number of samples (augment underrepresented classes if needed).
@@ -30,9 +28,6 @@ Pipeline:
 
 """
 
-
-
-
 # ----------------------------
 # Logging Setup
 # ----------------------------
@@ -50,7 +45,7 @@ mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(
     static_image_mode=True,
     max_num_hands=1,
-    min_detection_confidence=0.5, # with 0.7 we get 3.12% invalid samples, with 0.5 we get 1.67% invalid samples, 
+    min_detection_confidence=0.5, 
     model_complexity=1
 )
 
@@ -62,7 +57,7 @@ dataset_folder = "SignAlphaSet/data/SignAlphaSet/SignAlphaSet"
 # ----------------------------
 # Lists to store keypoints and labels
 # ----------------------------
-all_keypoints = []
+all_samples = [] # Stores flat vectors (coords + features)
 all_labels = []
 failed_files = []
 failed_by_class = {}
@@ -71,6 +66,67 @@ failed_by_reason = {
     "no_hand": 0,
     "other": 0
 }
+
+# ----------------------------
+# FEATURE CALCULATION
+# ----------------------------
+def calculate_extra_features(keypoints):
+    """
+    Berechnet zusätzliche Distanz-Features basierend auf den (21, 3) Keypoints.
+    Gibt ein Array mit den Features zurück.
+    """
+    # Keypoint Indices:
+    # 0: Wrist
+    # 4: Thumb Tip
+    # 8: Index Tip, 7: Index Dip
+    # 12: Middle Tip, 11: Middle Dip
+    # 16: Ring Tip, 15: Ring Dip
+    # 20: Pinky Tip, 19: Pinky Dip
+
+    features = []
+    
+    thumb_tip = keypoints[4]
+    index_tip = keypoints[8]
+    index_dip = keypoints[7]
+    index_pip = keypoints[6]
+    
+    middle_tip = keypoints[12]
+    middle_dip = keypoints[11]
+    middle_pip = keypoints[10]
+    
+    ring_tip = keypoints[16]
+    ring_dip = keypoints[15]
+    ring_pip = keypoints[14]
+    
+    pinky_tip = keypoints[20]
+    pinky_dip = keypoints[19]
+    pinky_pip = keypoints[18]
+
+
+    # 1. Distances between Tip for each finger (except thumb and pinky)
+    features.append(np.linalg.norm(index_tip - middle_tip))
+    features.append(np.linalg.norm(middle_tip - ring_tip))
+
+    # 2. Distances between Thumb Tip and (Tip and Dip) of every other finger
+    # Fingers: Index (8,7,6), Middle (12,11,10), Ring (16,15,14), Pinky (20,19,18)
+    
+    # Index
+    features.append(np.linalg.norm(thumb_tip - index_dip))
+    features.append(np.linalg.norm(thumb_tip - index_pip))
+    
+    # Middle
+    features.append(np.linalg.norm(thumb_tip - middle_dip))
+    features.append(np.linalg.norm(thumb_tip - middle_pip))
+    
+    # Ring
+    features.append(np.linalg.norm(thumb_tip - ring_dip))
+    features.append(np.linalg.norm(thumb_tip - ring_pip))
+    
+    # Pinky
+    features.append(np.linalg.norm(thumb_tip - pinky_dip))
+    features.append(np.linalg.norm(thumb_tip - pinky_pip))
+
+    return np.array(features, dtype=np.float32)
 
 # ----------------------------
 # Extract keypoints from image
@@ -96,7 +152,6 @@ def extract_keypoints(image_path):
 # Center the keypoints
 # ----------------------------
 def center_keypoints(keypoints):
-    # get wrist keypoint (landmark 0) => (0,0,0)
     wrist_keypoint = keypoints[0]
     centered_keypoints = keypoints - wrist_keypoint
     return centered_keypoints
@@ -114,194 +169,174 @@ def normalize_keypoints(keypoints):
     normalized_keypoints = keypoints / scale
     return normalized_keypoints
 
+# ----------------------------
+# Mirroring Functions (working on flat vectors)
+# Vector layout: [x1, y1, z1, ..., x21, y21, z21, feat1, feat2, ...]
+# Coordinates are first 63 elements.
+# ----------------------------
+def mirror_vector(vector, flip_x=False, flip_z=False):
+    new_vec = vector.copy()
+    coords = new_vec[:63].reshape(21, 3)
+    
+    if flip_x:
+        coords[:, 0] *= -1.0 # Flip X
+    
+    if flip_z:
+        coords[:, 2] *= -1.0 # Flip Z
+        
+    new_vec[:63] = coords.flatten()
+    # Features (distances) are invariant to mirroring, so they stay the same!
+    return new_vec
 
-def mirror_keypoints(keypoints):
-    mirrored = keypoints.copy()
-    mirrored[:, 0] *= -1.0
-    mirrored[0] = 0.0
-    return mirrored
+def augment_vector_light(vector, rng):
+    """
+    Leichte Augmentierung für Balancing.
+    """
+    coords = vector[:63].reshape(21, 3).copy()
+    features = vector[63:].copy()
+    
+    non_wrist = coords[1:].copy()
 
-
-def augment_keypoints_light(keypoints, rng):
-    augmented = keypoints.copy()
-    non_wrist = augmented[1:].copy()
-
-    # rotation max +/- 5 degrees in x/y
+    # Rotation
     angle = np.deg2rad(rng.uniform(-5.0, 5.0))
     cos_a = np.cos(angle)
     sin_a = np.sin(angle)
     rotation_matrix = np.array([[cos_a, -sin_a], [sin_a, cos_a]], dtype=np.float32)
 
-    # light scaling
-    scale = rng.uniform(0.92, 1.08)
-
-    # light translation in normalized coordinate space
-    tx = rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.03)
-    ty = rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.03)
-
+    scale = rng.uniform(0.95, 1.05)
+    
     xy = non_wrist[:, :2]
     xy = (xy @ rotation_matrix.T) * scale
+    
+    # Translation
+    tx = rng.uniform(-0.02, 0.02)
+    ty = rng.uniform(-0.02, 0.02)
     xy += np.array([tx, ty], dtype=np.float32)
+    
     non_wrist[:, :2] = xy
     non_wrist[:, 2] *= scale
-
-    # small gaussian noise, excluding wrist (origin)
-    noise = rng.normal(0.0, 0.01, size=non_wrist.shape).astype(np.float32)
+    
+    # Noise
+    noise = rng.normal(0.0, 0.005, size=non_wrist.shape).astype(np.float32)
     non_wrist += noise
-
-    augmented[1:] = non_wrist
-    augmented[0] = 0.0
-    return augmented
-
-
-def augment_keypoints_diverse(keypoints, rng):
-    augmented = keypoints.copy()
-
-    # optional random mirror for extra diversity
-    if rng.random() < 0.5:
-        augmented[:, 0] *= -1.0
-
-    non_wrist = augmented[1:].copy()
-
-    # choose one of several light augmentation styles
-    style = int(rng.integers(0, 4))
-
-    if style == 0:
-        # geometric combo (rotation + scale + translation)
-        angle = np.deg2rad(rng.uniform(-5.0, 5.0))
-        cos_a = np.cos(angle)
-        sin_a = np.sin(angle)
-        rotation_matrix = np.array([[cos_a, -sin_a], [sin_a, cos_a]], dtype=np.float32)
-
-        scale = rng.uniform(0.90, 1.10)
-        tx = rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.04)
-        ty = rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.04)
-
-        xy = non_wrist[:, :2]
-        xy = (xy @ rotation_matrix.T) * scale
-        xy += np.array([tx, ty], dtype=np.float32)
-        non_wrist[:, :2] = xy
-        non_wrist[:, 2] *= scale
-
-    elif style == 1:
-        # anisotropic scale + tiny global drift
-        sx = rng.uniform(0.92, 1.08)
-        sy = rng.uniform(0.92, 1.08)
-        sz = rng.uniform(0.92, 1.08)
-        non_wrist[:, 0] *= sx
-        non_wrist[:, 1] *= sy
-        non_wrist[:, 2] *= sz
-        non_wrist[:, 0] += rng.uniform(-0.03, 0.03)
-        non_wrist[:, 1] += rng.uniform(-0.03, 0.03)
-
-    elif style == 2:
-        # finger-local jitter (keeps wrist fixed)
-        finger_jitter = rng.normal(0.0, 0.012, size=non_wrist.shape).astype(np.float32)
-        non_wrist += finger_jitter
-
-    else:
-        # mixed light transform
-        angle = np.deg2rad(rng.uniform(-5.0, 5.0))
-        cos_a = np.cos(angle)
-        sin_a = np.sin(angle)
-        rotation_matrix = np.array([[cos_a, -sin_a], [sin_a, cos_a]], dtype=np.float32)
-        xy = non_wrist[:, :2] @ rotation_matrix.T
-        xy += rng.normal(0.0, 0.008, size=xy.shape).astype(np.float32)
-        xy += np.array([
-            rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.03),
-            rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.03)
-        ], dtype=np.float32)
-        non_wrist[:, :2] = xy
-        non_wrist[:, 2] += rng.normal(0.0, 0.008, size=non_wrist[:, 2].shape).astype(np.float32)
-
-    # always add small noise (excluding wrist)
-    noise = rng.normal(0.0, 0.01, size=non_wrist.shape).astype(np.float32)
-    non_wrist += noise
-
-    augmented[1:] = non_wrist
-    augmented[0] = 0.0
-    return augmented
+    
+    coords[1:] = non_wrist
+    coords[0] = 0.0
+    # Features skalieren (da Distanzen linear mit Scale skalieren)
+    features *= scale
+    
+    return np.concatenate([coords.flatten(), features])
 
 
-def augment_train_dataset(X_train, y_train, total_dataset_size, augmentation_ratio=0.20, random_seed=42):
-    rng = np.random.default_rng(random_seed)
+def balance_classes(X, y, rng):
+    """
+    Bringt alle Klassen auf die Anzahl der größten Klasse.
+    """
+    unique_classes, counts = np.unique(y, return_counts=True)
+    max_count = np.max(counts)
+    logging.info(f"Balancing all classes to {max_count} samples...")
+    
+    X_balanced = []
+    y_balanced = []
+    
+    for cls in unique_classes:
+        indices = np.where(y == cls)[0]
+        samples = X[indices]
+        current_count = len(samples)
+        
+        # Originale hinzufügen
+        X_balanced.append(samples)
+        y_balanced.append(np.full(current_count, cls, dtype=y.dtype))
+        
+        diff = max_count - current_count
+        if diff > 0:
+            # Zufällige Auswahl zum Auffüllen
+            extra_indices = rng.choice(current_count, size=diff, replace=True)
+            extra_samples = []
+            for idx in extra_indices:
+                # Augmentieren, damit keine exakten Dubletten entstehen
+                aug = augment_vector_light(samples[idx], rng)
+                extra_samples.append(aug)
+            
+            X_balanced.append(np.array(extra_samples))
+            y_balanced.append(np.full(diff, cls, dtype=y.dtype))
+            
+    return np.concatenate(X_balanced, axis=0), np.concatenate(y_balanced, axis=0)
 
-    # 1) Mirror all train samples -> train set is doubled
-    X_mirror = np.array([mirror_keypoints(sample) for sample in X_train], dtype=np.float32)
-    y_mirror = y_train.copy()
-
-    X_train_base = np.concatenate([X_train, X_mirror], axis=0)
-    y_train_base = np.concatenate([y_train, y_mirror], axis=0)
-
-    # 2) Add additional augmented samples equal to 20% of total dataset size
-    target_augmented_count = int(round(total_dataset_size * augmentation_ratio))
-    if target_augmented_count <= 0:
-        return X_train_base, y_train_base
-
-    sampled_idx = rng.integers(0, len(X_train_base), size=target_augmented_count)
-    X_extra = []
-    y_extra = []
-
-    for idx in sampled_idx:
-        X_extra.append(augment_keypoints_diverse(X_train_base[idx], rng))
-        y_extra.append(y_train_base[idx])
-
-    X_extra = np.array(X_extra, dtype=np.float32)
-    y_extra = np.array(y_extra, dtype=np.int64)
-
-    X_train_final = np.concatenate([X_train_base, X_extra], axis=0)
-    y_train_final = np.concatenate([y_train_base, y_extra], axis=0)
-
-    shuffle_idx = np.arange(len(X_train_final))
-    rng.shuffle(shuffle_idx)
-    X_train_final = X_train_final[shuffle_idx]
-    y_train_final = y_train_final[shuffle_idx]
-
-    return X_train_final, y_train_final
 
 # ----------------------------
 # Split dataset into train, val, test and save as npz files
 # ----------------------------
-def create_dataset(
+def create_dataset_v3(
     X,
     y,
     output_folder="SignAlphaSet/data/processed_dataset",
     train_ratio=0.8,
     val_ratio=0.1,
     test_ratio=0.1,
-    train_augmentation_ratio=1.50,
     augmentation_seed=42
 ):
-    # ensure fresh output folder for full reprocessing
     if os.path.exists(output_folder):
         logging.info(f"Existing processed dataset found. Removing folder: {output_folder}")
         shutil.rmtree(output_folder)
     os.makedirs(output_folder, exist_ok=True)
 
-    # shuffle first
-    idx = np.arange(len(X))
-    np.random.shuffle(idx)
-    X = X[idx]
-    y = y[idx]
+    rng = np.random.default_rng(augmentation_seed)
 
-    N = len(X)
+    # 1. Expand Dataset with Mirrors (Original, Z-Flip, X-Flip, XZ-Flip) for ALL samples
+    logging.info("Generating mirrors (Original, Z-Flip, X-Flip, XZ-Flip)...")
+    X_aug = []
+    y_aug = []
+    
+    for i in range(len(X)):
+        sample = X[i]
+        label = y[i]
+        
+        # 1. Original
+        X_aug.append(sample)
+        y_aug.append(label)
+        
+        # 2. Z-Flip
+        X_aug.append(mirror_vector(sample, flip_x=False, flip_z=True))
+        y_aug.append(label)
+        
+        # 3. X-Flip
+        X_aug.append(mirror_vector(sample, flip_x=True, flip_z=False))
+        y_aug.append(label)
+        
+        # 4. XZ-Flip
+        X_aug.append(mirror_vector(sample, flip_x=True, flip_z=True))
+        y_aug.append(label)
+        
+    X_full = np.array(X_aug, dtype=np.float32)
+    y_full = np.array(y_aug, dtype=np.int64)
+    
+    logging.info(f"Dataset size after mirroring: {len(X_full)}")
+
+    # 2. Split
+    # Shuffle first
+    idx = np.arange(len(X_full))
+    rng.shuffle(idx)
+    X_full = X_full[idx]
+    y_full = y_full[idx]
+
+    N = len(X_full)
     train_end = int(train_ratio * N)
     val_end = int((train_ratio + val_ratio) * N)
 
-    X_train, y_train = X[:train_end], y[:train_end]
-    X_val, y_val = X[train_end:val_end], y[train_end:val_end]
-    X_test, y_test = X[val_end:], y[val_end:]
+    X_train, y_train = X_full[:train_end], y_full[:train_end]
+    X_val, y_val = X_full[train_end:val_end], y_full[train_end:val_end]
+    X_test, y_test = X_full[val_end:], y_full[val_end:]
 
-    # Augmentation only for training split:
-    # - mirror all training samples (2x)
-    # - add many extra augmented samples from train data only
-    X_train, y_train = augment_train_dataset(
-        X_train,
-        y_train,
-        total_dataset_size=N,
-        augmentation_ratio=train_augmentation_ratio,
-        random_seed=augmentation_seed
-    )
+    # 3. Balance (only Train set to avoid leaking augmented/synthetic data into val/test)
+    logging.info("Balancing Training Set...")
+    X_train, y_train = balance_classes(X_train, y_train, rng)
+    
+    # Final Shuffle Train
+    idx_train = np.arange(len(X_train))
+    rng.shuffle(idx_train)
+    X_train = X_train[idx_train]
+    y_train = y_train[idx_train]
 
     # save as npz in output folder
     np.savez_compressed(os.path.join(output_folder, "train_data.npz"), X=X_train, y=y_train)
@@ -310,7 +345,7 @@ def create_dataset(
 
     logging.info(f"Datasets saved in folder: {output_folder}")
     logging.info(
-        f"Train samples: {len(X_train)} (mirrored all + {int(round(N * train_augmentation_ratio))} extra augmented), "
+        f"Train samples: {len(X_train)}, "
         f"Val samples: {len(X_val)}, Test samples: {len(X_test)}"
     )
 
@@ -327,10 +362,8 @@ if __name__ == "__main__":
 
     total_start = time.perf_counter()
     extract_time = 0.0
-    center_time = 0.0
-    normalize_time = 0.0
     save_time = 0.0
-
+    
     progress_every = 100
 
     for class_name in alphabet:
@@ -354,7 +387,6 @@ if __name__ == "__main__":
             tmp_keypoints, err_reason = extract_keypoints(file_path)
             extract_time += time.perf_counter() - start
 
-            # check if keypoints are fine
             if tmp_keypoints is None:
                 logging.warning(
                     f"Skipping file '{file_name}' in class '{class_name}' due to keypoint extraction failure."
@@ -368,22 +400,24 @@ if __name__ == "__main__":
                 class_failed += 1
                 continue
 
-            # center and normalize 
-            start = time.perf_counter()
+            # Process: Center -> Normalize -> Features -> Flatten
             tmp_keypoints = center_keypoints(tmp_keypoints)
-            center_time += time.perf_counter() - start
-
-            start = time.perf_counter()
             tmp_keypoints = normalize_keypoints(tmp_keypoints)
-            normalize_time += time.perf_counter() - start
+            
+            # Calculate extra features
+            extra_features = calculate_extra_features(tmp_keypoints)
+            
+            # Flatten coordinates
+            flat_coords = tmp_keypoints.flatten()
+            
+            # Concatenate
+            full_vector = np.concatenate([flat_coords, extra_features], axis=0)
 
-            # append to dataset
-            all_keypoints.append(tmp_keypoints)
+            all_samples.append(full_vector)
             all_labels.append(class_to_idx[class_name])
             total += 1
             class_processed += 1
 
-            # processed count logging/progress
             if total % progress_every == 0:
                 elapsed = time.perf_counter() - total_start
                 pct = (total / total_files * 100.0) if total_files > 0 else 0.0
@@ -399,68 +433,29 @@ if __name__ == "__main__":
         class_pct = (class_processed / class_total * 100.0) if class_total > 0 else 0.0
         logging.info(
             f"Class '{class_name}' done: {class_processed}/{class_total} "
-            f"({class_pct:.2f}%) | failed {class_failed} | {class_elapsed:.2f}s\nd"
+            f"({class_pct:.2f}%) | failed {class_failed} | {class_elapsed:.2f}s"
         )
 
     # =================================================
     # Convert to arrays
     # =================================================
-    X = np.array(all_keypoints, dtype=np.float32)
+    X = np.array(all_samples, dtype=np.float32)
     y = np.array(all_labels, dtype=np.int64)
 
-    logging.info(f"Valid samples: {len(X)}")
+    logging.info(f"Valid samples (Base): {len(X)}")
     logging.info(f"Failed samples: {len(failed_files)}")
 
     # =================================================
-    # Split and save train/val/test datasets
+    # Split, Mirror, Balance, Save
     # =================================================
     start = time.perf_counter()
-    create_dataset(X, y)
-    save_time += time.perf_counter() - start
+    create_dataset_v3(X, y)
+    save_time = time.perf_counter() - start
 
     total_time = time.perf_counter() - total_start
 
-    # =================================================
-    # Summary
-    # =================================================
-    failed_count = len(failed_files)
-    processed_count = len(X)
-    total_count = total_files
-    failed_pct = (failed_count / total_count * 100.0) if total_count > 0 else 0.0
-    processed_pct = (processed_count / total_count * 100.0) if total_count > 0 else 0.0
-    avg_extract = extract_time / total_count if total_count > 0 else 0.0
-    avg_center = center_time / processed_count if processed_count > 0 else 0.0
-    avg_normalize = normalize_time / processed_count if processed_count > 0 else 0.0
-
     logging.info("=" * 60)
     logging.info("Summary")
-    logging.info(f"Total files: {total_count}")
-    logging.info(f"Processed (valid): {processed_count} ({processed_pct:.2f}%)")
-    logging.info(f"Failed: {failed_count} ({failed_pct:.2f}%)")
-    logging.info("Timing (seconds)")
-    logging.info(f"- Total: {total_time:.2f}")
-    logging.info(f"- Extraction total: {extract_time:.2f} (avg {avg_extract:.4f}/file)")
-    logging.info(f"- Center total: {center_time:.2f} (avg {avg_center:.4f}/valid)")
-    logging.info(f"- Normalize total: {normalize_time:.2f} (avg {avg_normalize:.4f}/valid)")
-    logging.info(f"- Save dataset: {save_time:.2f}")
-
-    if failed_by_reason:
-        logging.info("Failed by reason")
-        for reason, count in failed_by_reason.items():
-            if count == 0:
-                continue
-            pct = (count / total_count * 100.0) if total_count > 0 else 0.0
-            logging.info(f"- {reason}: {count} ({pct:.2f}%)")
-
-    if failed_by_class:
-        logging.info("Failed by class")
-        for class_name in sorted(failed_by_class.keys()):
-            files = failed_by_class[class_name]
-            pct = (len(files) / total_count * 100.0) if total_count > 0 else 0.0
-            logging.info(f"- {class_name}: {len(files)} ({pct:.2f}%)")
-            for file_path in files:
-                logging.info(f"  - {file_path}")
-    else:
-        logging.info("No failed files.")
-
+    logging.info(f"Total time: {total_time:.2f}s")
+    logging.info(f"Save/Process dataset time: {save_time:.2f}s")
     logging.info("=" * 60)
