@@ -130,6 +130,75 @@ def augment_keypoints_light(keypoints, rng):
     return augmented
 
 
+def augment_keypoints_diverse(keypoints, rng):
+    augmented = keypoints.copy()
+
+    # optional random mirror for extra diversity
+    if rng.random() < 0.5:
+        augmented[:, 0] *= -1.0
+
+    non_wrist = augmented[1:].copy()
+
+    # choose one of several light augmentation styles
+    style = int(rng.integers(0, 4))
+
+    if style == 0:
+        # geometric combo (rotation + scale + translation)
+        angle = np.deg2rad(rng.uniform(-5.0, 5.0))
+        cos_a = np.cos(angle)
+        sin_a = np.sin(angle)
+        rotation_matrix = np.array([[cos_a, -sin_a], [sin_a, cos_a]], dtype=np.float32)
+
+        scale = rng.uniform(0.90, 1.10)
+        tx = rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.04)
+        ty = rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.04)
+
+        xy = non_wrist[:, :2]
+        xy = (xy @ rotation_matrix.T) * scale
+        xy += np.array([tx, ty], dtype=np.float32)
+        non_wrist[:, :2] = xy
+        non_wrist[:, 2] *= scale
+
+    elif style == 1:
+        # anisotropic scale + tiny global drift
+        sx = rng.uniform(0.92, 1.08)
+        sy = rng.uniform(0.92, 1.08)
+        sz = rng.uniform(0.92, 1.08)
+        non_wrist[:, 0] *= sx
+        non_wrist[:, 1] *= sy
+        non_wrist[:, 2] *= sz
+        non_wrist[:, 0] += rng.uniform(-0.03, 0.03)
+        non_wrist[:, 1] += rng.uniform(-0.03, 0.03)
+
+    elif style == 2:
+        # finger-local jitter (keeps wrist fixed)
+        finger_jitter = rng.normal(0.0, 0.012, size=non_wrist.shape).astype(np.float32)
+        non_wrist += finger_jitter
+
+    else:
+        # mixed light transform
+        angle = np.deg2rad(rng.uniform(-5.0, 5.0))
+        cos_a = np.cos(angle)
+        sin_a = np.sin(angle)
+        rotation_matrix = np.array([[cos_a, -sin_a], [sin_a, cos_a]], dtype=np.float32)
+        xy = non_wrist[:, :2] @ rotation_matrix.T
+        xy += rng.normal(0.0, 0.008, size=xy.shape).astype(np.float32)
+        xy += np.array([
+            rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.03),
+            rng.choice([-1.0, 1.0]) * rng.uniform(0.01, 0.03)
+        ], dtype=np.float32)
+        non_wrist[:, :2] = xy
+        non_wrist[:, 2] += rng.normal(0.0, 0.008, size=non_wrist[:, 2].shape).astype(np.float32)
+
+    # always add small noise (excluding wrist)
+    noise = rng.normal(0.0, 0.01, size=non_wrist.shape).astype(np.float32)
+    non_wrist += noise
+
+    augmented[1:] = non_wrist
+    augmented[0] = 0.0
+    return augmented
+
+
 def augment_train_dataset(X_train, y_train, total_dataset_size, augmentation_ratio=0.20, random_seed=42):
     rng = np.random.default_rng(random_seed)
 
@@ -150,7 +219,7 @@ def augment_train_dataset(X_train, y_train, total_dataset_size, augmentation_rat
     y_extra = []
 
     for idx in sampled_idx:
-        X_extra.append(augment_keypoints_light(X_train_base[idx], rng))
+        X_extra.append(augment_keypoints_diverse(X_train_base[idx], rng))
         y_extra.append(y_train_base[idx])
 
     X_extra = np.array(X_extra, dtype=np.float32)
@@ -176,7 +245,7 @@ def create_dataset(
     train_ratio=0.8,
     val_ratio=0.1,
     test_ratio=0.1,
-    train_augmentation_ratio=0.20,
+    train_augmentation_ratio=1.50,
     augmentation_seed=42
 ):
     # ensure fresh output folder for full reprocessing
@@ -201,7 +270,7 @@ def create_dataset(
 
     # Augmentation only for training split:
     # - mirror all training samples (2x)
-    # - add extra augmented samples equal to 20% of total dataset size
+    # - add many extra augmented samples from train data only
     X_train, y_train = augment_train_dataset(
         X_train,
         y_train,
@@ -217,7 +286,7 @@ def create_dataset(
 
     logging.info(f"Datasets saved in folder: {output_folder}")
     logging.info(
-        f"Train samples: {len(X_train)} (mirrored all + {int(round(N * train_augmentation_ratio))} augmented), "
+        f"Train samples: {len(X_train)} (mirrored all + {int(round(N * train_augmentation_ratio))} extra augmented), "
         f"Val samples: {len(X_val)}, Test samples: {len(X_test)}"
     )
 

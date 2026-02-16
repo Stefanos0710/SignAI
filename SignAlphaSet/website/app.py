@@ -19,7 +19,7 @@ app = Flask(__name__)
 # 1. ROBUST PATH SETUP
 # -------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, '..', 'models', 'signalphaset_v1.keras')
+MODEL_PATH = os.path.join(BASE_DIR, '..', 'models', 'signalphaset_v2.keras')
 
 # Path to the raw dataset to get class names
 DATASET_DIR = os.path.join(BASE_DIR, '..', 'data', 'SignAlphaSet', 'SignAlphaSet') 
