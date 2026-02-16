@@ -8,6 +8,8 @@ import numpy as np
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from tensorflow import keras
+
 
 DEFAULT_SPLITS = ("train", "val", "test")
 
@@ -172,67 +174,133 @@ def calc_error_rate_pairwise(model, x_test, y_test, class_labels):
 
     return error_rates
 
-def run_analysis() -> tuple[np.ndarray, np.ndarray, list[str], np.ndarray]:
-	"""Run the full average-hand analysis pipeline.
+def plot_error_rate_heatmap(error_rates_matrix, class_labels, output_path):
+	"""Plot and save a heatmap of pairwise error rates between classes."""
+	fig, ax = plt.subplots(figsize=(11, 9), dpi=140)
+	image = ax.imshow(error_rates_matrix, cmap="Reds")
+	ax.set_title("Pairwise Error Rates (Confusion Matrix Normalized)")
+	ax.set_xticks(np.arange(len(class_labels)))
+	ax.set_yticks(np.arange(len(class_labels)))
+	ax.set_xticklabels(class_labels, rotation=90)
+	ax.set_yticklabels(class_labels)
+	fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="Error Rate")
+	fig.tight_layout()
+	fig.savefig(output_path)
+	plt.close(fig)
 
-	This function loads data, computes class-wise average poses, computes the distance
-	matrix, saves a similarity heatmap, writes average 3D landmark values per letter,
-	and stores raw numpy outputs.
+def run_analysis(zero_error_diagonal: bool = True) -> tuple[np.ndarray, np.ndarray, list[str], np.ndarray]:
+	"""Run the analysis pipeline with distance/error comparison and correlation metrics.
+
+	The function uses train+val data to compute average class poses and class distances,
+	then evaluates the trained model on test data to build a normalized error-rate matrix.
+	It normalizes distances to [0, 1], optionally zeroes the error-rate diagonal,
+	computes Pearson correlation between both matrices (without diagonal), and prints
+	the top 5 confusion pairs.
 
 	Returns:
 		tuple[np.ndarray, np.ndarray, list[str], np.ndarray]:
-			- avg_poses: class-wise average landmarks.
-			- class_counts: number of samples per class.
+			- avg_poses: class-wise average landmarks from train+val.
+			- class_counts: number of train+val samples per class.
 			- class_labels: ordered labels used in outputs.
-			- distance_matrix: pairwise class distances.
+			- distance_matrix_norm: pairwise normalized class distances in [0, 1].
 	"""
+
 	# define input and output paths
 	base_dir = Path(__file__).resolve().parent
 	processed_dir = base_dir / "data" / "processed_dataset"
 	alpha_dataset_dir = base_dir / "data" / "SignAlphaSet" / "SignAlphaSet"
 	output_dir = base_dir / "logs" / "avg_hand_analysis"
 
-	# load data and compute statistics
-	x, y = load_processed_dataset(processed_dir=processed_dir, splits=DEFAULT_SPLITS)
-	num_classes = int(np.max(y)) + 1
-	class_labels = discover_class_labels(alpha_dataset_dir=alpha_dataset_dir, num_classes=num_classes)
-	avg_poses, class_counts = compute_average_poses(x=x, y=y, num_classes=num_classes)
-	distance_matrix = compute_distance_matrix(avg_poses=avg_poses)
-
-	# load test data and model
-	x, y = load_processed_dataset(processed_dir=processed_dir, splits=["test"])
-	model = keras.models.load_model(base_dir / "models" / "signalphaset_v2.keras") # SignAlphaSet/models/signalphaset_v2.keras
-
-	# here comes the compare error rate between every sign
-
-	# then all output will be saved
-
-	# gen and save heatmap 
-
-	# create compared heatmap of similarity between average poses
-
-
-	# ensure output directory exists
+	# create output folder immediately after definition
 	output_dir.mkdir(parents=True, exist_ok=True)
 
-	# save heatmap image
-	heatmap_path = output_dir / "similarity_heatmap.png"
-	plot_distance_heatmap(distance_matrix, class_labels, heatmap_path)
+	# 1) load train/val data only for average pose statistics
+	x_all, y_all = load_processed_dataset(processed_dir=processed_dir, splits=["train", "val"])
+	num_classes = int(np.max(y_all)) + 1
+	class_labels = discover_class_labels(alpha_dataset_dir=alpha_dataset_dir, num_classes=num_classes)
+	avg_poses, class_counts = compute_average_poses(x=x_all, y=y_all, num_classes=num_classes)
 
-	# save average 3d positions per class
+	# 2) compute raw distance matrix and normalize it to [0, 1]
+	distance_matrix = compute_distance_matrix(avg_poses=avg_poses)
+	dist_min = float(np.min(distance_matrix))
+	dist_max = float(np.max(distance_matrix))
+	if dist_max > dist_min:
+		distance_matrix_norm = ((distance_matrix - dist_min) / (dist_max - dist_min)).astype(np.float32)
+	else:
+		distance_matrix_norm = np.zeros_like(distance_matrix, dtype=np.float32)
+
+	# 3) load test data separately for confusion/error analysis
+	x_test, y_test = load_processed_dataset(processed_dir=processed_dir, splits=["test"])
+	model = keras.models.load_model(base_dir / "models" / "signalphaset_v2.keras")
+
+	# 4) calculate normalized error-rate matrix from test predictions
+	error_rates_matrix = calc_error_rate_pairwise(model, x_test, y_test, class_labels)
+
+	# optionally set diagonal to zero (ignore correct predictions in pairwise error view)
+	if zero_error_diagonal:
+		np.fill_diagonal(error_rates_matrix, 0.0)
+
+	# 5) pearson correlation between normalized distance and error-rate matrices (without diagonal)
+	off_diag_mask = ~np.eye(num_classes, dtype=bool)
+	distance_vector = distance_matrix_norm[off_diag_mask]
+	error_vector = error_rates_matrix[off_diag_mask]
+	if np.std(distance_vector) > 0 and np.std(error_vector) > 0:
+		pearson_corr = float(np.corrcoef(distance_vector, error_vector)[0, 1])
+	else:
+		pearson_corr = float("nan")
+
+	# 6) extract top 5 confusion pairs from off-diagonal error rates
+	confusion_pairs = []
+	for i in range(num_classes):
+		for j in range(num_classes):
+			if i == j:
+				continue
+			confusion_pairs.append((i, j, float(error_rates_matrix[i, j])))
+	confusion_pairs.sort(key=lambda item: item[2], reverse=True)
+	top_confusions = confusion_pairs[:5]
+
+	# 7) save visual and numeric outputs
+	error_rates_path = output_dir / "error_rates_heatmap.png"
+	plot_error_rate_heatmap(error_rates_matrix, class_labels, error_rates_path)
+
+	heatmap_path = output_dir / "similarity_heatmap.png"
+	plot_distance_heatmap(distance_matrix_norm, class_labels, heatmap_path)
+
 	avg_positions_path = output_dir / "average_hand_positions_3d.txt"
 	write_average_positions_3d(avg_poses, class_labels, avg_positions_path)
 
-	# save raw numpy outputs for later use
 	np.save(output_dir / "average_poses.npy", avg_poses)
 	np.save(output_dir / "distance_matrix.npy", distance_matrix)
+	np.save(output_dir / "distance_matrix_norm.npy", distance_matrix_norm)
+	np.save(output_dir / "error_rates_matrix.npy", error_rates_matrix)
+
+	# write compact text report for correlation and top confusions
+	report_lines = [
+		"Distance vs Error Analysis",
+		"=" * 30,
+		f"pearson_correlation_off_diagonal={pearson_corr:.6f}",
+		"",
+		"Top 5 confusion pairs (true -> predicted):",
+	]
+	for i, j, rate in top_confusions:
+		report_lines.append(
+			f"- {class_labels[i]} -> {class_labels[j]}: error_rate={rate:.6f}, distance_norm={float(distance_matrix_norm[i, j]):.6f}"
+		)
+	(output_dir / "distance_error_report.txt").write_text("\n".join(report_lines), encoding="utf-8")
 
 	print("Analysis completed.")
-	print(f"- Heatmap: {heatmap_path}")
+	print(f"- Similarity heatmap (normalized distance): {heatmap_path}")
+	print(f"- Error-rate heatmap: {error_rates_path}")
 	print(f"- 3D average positions: {avg_positions_path}")
+	print(f"- Pearson correlation (off-diagonal): {pearson_corr:.6f}")
+	print("- Top 5 confusion pairs:")
+	for i, j, rate in top_confusions:
+		print(
+			f"  {class_labels[i]} -> {class_labels[j]} | error_rate={rate:.6f} | distance_norm={float(distance_matrix_norm[i, j]):.6f}"
+		)
 
 	# return all computed core artifacts
-	return avg_poses, class_counts, class_labels, distance_matrix
+	return avg_poses, class_counts, class_labels, distance_matrix_norm
 
 
 if __name__ == "__main__":
