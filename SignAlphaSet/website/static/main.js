@@ -15,13 +15,26 @@ const timingStats = document.getElementById('timing-stats');
 const metaStats = document.getElementById('meta-stats');
 const top5List = document.getElementById('top5-list');
 const modelVersionSelect = document.getElementById('model-version');
+const cameraStats = document.getElementById('camera-stats');
+const systemStats = document.getElementById('system-stats');
+const predictionStats = document.getElementById('prediction-stats');
+const debugJson = document.getElementById('debug-json');
+const dbgFps = document.getElementById('dbg-fps');
+const dbgRoundtrip = document.getElementById('dbg-roundtrip');
+const dbgFrameCount = document.getElementById('dbg-frame-count');
+const dbgLastUpdate = document.getElementById('dbg-last-update');
 
 let intervalId = null;
 let isProcessing = false;
 let stream = null;
 let debugMode = false;
+let debugFrameCount = 0;
+let lastFrameTs = null;
+let smoothedFps = 0;
+let isFullscreen = false;
 
 const container = document.getElementById('container');
+const fullscreenBtn = document.getElementById('fullscreen-btn');
 
 function setCameraUIActive(isActive) {
     if (!container) return;
@@ -56,6 +69,13 @@ function toggleDebug() {
         if (debugPanel) {
             debugPanel.style.display = "flex"; 
         }
+        debugFrameCount = 0;
+        lastFrameTs = null;
+        smoothedFps = 0;
+        if (dbgFps) dbgFps.textContent = '-';
+        if (dbgRoundtrip) dbgRoundtrip.textContent = '-';
+        if (dbgFrameCount) dbgFrameCount.textContent = '0';
+        if (dbgLastUpdate) dbgLastUpdate.textContent = '-';
         // Force loop restart to adjust interval if needed
         if (intervalId) {
             clearInterval(intervalId);
@@ -74,14 +94,101 @@ function toggleDebug() {
     }
 }
 
+function formatMs(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) return "-";
+    return `${Math.round(Number(value))} ms`;
+}
+
+function formatTime(value) {
+    if (!value) return "-";
+    return new Date(value).toLocaleTimeString();
+}
+
+function estimateKbFromDataUrl(dataURL) {
+    if (!dataURL || typeof dataURL !== 'string') return 0;
+    const base64 = dataURL.split(',')[1] || '';
+    return Math.round((base64.length * 3) / 4 / 1024);
+}
+
+function updateDebugSummary(roundtripMs) {
+    const now = performance.now();
+    if (lastFrameTs !== null) {
+        const delta = now - lastFrameTs;
+        if (delta > 0) {
+            const instantFps = 1000 / delta;
+            smoothedFps = smoothedFps === 0 ? instantFps : (smoothedFps * 0.8 + instantFps * 0.2);
+        }
+    }
+    lastFrameTs = now;
+    debugFrameCount += 1;
+
+    if (dbgFps) dbgFps.textContent = smoothedFps ? `${smoothedFps.toFixed(1)}` : '-';
+    if (dbgRoundtrip) dbgRoundtrip.textContent = formatMs(roundtripMs);
+    if (dbgFrameCount) dbgFrameCount.textContent = `${debugFrameCount}`;
+    if (dbgLastUpdate) dbgLastUpdate.textContent = formatTime(Date.now());
+}
+
+function renderDebugData(data, contextInfo) {
+    if (!debugMode) return;
+
+    const top5 = Array.isArray(data.top_5) ? data.top_5 : [];
+    const confPercent = data.confidence !== undefined ? Math.round(Number(data.confidence) * 100) : null;
+    const top1 = top5[0];
+    const top2 = top5[1];
+    const topGap = top1 && top2 ? Math.round((top1.confidence - top2.confidence) * 100) : null;
+    const landmarks = data.debug_info && data.debug_info.raw_landmarks ? data.debug_info.raw_landmarks : [];
+
+    if (cameraStats) {
+        cameraStats.innerHTML = `
+            <li>State: <span>${stream ? 'active' : 'inactive'}</span></li>
+            <li>Resolution: <span>${video.videoWidth || 0}x${video.videoHeight || 0}</span></li>
+            <li>JPEG Quality: <span>${Math.round(contextInfo.quality * 100)}%</span></li>
+            <li>Payload Size: <span>${contextInfo.payloadKb} KB</span></li>
+            <li>Landmarks: <span>${landmarks.length}</span></li>
+        `;
+    }
+
+    if (systemStats) {
+        systemStats.innerHTML = `
+            <li>Loop Delay: <span>${debugMode ? '60ms' : '30ms'}</span></li>
+            <li>Canvas: <span>${canvas.width}x${canvas.height}</span></li>
+            <li>Processing: <span>${isProcessing ? 'busy' : 'idle'}</span></li>
+            <li>Model Selected: <span>v${modelVersionSelect ? modelVersionSelect.value : '-'}</span></li>
+            <li>Model Active: <span>v${data.model_version ?? '-'}</span></li>
+        `;
+    }
+
+    if (predictionStats) {
+        predictionStats.innerHTML = `
+            <li>Prediction: <span>${data.prediction ?? '-'}</span></li>
+            <li>Confidence: <span>${confPercent !== null ? `${confPercent}%` : '-'}</span></li>
+            <li>Top1/Top2 Gap: <span>${topGap !== null ? `${topGap}%` : '-'}</span></li>
+            <li>Request RTT: <span>${formatMs(contextInfo.roundtripMs)}</span></li>
+            <li>Status: <span>${data.error ? 'error' : 'ok'}</span></li>
+        `;
+    }
+
+    if (debugJson) {
+        const rawPreview = {
+            prediction: data.prediction,
+            confidence: data.confidence,
+            model_version: data.model_version,
+            timing: data.timing,
+            meta: data.meta,
+            top_5: top5.slice(0, 5)
+        };
+        debugJson.textContent = JSON.stringify(rawPreview, null, 2);
+    }
+}
+
 async function startCamera() {
     if (stream) return;
 
     try {
         stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
-                width: 640, 
-                height: 480,
+                width: { ideal: 1920 }, 
+                height: { ideal: 1080 },
                 frameRate: { ideal: 30 }
             } 
         });
@@ -90,12 +197,21 @@ async function startCamera() {
         
         // Wait for video to be ready
         video.onloadedmetadata = () => {
+            // Sync canvas sizes to actual video resolution
+            const vw = video.videoWidth || 1920;
+            const vh = video.videoHeight || 1080;
+            canvas.width = vw;
+            canvas.height = vh;
+            landmarksCanvas.width = vw;
+            landmarksCanvas.height = vh;
+
             // Initial interval
             intervalId = setInterval(processFrame, 30);
         };
     } catch (err) {
         console.error("Error accessing camera: ", err);
         statusDiv.innerText = "Error: Could not access camera. Please allow permissions.";
+        setCameraUIActive(false);
     }
 }
 
@@ -109,9 +225,10 @@ function stopCamera() {
         clearInterval(intervalId);
         intervalId = null;
     }
-    resultDiv.innerText = "Stopped";
+    resultDiv.innerText = "";
     confDiv.innerText = "";
     statusDiv.innerText = "Camera stopped.";
+    setCameraUIActive(false);
     if (landmarksCtx && landmarksCanvas) {
         landmarksCtx.clearRect(0, 0, landmarksCanvas.width, landmarksCanvas.height);
     }
@@ -158,7 +275,7 @@ function renderTop5(top5data) {
         const percent = Math.round(item.confidence * 100);
         html += `
         <div class="top5-item">
-            <div style="width: 20px; font-weight: bold;">${item.label}</div>
+            <div class="top5-label">${item.label}</div>
             <div class="bar-container">
                 <div class="bar-fill" style="width: ${percent}%"></div>
             </div>
@@ -176,11 +293,13 @@ function processFrame() {
     isProcessing = true;
     
     // Draw video frame to canvas
-    // If debug is on, use lower quality JPEG to save bandwidth
-    const quality = debugMode ? 0.5 : 0.7;
+    // Use high quality JPEG for best prediction accuracy
+    const quality = debugMode ? 0.7 : 0.92;
+    const requestStart = performance.now();
 
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataURL = canvas.toDataURL('image/jpeg', quality);
+    const payloadKb = estimateKbFromDataUrl(dataURL);
 
     // Prepare payload
     const payload = {
@@ -196,11 +315,17 @@ function processFrame() {
     })
     .then(response => response.json())
     .then(data => {
+        const roundtripMs = performance.now() - requestStart;
+        if (debugMode) {
+            updateDebugSummary(roundtripMs);
+        }
+
         if (data.error) {
             console.error(data.error);
             if (statusDiv) statusDiv.innerText = `Error: ${data.error}`;
         } else {
             resultDiv.innerText = data.prediction;
+            setCameraUIActive(true);
             if (statusDiv && data.model_version !== undefined) {
                 statusDiv.innerText = `Using model v${data.model_version}`;
             }
@@ -247,10 +372,17 @@ function processFrame() {
                     renderTop5(data.top_5);
                 }
 
+                renderDebugData(data, { roundtripMs, quality, payloadKb });
+
             } else {
                 // Clear landmarks if debug is off/no hand detected but debug is on
                 if (landmarksCtx && landmarksCanvas) {
                     landmarksCtx.clearRect(0, 0, landmarksCanvas.width, landmarksCanvas.height);
+                }
+
+                if (debugMode) {
+                    renderTop5(Array.isArray(data.top_5) ? data.top_5 : []);
+                    renderDebugData(data, { roundtripMs, quality, payloadKb });
                 }
             }
         }
@@ -261,4 +393,76 @@ function processFrame() {
     .finally(() => {
         isProcessing = false;
     });
+}
+
+// ===== FULLSCREEN MODE =====
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(() => {
+            enterFullscreenMode();
+        }).catch(err => {
+            // Fallback: use CSS-only fullscreen if API fails
+            enterFullscreenMode();
+        });
+    } else {
+        document.exitFullscreen().then(() => {
+            exitFullscreenMode();
+        }).catch(() => {
+            exitFullscreenMode();
+        });
+    }
+}
+
+function enterFullscreenMode() {
+    isFullscreen = true;
+    document.body.classList.add('fullscreen-mode');
+    if (debugMode) {
+        document.body.classList.add('debug-open');
+    }
+    if (fullscreenBtn) fullscreenBtn.textContent = 'Exit Fullscreen';
+    // Collapse settings by default in fullscreen
+    const controlsPanel = document.getElementById('controls-panel');
+    const settingsBtn = document.getElementById('settings-toggle');
+    if (controlsPanel) controlsPanel.classList.add('collapsed');
+    if (settingsBtn) settingsBtn.classList.remove('active');
+}
+
+function exitFullscreenMode() {
+    isFullscreen = false;
+    document.body.classList.remove('fullscreen-mode', 'debug-open');
+    if (fullscreenBtn) fullscreenBtn.textContent = 'Fullscreen';
+    // Always show settings when leaving fullscreen
+    const controlsPanel = document.getElementById('controls-panel');
+    const settingsBtn = document.getElementById('settings-toggle');
+    if (controlsPanel) controlsPanel.classList.remove('collapsed');
+    if (settingsBtn) settingsBtn.classList.remove('active');
+}
+
+// Sync when user presses Escape or browser exits fullscreen
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && isFullscreen) {
+        exitFullscreenMode();
+    }
+});
+
+// Keep debug-open class in sync with debug toggle
+const _origToggleDebug = toggleDebug;
+toggleDebug = function() {
+    _origToggleDebug();
+    if (isFullscreen) {
+        if (debugMode) {
+            document.body.classList.add('debug-open');
+        } else {
+            document.body.classList.remove('debug-open');
+        }
+    }
+};
+
+// ===== COLLAPSIBLE SETTINGS IN FULLSCREEN =====
+function toggleSettings() {
+    const controlsPanel = document.getElementById('controls-panel');
+    const settingsBtn = document.getElementById('settings-toggle');
+    if (!controlsPanel) return;
+    controlsPanel.classList.toggle('collapsed');
+    if (settingsBtn) settingsBtn.classList.toggle('active');
 }

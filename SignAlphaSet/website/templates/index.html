@@ -7,11 +7,17 @@
 </head>
 <body>
 
-    <h1>SignAI Live Classifier</h1>
-    
-    <div class="controls">
+    <div class="fullscreen-header">
+        <h1>SignAI Live Classifier</h1>
+        <button id="settings-toggle" class="settings-toggle-btn" onclick="toggleSettings()" title="Settings">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+    </div>
+
+    <div class="controls" id="controls-panel">
         <button onclick="startCamera()">Start Camera</button>
         <button onclick="stopCamera()">Stop Camera</button>
+        <button id="fullscreen-btn" onclick="toggleFullscreen()">Fullscreen</button>
         <label for="model-version">Model Version:</label>
         <select id="model-version">
             {% for version in model_versions %}
@@ -28,8 +34,8 @@
     <div class="app-layout">
         <!-- Main Video Area -->
         <div id="container">
-            <video id="video" width="640" height="480" autoplay playsinline></video>
-            <canvas id="landmarks" width="640" height="480" style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
+            <video id="video" autoplay playsinline></video>
+            <canvas id="landmarks" width="1920" height="1080" style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
             
             <div id="overlay">
                 <div id="result">Waiting...</div>
@@ -40,6 +46,25 @@
         <!-- Debug Area -->
         <div id="debug-panel" style="display:none;">
             <h3>Debug Center</h3>
+
+            <div class="debug-summary">
+                <div class="summary-chip">
+                    <span>FPS</span>
+                    <strong id="dbg-fps">-</strong>
+                </div>
+                <div class="summary-chip">
+                    <span>Roundtrip</span>
+                    <strong id="dbg-roundtrip">-</strong>
+                </div>
+                <div class="summary-chip">
+                    <span>Frames</span>
+                    <strong id="dbg-frame-count">0</strong>
+                </div>
+                <div class="summary-chip">
+                    <span>Last Update</span>
+                    <strong id="dbg-last-update">-</strong>
+                </div>
+            </div>
             
             <div class="debug-grid">
                 <!-- Visuals -->
@@ -47,6 +72,12 @@
                     <div class="debug-card">
                         <h4>Hand Cutout</h4>
                         <img id="hand-cutout" alt="No Hand">
+                    </div>
+                    <div class="debug-card">
+                        <h4>Camera / Stream</h4>
+                        <ul id="camera-stats" class="stats-list">
+                            <li>Waiting for camera...</li>
+                        </ul>
                     </div>
                 </div>
 
@@ -56,6 +87,21 @@
                         <h4>Performance</h4>
                         <ul id="timing-stats" class="stats-list">
                             <li>Waiting for data...</li>
+                        </ul>
+                    </div>
+                    <div class="debug-card">
+                        <h4>System</h4>
+                        <ul id="system-stats" class="stats-list">
+                            <li>-</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="debug-col">
+                    <div class="debug-card">
+                        <h4>Prediction</h4>
+                        <ul id="prediction-stats" class="stats-list">
+                            <li>-</li>
                         </ul>
                     </div>
                     <div class="debug-card">
@@ -71,13 +117,18 @@
                 <h4>Top 5 Predictions</h4>
                 <div id="top5-list"></div>
             </div>
+
+            <div class="debug-card full-width">
+                <h4>Raw Response (Live)</h4>
+                <pre id="debug-json">Waiting for debug data...</pre>
+            </div>
         </div>
     </div>
     
     <div id="status">Ready</div>
 
     <!-- Hidden canvas to capture frames -->
-    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+    <canvas id="canvas" width="1920" height="1080" style="display:none;"></canvas>
 
     <!-- Sign Dictionary Section -->
     <div id="dictionary-section">
