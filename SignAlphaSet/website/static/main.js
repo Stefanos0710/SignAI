@@ -21,6 +21,23 @@ let isProcessing = false;
 let stream = null;
 let debugMode = false;
 
+const container = document.getElementById('container');
+
+function setCameraUIActive(isActive) {
+    if (!container) return;
+    container.classList.toggle('camera-inactive', !isActive);
+
+    if (!isActive) {
+        resultDiv.innerText = "";
+        confDiv.innerText = "";
+        if (landmarksCtx && landmarksCanvas) {
+            landmarksCtx.clearRect(0, 0, landmarksCanvas.width, landmarksCanvas.height);
+        }
+    }
+}
+
+setCameraUIActive(false);
+
 // Connections for Hand Landmarks (MediaPipe convention)
 const HAND_CONNECTIONS = [
     [0, 1], [1, 2], [2, 3], [3, 4], // Thumb
