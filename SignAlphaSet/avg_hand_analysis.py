@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 from typing import Iterable
 
@@ -15,6 +16,33 @@ DEFAULT_SPLITS = ("train", "val", "test")
 NUM_LANDMARKS = 21
 COORD_DIMS = 3
 BASE_KEYPOINT_FEATURES = NUM_LANDMARKS * COORD_DIMS
+
+
+def parse_args():
+	parser = argparse.ArgumentParser(description="Average hand analysis for a specific SignAlphaSet model version.")
+	parser.add_argument(
+		"--model-version",
+		type=int,
+		required=True,
+		help="Model version number to analyze (e.g. 3 for signalphaset_v3.keras).",
+	)
+	return parser.parse_args()
+
+
+def resolve_model_path(models_dir: Path, model_version: int) -> Path:
+	candidates = [
+		models_dir / f"signalphaset_v{model_version}.keras",
+		models_dir / f"signalphaset_v{model_version}.keras",
+	]
+	for candidate in candidates:
+		if candidate.exists():
+			return candidate
+
+	available = sorted([item.name for item in models_dir.glob("*v*.keras")])
+	raise FileNotFoundError(
+		f"Could not find model for version v{model_version} in {models_dir}. "
+		f"Available: {available}"
+	)
 
 
 def adapt_features_for_keypoint_pose(x: np.ndarray) -> np.ndarray:
@@ -260,7 +288,7 @@ def plot_error_rate_heatmap(error_rates_matrix, class_labels, output_path):
 	fig.savefig(output_path)
 	plt.close(fig)
 
-def run_analysis(zero_error_diagonal: bool = True) -> tuple[np.ndarray, np.ndarray, list[str], np.ndarray]:
+def run_analysis(model_version: int, zero_error_diagonal: bool = True) -> tuple[np.ndarray, np.ndarray, list[str], np.ndarray]:
 	"""Run the analysis pipeline with distance/error comparison and correlation metrics.
 
 	The function uses train+val data to compute average class poses and class distances,
@@ -303,7 +331,9 @@ def run_analysis(zero_error_diagonal: bool = True) -> tuple[np.ndarray, np.ndarr
 
 	# 3) load test data separately for confusion/error analysis
 	x_test, y_test = load_processed_dataset(processed_dir=processed_dir, splits=["test"])
-	model = keras.models.load_model(base_dir / "models" / "signalphaset_v2.keras")
+	model_path = resolve_model_path(base_dir / "models", model_version)
+	print(f"Using specified model version v{model_version}: {model_path}")
+	model = keras.models.load_model(model_path)
 
 	# 4) calculate normalized error-rate matrix from test predictions
 	error_rates_matrix = calc_error_rate_pairwise(model, x_test, y_test, class_labels)
@@ -376,5 +406,6 @@ def run_analysis(zero_error_diagonal: bool = True) -> tuple[np.ndarray, np.ndarr
 
 
 if __name__ == "__main__":
-	run_analysis()
+	args = parse_args()
+	run_analysis(model_version=args.model_version)
 	

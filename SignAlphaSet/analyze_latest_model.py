@@ -1,5 +1,6 @@
 import os
 import glob
+import argparse
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -17,16 +18,40 @@ BASE_KEYPOINT_FEATURES = NUM_LANDMARKS * COORD_DIMS
 MODEL_DIR = "SignAlphaSet/models"
 TEST_DATA_PATH = "SignAlphaSet/data/processed_dataset/test_data.npz"
 
-# =========================
-# FIND LATEST MODEL
-# =========================
-model_files = glob.glob(os.path.join(MODEL_DIR, "*.keras"))
 
-if not model_files:
-    raise FileNotFoundError("No .keras model found in models folder.")
+def parse_args():
+    parser = argparse.ArgumentParser(description="Analyze a specific SignAlphaSet model version.")
+    parser.add_argument(
+        "--model-version",
+        type=int,
+        required=True,
+        help="Model version number to analyze (e.g. 3 for signalphaset_v3.keras).",
+    )
+    return parser.parse_args()
 
-latest_model_path = max(model_files, key=os.path.getmtime)
-print(f"Using latest model: {latest_model_path}")
+
+def resolve_model_path(model_dir: str, model_version: int) -> str:
+    candidates = [
+        os.path.join(model_dir, f"signalphaset_v{model_version}.keras"),
+        os.path.join(model_dir, f"signalphaset_v{model_version}.keras"),
+    ]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+
+    available = sorted(glob.glob(os.path.join(model_dir, "*v*.keras")))
+    available_names = [os.path.basename(path) for path in available]
+    raise FileNotFoundError(
+        f"Could not find model for version v{model_version} in {model_dir}. "
+        f"Available: {available_names}"
+    )
+
+# =========================
+# SELECT MODEL VERSION
+# =========================
+args = parse_args()
+selected_model_path = resolve_model_path(MODEL_DIR, args.model_version)
+print(f"Using specified model version v{args.model_version}: {selected_model_path}")
 
 # =========================
 # CREATE ANALYSIS FOLDER
@@ -38,7 +63,7 @@ os.makedirs(analysis_dir, exist_ok=True)
 # =========================
 # LOAD MODEL
 # =========================
-model = tf.keras.models.load_model(latest_model_path)
+model = tf.keras.models.load_model(selected_model_path)
 
 
 def adapt_features_for_model(x_data, keras_model):
@@ -207,7 +232,7 @@ with open(summary_path, "w") as f:
     f.write("MODEL ANALYSIS SUMMARY\n")
     f.write("="*40 + "\n\n")
 
-    f.write(f"Model used: {latest_model_path}\n")
+    f.write(f"Model used: {selected_model_path}\n")
     f.write(f"Test samples: {len(X_test)}\n\n")
 
     f.write("BASIC METRICS\n")
