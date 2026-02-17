@@ -347,6 +347,34 @@ div:has(> button) {
     color: var(--text-primary);
 }
 
+.rec-container {
+    position: relative;
+}
+
+.ref-overlay {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 170px;
+    background: rgba(255, 255, 255, 0.82);
+    border-radius: 10px;
+    padding: 8px;
+    z-index: 5;
+}
+
+.ref-overlay #letter-text {
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.ref-overlay img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    display: block;
+}
+
 /* Hidden elements */
 #canvas {
     display: none;

@@ -30,10 +30,7 @@ def parse_args():
 
 
 def resolve_model_path(models_dir: Path, model_version: int) -> Path:
-	candidates = [
-		models_dir / f"signalphaset_v{model_version}.keras",
-		models_dir / f"signalphaset_v{model_version}.keras",
-	]
+	candidates = [models_dir / f"signalphaset_v{model_version}.keras"]
 	for candidate in candidates:
 		if candidate.exists():
 			return candidate

@@ -2,6 +2,9 @@ import os
 import json
 import base64
 import re
+import time
+import threading
+import string
 import numpy as np
 import cv2
 
@@ -21,6 +24,7 @@ app = Flask(__name__)
 # -------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, '..', 'models')
+CAPTURED_DIR = os.path.join(BASE_DIR, 'pic', 'captured')
 
 # Path to the raw dataset to get class names
 DATASET_DIR = os.path.join(BASE_DIR, '..', 'data', 'SignAlphaSet', 'SignAlphaSet') 
@@ -36,6 +40,184 @@ logging.info(f"Models Dir: {MODELS_DIR}")
 NUM_LANDMARKS = 21
 COORD_DIMS = 3
 BASE_KEYPOINT_FEATURES = NUM_LANDMARKS * COORD_DIMS
+REC_LETTERS = list(string.ascii_uppercase)
+
+rec_state_lock = threading.Lock()
+rec_session = None
+
+
+def _status_text_for_phase(phase):
+    mapping = {
+        "waiting": "Warte",
+        "countdown": "Warte",
+        "capturing": "Aufnahme läuft",
+        "pause": "Pause",
+        "done": "Fertig",
+        "stopped": "Gestoppt",
+        "error": "Fehler",
+    }
+    return mapping.get(phase, "Warte")
+
+
+def _build_rec_state_payload(session):
+    now = time.time()
+    seconds_remaining = 0.0
+    if session.get("next_phase_at"):
+        seconds_remaining = max(0.0, float(session["next_phase_at"]) - now)
+
+    current_letter = None
+    if 0 <= session["current_letter_index"] < len(session["letters"]):
+        current_letter = session["letters"][session["current_letter_index"]]
+
+    return {
+        "phase": session["phase"],
+        "status_text": _status_text_for_phase(session["phase"]),
+        "current_letter": current_letter,
+        "current_letter_index": session["current_letter_index"],
+        "letters_total": len(session["letters"]),
+        "current_progress": session["accepted_count_current"],
+        "target_count": session["target_count"],
+        "seconds_remaining": round(seconds_remaining, 2),
+        "fps": session["fps"],
+        "similarity_threshold": session["similarity_threshold"],
+        "summary": session["summary"],
+        "total_saved": session["total_saved"],
+        "zip_available": False,
+        "dataset_path": CAPTURED_DIR,
+    }
+
+
+def _ensure_capture_dirs():
+    os.makedirs(CAPTURED_DIR, exist_ok=True)
+    for letter in REC_LETTERS:
+        os.makedirs(os.path.join(CAPTURED_DIR, letter), exist_ok=True)
+
+
+def _list_existing_image_paths(letter):
+    letter_dir = os.path.join(CAPTURED_DIR, letter)
+    if not os.path.isdir(letter_dir):
+        return []
+
+    paths = []
+    for file_name in os.listdir(letter_dir):
+        lower = file_name.lower()
+        if not (lower.endswith('.png') or lower.endswith('.jpg') or lower.endswith('.jpeg')):
+            continue
+        if not file_name.startswith(f"{letter}_"):
+            continue
+        paths.append(os.path.join(letter_dir, file_name))
+
+    paths.sort()
+    return paths
+
+
+def _load_existing_vectors_for_letter(letter):
+    vectors = []
+    for image_path in _list_existing_image_paths(letter):
+        image = cv2.imread(image_path)
+        if image is None:
+            continue
+
+        keypoints, error, _ = extract_keypoints(image)
+        if error:
+            continue
+
+        centered_keypoints = center_keypoints(keypoints)
+        normalized_keypoints, _ = normalize_keypoints(centered_keypoints)
+        vectors.append(normalized_keypoints.reshape(-1).astype(np.float32))
+
+    return vectors
+
+
+def _find_first_incomplete_index(summary, target_count):
+    for index, letter in enumerate(REC_LETTERS):
+        if int(summary.get(letter, 0)) < int(target_count):
+            return index
+    return len(REC_LETTERS)
+
+
+def _activate_current_letter(session):
+    if session["current_letter_index"] >= len(session["letters"]):
+        session["phase"] = "done"
+        session["next_phase_at"] = None
+        session["accepted_vectors_current"] = []
+        session["accepted_count_current"] = 0
+        return
+
+    current_letter = session["letters"][session["current_letter_index"]]
+    existing_count = int(session["summary"].get(current_letter, 0))
+
+    session["accepted_count_current"] = existing_count
+
+    if existing_count >= session["target_count"]:
+        next_index = _find_first_incomplete_index(session["summary"], session["target_count"])
+        session["current_letter_index"] = next_index
+        _activate_current_letter(session)
+        return
+
+    session["accepted_vectors_current"] = _load_existing_vectors_for_letter(current_letter)
+    session["phase"] = "countdown"
+    session["next_phase_at"] = time.time() + session["countdown_seconds"]
+
+
+def _new_rec_session(fps, similarity_threshold, target_count):
+    _ensure_capture_dirs()
+    existing_summary = {}
+    for letter in REC_LETTERS:
+        existing_summary[letter] = len(_list_existing_image_paths(letter))
+
+    first_incomplete_index = _find_first_incomplete_index(existing_summary, target_count)
+
+    session = {
+        "phase": "countdown",
+        "letters": REC_LETTERS,
+        "current_letter_index": first_incomplete_index,
+        "accepted_vectors_current": [],
+        "accepted_count_current": 0,
+        "summary": existing_summary,
+        "total_saved": int(sum(existing_summary.values())),
+        "fps": int(fps),
+        "similarity_threshold": float(similarity_threshold),
+        "target_count": int(target_count),
+        "countdown_seconds": 10,
+        "pause_seconds": 5,
+        "next_phase_at": None,
+        "started_at": time.time(),
+    }
+
+    _activate_current_letter(session)
+    return session
+
+
+def _update_rec_phase(session):
+    now = time.time()
+
+    if session["phase"] == "countdown" and now >= session["next_phase_at"]:
+        session["phase"] = "capturing"
+        session["next_phase_at"] = None
+
+    if session["phase"] == "pause" and now >= session["next_phase_at"]:
+        next_index = session["current_letter_index"] + 1
+        session["current_letter_index"] = next_index
+        _activate_current_letter(session)
+
+
+def _next_image_path(letter):
+    letter_dir = os.path.join(CAPTURED_DIR, letter)
+    existing_files = [
+        file_name for file_name in os.listdir(letter_dir)
+        if file_name.startswith(f"{letter}_") and file_name.lower().endswith(".png")
+    ]
+    next_index = len(existing_files) + 1
+    return os.path.join(letter_dir, f"{letter}_{next_index:03d}.png")
+
+
+def _compute_similarity_distance(flattened_vector, vectors):
+    if not vectors:
+        return None
+    candidates = np.asarray(vectors, dtype=np.float32)
+    distances = np.linalg.norm(candidates - flattened_vector.reshape(1, -1), axis=1)
+    return float(np.min(distances))
 
 
 def discover_model_versions(models_dir):
@@ -284,6 +466,161 @@ def home():
         default_model_version=DEFAULT_MODEL_VERSION,
     )
 
+
+@app.route('/rec_data')
+def rec_data_page():
+    return render_template('rec_data.html')
+
+
+@app.route('/rec_data/start', methods=['POST'])
+def rec_data_start():
+    global rec_session
+
+    payload = request.json or {}
+    fps = payload.get('fps', 30)
+    similarity_threshold = payload.get('similarity_threshold', 0.12)
+    target_count = payload.get('target_count', 100)
+
+    try:
+        fps = int(fps)
+        similarity_threshold = float(similarity_threshold)
+        target_count = int(target_count)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid config values'}), 400
+
+    if fps <= 0 or target_count <= 0 or similarity_threshold < 0:
+        return jsonify({'error': 'fps/target_count must be > 0 and threshold >= 0'}), 400
+
+    with rec_state_lock:
+        rec_session = _new_rec_session(fps, similarity_threshold, target_count)
+        state = _build_rec_state_payload(rec_session)
+
+    return jsonify({'ok': True, 'state': state})
+
+
+@app.route('/rec_data/stop', methods=['POST'])
+def rec_data_stop():
+    global rec_session
+
+    with rec_state_lock:
+        if rec_session is None:
+            return jsonify({'ok': True, 'state': None})
+        rec_session['phase'] = 'stopped'
+        rec_session['next_phase_at'] = None
+        state = _build_rec_state_payload(rec_session)
+
+    return jsonify({'ok': True, 'state': state})
+
+
+@app.route('/rec_data/state', methods=['GET'])
+def rec_data_state():
+    with rec_state_lock:
+        if rec_session is None:
+            return jsonify({'ok': True, 'state': None})
+        _update_rec_phase(rec_session)
+        state = _build_rec_state_payload(rec_session)
+    return jsonify({'ok': True, 'state': state})
+
+
+@app.route('/rec_data/frame', methods=['POST'])
+def rec_data_frame():
+    global rec_session
+
+    data = request.json or {}
+    if 'image' not in data:
+        return jsonify({'error': 'No image received'}), 400
+
+    with rec_state_lock:
+        if rec_session is None:
+            return jsonify({'error': 'No active session'}), 400
+
+        _update_rec_phase(rec_session)
+        if rec_session['phase'] != 'capturing':
+            return jsonify({
+                'accepted': False,
+                'reason': f"phase_{rec_session['phase']}",
+                'state': _build_rec_state_payload(rec_session)
+            })
+
+        current_letter = rec_session['letters'][rec_session['current_letter_index']]
+        threshold = rec_session['similarity_threshold']
+
+    try:
+        image_data = data['image'].split(',')[1]
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if image is None:
+            return jsonify({'accepted': False, 'reason': 'decode_failed'}), 400
+
+        keypoints, error, _ = extract_keypoints(image)
+        if error:
+            with rec_state_lock:
+                state = _build_rec_state_payload(rec_session)
+            return jsonify({'accepted': False, 'reason': 'no_hand', 'state': state})
+
+        centered_keypoints = center_keypoints(keypoints)
+        normalized_keypoints, _ = normalize_keypoints(centered_keypoints)
+        flattened_vector = normalized_keypoints.reshape(-1).astype(np.float32)
+
+        with rec_state_lock:
+            min_distance = _compute_similarity_distance(
+                flattened_vector,
+                rec_session['accepted_vectors_current']
+            )
+            if min_distance is not None and min_distance < threshold:
+                state = _build_rec_state_payload(rec_session)
+                return jsonify({
+                    'accepted': False,
+                    'reason': 'too_similar',
+                    'min_distance': min_distance,
+                    'state': state,
+                })
+
+            image_path = _next_image_path(current_letter)
+            saved = cv2.imwrite(image_path, image)
+            if not saved:
+                state = _build_rec_state_payload(rec_session)
+                return jsonify({'accepted': False, 'reason': 'save_failed', 'state': state}), 500
+
+            rec_session['accepted_vectors_current'].append(flattened_vector)
+            rec_session['accepted_count_current'] += 1
+            rec_session['summary'][current_letter] += 1
+            rec_session['total_saved'] += 1
+
+            if rec_session['accepted_count_current'] >= rec_session['target_count']:
+                rec_session['phase'] = 'pause'
+                rec_session['next_phase_at'] = time.time() + rec_session['pause_seconds']
+
+            state = _build_rec_state_payload(rec_session)
+
+        return jsonify({
+            'accepted': True,
+            'reason': 'saved',
+            'min_distance': min_distance,
+            'state': state,
+        })
+
+    except Exception as e:
+        logging.error(f"rec_data frame error: {e}")
+        with rec_state_lock:
+            state = _build_rec_state_payload(rec_session) if rec_session is not None else None
+        return jsonify({'accepted': False, 'reason': 'server_error', 'error': str(e), 'state': state}), 500
+
+
+@app.route('/rec_data/summary', methods=['GET'])
+def rec_data_summary():
+    with rec_state_lock:
+        if rec_session is None:
+            return jsonify({'ok': True, 'summary': None})
+        summary = {
+            'per_letter': rec_session['summary'],
+            'total_saved': rec_session['total_saved'],
+            'dataset_path': CAPTURED_DIR,
+            'zip_available': False,
+        }
+    return jsonify({'ok': True, 'summary': summary})
+
 @app.route('/dataset_img/<label>')
 def dataset_img(label):
     # Check for png first, then jpg
@@ -292,8 +629,6 @@ def dataset_img(label):
         if os.path.exists(os.path.join(PICTURES_DIR, filename)):
              return send_from_directory(PICTURES_DIR, filename)
     return "", 404
-
-import time
 
 @app.route('/predict', methods=['POST'])
 def predict():

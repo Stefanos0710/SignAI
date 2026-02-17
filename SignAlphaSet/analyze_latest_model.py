@@ -31,10 +31,7 @@ def parse_args():
 
 
 def resolve_model_path(model_dir: str, model_version: int) -> str:
-    candidates = [
-        os.path.join(model_dir, f"signalphaset_v{model_version}.keras"),
-        os.path.join(model_dir, f"signalphaset_v{model_version}.keras"),
-    ]
+    candidates = [os.path.join(model_dir, f"signalphaset_v{model_version}.keras")]
     for candidate in candidates:
         if os.path.exists(candidate):
             return candidate

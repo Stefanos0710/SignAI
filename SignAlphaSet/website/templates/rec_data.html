@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SignAI Dataset Recorder</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>ASL Dataset Recorder (A-Z)</h1>
+
+    <div class="controls">
+        <label for="fps">FPS</label>
+        <input id="fps" type="number" min="1" max="60" value="30">
+
+        <label for="threshold">Similarity Threshold</label>
+        <input id="threshold" type="number" min="0" step="0.001" value="0.12">
+
+        <label for="target-count">Target / Letter</label>
+        <input id="target-count" type="number" min="1" value="100">
+
+        <button id="start-btn">Start</button>
+        <button id="stop-btn">Stop</button>
+    </div>
+
+    <div id="container" class="rec-container">
+        <video id="video" width="640" height="480" autoplay playsinline></video>
+
+        <div id="ref-overlay" class="ref-overlay">
+            <div id="letter-text">Zeige Buchstaben: -</div>
+            <img id="ref-image" alt="Reference">
+        </div>
+
+        <div id="overlay">
+            <div id="result">Warte</div>
+            <div id="confidence"></div>
+        </div>
+    </div>
+
+    <div id="rec-info" class="debug-card full-width" style="max-width: 760px; margin: 14px auto;">
+        <h4>Recorder Status</h4>
+        <ul class="stats-list" id="rec-stats">
+            <li>Status: <span id="status-text">Warte</span></li>
+            <li>Aktueller Buchstabe: <span id="current-letter">-</span></li>
+            <li>Fortschritt: <span id="current-progress">0/0</span></li>
+            <li>Timer: <span id="timer">0.0s</span></li>
+            <li>Gesamt: <span id="total-count">0</span></li>
+        </ul>
+    </div>
+
+    <div id="summary" class="debug-card full-width" style="max-width: 760px; margin: 14px auto; display:none;">
+        <h4>Zusammenfassung</h4>
+        <div id="summary-content"></div>
+    </div>
+
+    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+
+    <script src="{{ url_for('static', filename='rec_data.js') }}"></script>
+</body>
+</html>
