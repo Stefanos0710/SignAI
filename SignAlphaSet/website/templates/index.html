@@ -2,26 +2,29 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SignAI Live Prediction</title>
+    <title data-i18n-title="pageTitle">SignAI Live Demo</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
     <div class="fullscreen-header">
-        <h1>SignAI Live Classifier</h1>
-        <button id="settings-toggle" class="settings-toggle-btn" onclick="toggleSettings()" title="Settings">
+        <h1 data-i18n="pageTitle">SignAI Live Demo</h1>
+        <button id="lang-toggle" class="settings-toggle-btn" onclick="toggleLanguage()" data-i18n-title="languageTitle" title="Language">
+            <span class="lang-label">EN</span>
+        </button>
+        <button id="settings-toggle" class="settings-toggle-btn" onclick="toggleSettings()" data-i18n-title="settingsTitle" title="Settings">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
-        <button id="dictionary-toggle" class="settings-toggle-btn" onclick="toggleDictionaryOverlay()" title="Sign Dictionary">
+        <button id="dictionary-toggle" class="settings-toggle-btn" onclick="toggleDictionaryOverlay()" data-i18n-title="dictionaryTitle" title="Sign Dictionary">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         </button>
     </div>
 
     <div class="controls" id="controls-panel">
-        <button onclick="startCamera()">Start Camera</button>
-        <button onclick="stopCamera()">Stop Camera</button>
-        <button id="fullscreen-btn" onclick="toggleFullscreen()">Fullscreen</button>
-        <label for="model-version">Model Version:</label>
+        <button data-i18n="startCamera" onclick="startCamera()">Start Camera</button>
+        <button data-i18n="stopCamera" onclick="stopCamera()">Stop Camera</button>
+        <button id="fullscreen-btn" data-i18n="fullscreen" onclick="toggleFullscreen()">Fullscreen</button>
+        <label for="model-version" data-i18n="modelVersion">Model Version:</label>
         <select id="model-version">
             {% for version in model_versions %}
             <option value="{{ version }}" {% if version == default_model_version %}selected{% endif %}>v{{ version }}</option>
@@ -30,7 +33,7 @@
         <label class="toggle-switch">
             <input type="checkbox" id="debug-toggle" onchange="toggleDebug()">
             <span class="slider"></span>
-            Debug Mode
+            <span data-i18n="debugMode">Debug Mode</span>
         </label>
     </div>
 
@@ -41,14 +44,14 @@
             <canvas id="landmarks" width="1920" height="1080" style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
             
             <div id="overlay">
-                <div id="result">Waiting...</div>
+                <div id="result" data-i18n="waiting">Waiting...</div>
                 <div id="confidence"></div>
             </div>
         </div>
 
         <!-- Debug Area -->
         <div id="debug-panel" style="display:none;">
-            <h3>Debug Center</h3>
+            <h3 data-i18n="debugCenter">Debug Center</h3>
 
             <div class="debug-summary">
                 <div class="summary-chip">
@@ -56,15 +59,15 @@
                     <strong id="dbg-fps">-</strong>
                 </div>
                 <div class="summary-chip">
-                    <span>Roundtrip</span>
+                    <span data-i18n="roundtrip">Roundtrip</span>
                     <strong id="dbg-roundtrip">-</strong>
                 </div>
                 <div class="summary-chip">
-                    <span>Frames</span>
+                    <span data-i18n="frames">Frames</span>
                     <strong id="dbg-frame-count">0</strong>
                 </div>
                 <div class="summary-chip">
-                    <span>Last Update</span>
+                    <span data-i18n="lastUpdate">Last Update</span>
                     <strong id="dbg-last-update">-</strong>
                 </div>
             </div>
@@ -73,13 +76,13 @@
                 <!-- Visuals -->
                 <div class="debug-col">
                     <div class="debug-card">
-                        <h4>Hand Cutout</h4>
-                        <img id="hand-cutout" alt="No Hand">
+                        <h4 data-i18n="handCutout">Hand Cutout</h4>
+                        <img id="hand-cutout" data-i18n-alt="noHand" alt="No Hand">
                     </div>
                     <div class="debug-card">
-                        <h4>Camera / Stream</h4>
+                        <h4 data-i18n="cameraStream">Camera / Stream</h4>
                         <ul id="camera-stats" class="stats-list">
-                            <li>Waiting for camera...</li>
+                            <li data-i18n="waitingCamera">Waiting for camera...</li>
                         </ul>
                     </div>
                 </div>
@@ -87,13 +90,13 @@
                 <!-- Stats -->
                 <div class="debug-col">
                      <div class="debug-card">
-                        <h4>Performance</h4>
+                        <h4 data-i18n="performance">Performance</h4>
                         <ul id="timing-stats" class="stats-list">
-                            <li>Waiting for data...</li>
+                            <li data-i18n="waitingData">Waiting for data...</li>
                         </ul>
                     </div>
                     <div class="debug-card">
-                        <h4>System</h4>
+                        <h4 data-i18n="system">System</h4>
                         <ul id="system-stats" class="stats-list">
                             <li>-</li>
                         </ul>
@@ -102,13 +105,13 @@
 
                 <div class="debug-col">
                     <div class="debug-card">
-                        <h4>Prediction</h4>
+                        <h4 data-i18n="prediction">Prediction</h4>
                         <ul id="prediction-stats" class="stats-list">
                             <li>-</li>
                         </ul>
                     </div>
                     <div class="debug-card">
-                        <h4>Hand Meta</h4>
+                        <h4 data-i18n="handMeta">Hand Meta</h4>
                         <ul id="meta-stats" class="stats-list">
                             <li>-</li>
                         </ul>
@@ -117,25 +120,25 @@
             </div>
 
             <div class="debug-card full-width">
-                <h4>Top 5 Predictions</h4>
+                <h4 data-i18n="top5Predictions">Top 5 Predictions</h4>
                 <div id="top5-list"></div>
             </div>
 
             <div class="debug-card full-width">
-                <h4>Raw Response (Live)</h4>
-                <pre id="debug-json">Waiting for debug data...</pre>
+                <h4 data-i18n="rawResponse">Raw Response (Live)</h4>
+                <pre id="debug-json" data-i18n="waitingDebugData">Waiting for debug data...</pre>
             </div>
         </div>
     </div>
     
-    <div id="status">Ready</div>
+    <div id="status" data-i18n="ready">Ready</div>
 
     <!-- Hidden canvas to capture frames -->
     <canvas id="canvas" width="1920" height="1080" style="display:none;"></canvas>
 
     <!-- Sign Dictionary Section -->
     <div id="dictionary-section">
-        <h2>Sign Language Dictionary</h2>
+        <h2 data-i18n="dictTitle">Sign Language Dictionary</h2>
         <div class="dictionary-grid">
             {% for label in labels %}
             <div class="sign-card">
@@ -153,8 +156,8 @@
         <div class="dict-overlay-backdrop" onclick="toggleDictionaryOverlay()"></div>
         <div class="dict-overlay-content">
             <div class="dict-overlay-header">
-                <h2>Sign Language Dictionary</h2>
-                <button class="dict-close-btn" onclick="toggleDictionaryOverlay()" title="Close">
+                <h2 data-i18n="dictTitle">Sign Language Dictionary</h2>
+                <button class="dict-close-btn" onclick="toggleDictionaryOverlay()" data-i18n-title="closeTitle" title="Close">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>

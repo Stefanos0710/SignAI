@@ -56,7 +56,8 @@ h1 {
 
 /* Settings toggle button - hidden by default, shown in fullscreen */
 #settings-toggle,
-#dictionary-toggle {
+#dictionary-toggle,
+#lang-toggle {
     display: none;
 }
 
@@ -775,6 +776,23 @@ body.fullscreen-mode #dictionary-toggle {
     top: 1.2rem;
     right: 5.5rem;
     z-index: 200;
+}
+
+body.fullscreen-mode #lang-toggle {
+    display: inline-flex;
+    position: fixed;
+    top: 1.2rem;
+    right: 9.5rem;
+    z-index: 200;
+}
+
+/* Language button label */
+.lang-label {
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    pointer-events: none;
 }
 
 body.fullscreen-mode .app-layout {

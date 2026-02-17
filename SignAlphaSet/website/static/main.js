@@ -110,6 +110,11 @@ function estimateKbFromDataUrl(dataURL) {
     return Math.round((base64.length * 3) / 4 / 1024);
 }
 
+function localizePredictionLabel(label) {
+    if (!label) return label;
+    return label === 'No Hand' ? t('noHand') : label;
+}
+
 function updateDebugSummary(roundtripMs) {
     const now = performance.now();
     if (lastFrameTs !== null) {
@@ -140,31 +145,32 @@ function renderDebugData(data, contextInfo) {
 
     if (cameraStats) {
         cameraStats.innerHTML = `
-            <li>State: <span>${stream ? 'active' : 'inactive'}</span></li>
-            <li>Resolution: <span>${video.videoWidth || 0}x${video.videoHeight || 0}</span></li>
-            <li>JPEG Quality: <span>${Math.round(contextInfo.quality * 100)}%</span></li>
-            <li>Payload Size: <span>${contextInfo.payloadKb} KB</span></li>
-            <li>Landmarks: <span>${landmarks.length}</span></li>
+            <li>${t('state')}: <span>${stream ? t('active') : t('inactive')}</span></li>
+            <li>${t('resolution')}: <span>${video.videoWidth || 0}x${video.videoHeight || 0}</span></li>
+            <li>${t('jpegQuality')}: <span>${Math.round(contextInfo.quality * 100)}%</span></li>
+            <li>${t('payloadSize')}: <span>${contextInfo.payloadKb} KB</span></li>
+            <li>${t('landmarks')}: <span>${landmarks.length}</span></li>
         `;
     }
 
     if (systemStats) {
         systemStats.innerHTML = `
-            <li>Loop Delay: <span>${debugMode ? '60ms' : '30ms'}</span></li>
-            <li>Canvas: <span>${canvas.width}x${canvas.height}</span></li>
-            <li>Processing: <span>${isProcessing ? 'busy' : 'idle'}</span></li>
-            <li>Model Selected: <span>v${modelVersionSelect ? modelVersionSelect.value : '-'}</span></li>
-            <li>Model Active: <span>v${data.model_version ?? '-'}</span></li>
+            <li>${t('loopDelay')}: <span>${debugMode ? '60ms' : '30ms'}</span></li>
+            <li>${t('canvas')}: <span>${canvas.width}x${canvas.height}</span></li>
+            <li>${t('processing')}: <span>${isProcessing ? t('busy') : t('idle')}</span></li>
+            <li>${t('modelSelected')}: <span>v${modelVersionSelect ? modelVersionSelect.value : '-'}</span></li>
+            <li>${t('modelActive')}: <span>v${data.model_version ?? '-'}</span></li>
         `;
     }
 
     if (predictionStats) {
+        const localizedPrediction = localizePredictionLabel(data.prediction ?? '-');
         predictionStats.innerHTML = `
-            <li>Prediction: <span>${data.prediction ?? '-'}</span></li>
-            <li>Confidence: <span>${confPercent !== null ? `${confPercent}%` : '-'}</span></li>
-            <li>Top1/Top2 Gap: <span>${topGap !== null ? `${topGap}%` : '-'}</span></li>
-            <li>Request RTT: <span>${formatMs(contextInfo.roundtripMs)}</span></li>
-            <li>Status: <span>${data.error ? 'error' : 'ok'}</span></li>
+            <li>${t('prediction')}: <span>${localizedPrediction}</span></li>
+            <li>${t('confidence')}: <span>${confPercent !== null ? `${confPercent}%` : '-'}</span></li>
+            <li>${t('top1Top2Gap')}: <span>${topGap !== null ? `${topGap}%` : '-'}</span></li>
+            <li>${t('requestRtt')}: <span>${formatMs(contextInfo.roundtripMs)}</span></li>
+            <li>${t('status')}: <span>${data.error ? t('error') : t('ok')}</span></li>
         `;
     }
 
@@ -193,7 +199,7 @@ async function startCamera() {
             } 
         });
         video.srcObject = stream;
-        statusDiv.innerText = "Camera active. Starting predictions...";
+        statusDiv.innerText = t('cameraActive');
         
         // Wait for video to be ready
         video.onloadedmetadata = () => {
@@ -210,7 +216,7 @@ async function startCamera() {
         };
     } catch (err) {
         console.error("Error accessing camera: ", err);
-        statusDiv.innerText = "Error: Could not access camera. Please allow permissions.";
+        statusDiv.innerText = t('cameraError');
         setCameraUIActive(false);
     }
 }
@@ -227,7 +233,7 @@ function stopCamera() {
     }
     resultDiv.innerText = "";
     confDiv.innerText = "";
-    statusDiv.innerText = "Camera stopped.";
+    statusDiv.innerText = t('cameraStopped');
     setCameraUIActive(false);
     if (landmarksCtx && landmarksCanvas) {
         landmarksCtx.clearRect(0, 0, landmarksCanvas.width, landmarksCanvas.height);
@@ -322,16 +328,16 @@ function processFrame() {
 
         if (data.error) {
             console.error(data.error);
-            if (statusDiv) statusDiv.innerText = `Error: ${data.error}`;
+            if (statusDiv) statusDiv.innerText = `${t('error')}: ${data.error}`;
         } else {
-            resultDiv.innerText = data.prediction;
+            resultDiv.innerText = localizePredictionLabel(data.prediction);
             setCameraUIActive(true);
             if (statusDiv && data.model_version !== undefined) {
-                statusDiv.innerText = `Using model v${data.model_version}`;
+                statusDiv.innerText = `${t('usingModel')} v${data.model_version}`;
             }
             // Color code confidence
             const confPercent = Math.round(data.confidence * 100);
-            confDiv.innerText = `Confidence: ${confPercent}%`;
+            confDiv.innerText = `${t('confidence')}: ${confPercent}%`;
             
             if (confPercent > 80) resultDiv.style.color = "#4CAF50"; // Green
             else if (confPercent > 50) resultDiv.style.color = "#FFC107"; // Yellow
@@ -352,18 +358,18 @@ function processFrame() {
                 // 4. Timing
                 if (data.timing && timingStats) {
                     timingStats.innerHTML = `
-                        <li>Inference: <span>${data.timing.inference}</span></li>
-                        <li>Preprocess: <span>${data.timing.preprocess}</span></li>
-                        <li>Total: <span>${data.timing.total}</span></li>
+                        <li>${t('inference')}: <span>${data.timing.inference}</span></li>
+                        <li>${t('preprocess')}: <span>${data.timing.preprocess}</span></li>
+                        <li>${t('total')}: <span>${data.timing.total}</span></li>
                     `;
                 }
                 
                 // 5. Hand Metadata
                 if (data.meta && metaStats) {
                     metaStats.innerHTML = `
-                        <li>Hand: <span>${data.meta.handedness}</span></li>
-                        <li>Scale: <span>${data.meta.scale}</span></li>
-                        <li>Shape: <span>${data.meta.input_shape}</span></li>
+                        <li>${t('hand')}: <span>${data.meta.handedness}</span></li>
+                        <li>${t('scale')}: <span>${data.meta.scale}</span></li>
+                        <li>${t('shape')}: <span>${data.meta.input_shape}</span></li>
                     `;
                 }
 
@@ -419,7 +425,7 @@ function enterFullscreenMode() {
     if (debugMode) {
         document.body.classList.add('debug-open');
     }
-    if (fullscreenBtn) fullscreenBtn.textContent = 'Exit Fullscreen';
+    if (fullscreenBtn) fullscreenBtn.textContent = t('exitFullscreen');
     // Collapse settings by default in fullscreen
     const controlsPanel = document.getElementById('controls-panel');
     const settingsBtn = document.getElementById('settings-toggle');
@@ -430,7 +436,7 @@ function enterFullscreenMode() {
 function exitFullscreenMode() {
     isFullscreen = false;
     document.body.classList.remove('fullscreen-mode', 'debug-open');
-    if (fullscreenBtn) fullscreenBtn.textContent = 'Fullscreen';
+    if (fullscreenBtn) fullscreenBtn.textContent = t('fullscreen');
     // Always show settings when leaving fullscreen
     const controlsPanel = document.getElementById('controls-panel');
     const settingsBtn = document.getElementById('settings-toggle');
@@ -475,3 +481,180 @@ function toggleDictionaryOverlay() {
     overlay.classList.toggle('visible');
     if (dictBtn) dictBtn.classList.toggle('active');
 }
+
+// ===== LANGUAGE SYSTEM =====
+let currentLang = 'en';
+
+const translations = {
+    en: {
+        pageTitle: 'SignAI Live Demo',
+        startCamera: 'Start Camera',
+        stopCamera: 'Stop Camera',
+        fullscreen: 'Fullscreen',
+        exitFullscreen: 'Exit Fullscreen',
+        languageTitle: 'Language',
+        settingsTitle: 'Settings',
+        dictionaryTitle: 'Sign Dictionary',
+        closeTitle: 'Close',
+        modelVersion: 'Model Version:',
+        debugMode: 'Debug Mode',
+        waiting: 'Waiting...',
+        ready: 'Ready',
+        dictTitle: 'Sign Language Dictionary',
+        debugCenter: 'Debug Center',
+        roundtrip: 'Roundtrip',
+        frames: 'Frames',
+        lastUpdate: 'Last Update',
+        handCutout: 'Hand Cutout',
+        cameraStream: 'Camera / Stream',
+        waitingCamera: 'Waiting for camera...',
+        performance: 'Performance',
+        waitingData: 'Waiting for data...',
+        system: 'System',
+        prediction: 'Prediction',
+        handMeta: 'Hand Meta',
+        top5Predictions: 'Top 5 Predictions',
+        rawResponse: 'Raw Response (Live)',
+        waitingDebugData: 'Waiting for debug data...',
+        noHand: 'No Hand',
+        cameraActive: 'Camera active. Starting predictions...',
+        cameraError: 'Error: Could not access camera. Please allow permissions.',
+        cameraStopped: 'Camera stopped.',
+        usingModel: 'Using model',
+        confidence: 'Confidence',
+        state: 'State',
+        active: 'active',
+        inactive: 'inactive',
+        resolution: 'Resolution',
+        jpegQuality: 'JPEG Quality',
+        payloadSize: 'Payload Size',
+        landmarks: 'Landmarks',
+        loopDelay: 'Loop Delay',
+        canvas: 'Canvas',
+        processing: 'Processing',
+        busy: 'busy',
+        idle: 'idle',
+        modelSelected: 'Model Selected',
+        modelActive: 'Model Active',
+        top1Top2Gap: 'Top1/Top2 Gap',
+        requestRtt: 'Request RTT',
+        status: 'Status',
+        error: 'Error',
+        ok: 'ok',
+        inference: 'Inference',
+        preprocess: 'Preprocess',
+        total: 'Total',
+        hand: 'Hand',
+        scale: 'Scale',
+        shape: 'Shape',
+    },
+    de: {
+        pageTitle: 'SignAI Live Demo',
+        startCamera: 'Kamera starten',
+        stopCamera: 'Kamera stoppen',
+        fullscreen: 'Vollbild',
+        exitFullscreen: 'Vollbild beenden',
+        languageTitle: 'Sprache',
+        settingsTitle: 'Einstellungen',
+        dictionaryTitle: 'Gebärdenwörterbuch',
+        closeTitle: 'Schließen',
+        modelVersion: 'Modellversion:',
+        debugMode: 'Debug-Modus',
+        waiting: 'Warten...',
+        ready: 'Bereit',
+        dictTitle: 'Gebärdensprache Wörterbuch',
+        debugCenter: 'Debug-Zentrum',
+        roundtrip: 'Roundtrip',
+        frames: 'Frames',
+        lastUpdate: 'Letztes Update',
+        handCutout: 'Handausschnitt',
+        cameraStream: 'Kamera / Stream',
+        waitingCamera: 'Warte auf Kamera...',
+        performance: 'Leistung',
+        waitingData: 'Warte auf Daten...',
+        system: 'System',
+        prediction: 'Vorhersage',
+        handMeta: 'Hand-Meta',
+        top5Predictions: 'Top-5 Vorhersagen',
+        rawResponse: 'Rohantwort (Live)',
+        waitingDebugData: 'Warte auf Debug-Daten...',
+        noHand: 'Keine Hand',
+        cameraActive: 'Kamera aktiv. Starte Vorhersagen...',
+        cameraError: 'Fehler: Kein Zugriff auf Kamera. Bitte Berechtigung erteilen.',
+        cameraStopped: 'Kamera gestoppt.',
+        usingModel: 'Modell aktiv',
+        confidence: 'Konfidenz',
+        state: 'Status',
+        active: 'aktiv',
+        inactive: 'inaktiv',
+        resolution: 'Auflösung',
+        jpegQuality: 'JPEG-Qualität',
+        payloadSize: 'Datenmenge',
+        landmarks: 'Landmarks',
+        loopDelay: 'Loop-Verzögerung',
+        canvas: 'Canvas',
+        processing: 'Verarbeitung',
+        busy: 'beschäftigt',
+        idle: 'idle',
+        modelSelected: 'Modell gewählt',
+        modelActive: 'Modell aktiv',
+        top1Top2Gap: 'Top1/Top2 Abstand',
+        requestRtt: 'Anfrage RTT',
+        status: 'Status',
+        error: 'Fehler',
+        ok: 'ok',
+        inference: 'Inference',
+        preprocess: 'Vorverarbeitung',
+        total: 'Gesamt',
+        hand: 'Hand',
+        scale: 'Skalierung',
+        shape: 'Form',
+    }
+};
+
+function t(key) {
+    return translations[currentLang][key] || translations['en'][key] || key;
+}
+
+function applyTranslations() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        const text = t(key);
+        if (!text) return;
+        if (el.id === 'result' && stream) return;
+        if (el.id === 'debug-json' && el.textContent && el.textContent.trim().startsWith('{')) return;
+        el.textContent = text;
+    });
+
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        const text = t(key);
+        if (text) el.setAttribute('title', text);
+    });
+
+    document.querySelectorAll('[data-i18n-alt]').forEach(el => {
+        const key = el.getAttribute('data-i18n-alt');
+        const text = t(key);
+        if (text) el.setAttribute('alt', text);
+    });
+
+    document.title = t('pageTitle');
+    document.documentElement.lang = currentLang;
+    // Update fullscreen button text
+    const fsBtn = document.getElementById('fullscreen-btn');
+    if (fsBtn) {
+        fsBtn.textContent = isFullscreen ? t('exitFullscreen') : t('fullscreen');
+    }
+    // Update lang button label
+    const langLabel = document.querySelector('.lang-label');
+    if (langLabel) langLabel.textContent = currentLang.toUpperCase();
+}
+
+function toggleLanguage() {
+    currentLang = currentLang === 'en' ? 'de' : 'en';
+    const langBtn = document.getElementById('lang-toggle');
+    if (langBtn) langBtn.classList.toggle('active', currentLang === 'de');
+    applyTranslations();
+}
+
+applyTranslations();
