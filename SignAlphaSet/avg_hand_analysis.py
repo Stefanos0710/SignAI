@@ -12,6 +12,74 @@ from tensorflow import keras
 
 
 DEFAULT_SPLITS = ("train", "val", "test")
+NUM_LANDMARKS = 21
+COORD_DIMS = 3
+BASE_KEYPOINT_FEATURES = NUM_LANDMARKS * COORD_DIMS
+
+
+def adapt_features_for_keypoint_pose(x: np.ndarray) -> np.ndarray:
+	"""Ensure samples are in `(N,21,3)` using keypoint features only.
+
+	Supports:
+	- `(N,21,3)` directly
+	- `(N,F)` with `F>=63` (e.g. 63 or 73), where only first 63 are keypoints
+	"""
+	x = np.asarray(x, dtype=np.float32)
+
+	if x.ndim == 3 and x.shape[1:] == (NUM_LANDMARKS, COORD_DIMS):
+		return x
+
+	if x.ndim == 2 and x.shape[1] >= BASE_KEYPOINT_FEATURES:
+		return x[:, :BASE_KEYPOINT_FEATURES].reshape(-1, NUM_LANDMARKS, COORD_DIMS)
+
+	raise ValueError(
+		f"Unexpected input shape {x.shape}. Expected (N,21,3) or (N,F) with F>=63."
+	)
+
+
+def adapt_features_for_model(x: np.ndarray, model) -> np.ndarray:
+	"""Adapt feature tensor to the loaded model input shape.
+
+	Handles both 3D models `(None,21,3)` and 2D models `(None,F)`.
+	"""
+	x = np.asarray(x, dtype=np.float32)
+	model_input_shape = model.input_shape
+
+	if isinstance(model_input_shape, list):
+		model_input_shape = model_input_shape[0]
+
+	if len(model_input_shape) == 3:
+		expected_steps = model_input_shape[1]
+		expected_dims = model_input_shape[2]
+		if expected_steps != NUM_LANDMARKS or expected_dims != COORD_DIMS:
+			raise ValueError(
+				f"Unsupported 3D model input shape: {model_input_shape}. "
+				f"Expected (None, {NUM_LANDMARKS}, {COORD_DIMS})."
+			)
+		return adapt_features_for_keypoint_pose(x)
+
+	if len(model_input_shape) == 2:
+		expected_features = model_input_shape[1]
+		if expected_features is None:
+			raise ValueError("Model expects dynamic feature size, cannot adapt safely.")
+
+		if x.ndim == 3 and x.shape[1:] == (NUM_LANDMARKS, COORD_DIMS):
+			x = x.reshape(x.shape[0], -1)
+		elif x.ndim != 2:
+			raise ValueError(
+				f"Cannot adapt test data with shape {x.shape} for model input {model_input_shape}."
+			)
+
+		current_features = x.shape[1]
+		if current_features == expected_features:
+			return x
+		if current_features > expected_features:
+			return x[:, :expected_features]
+
+		pad_width = expected_features - current_features
+		return np.pad(x, ((0, 0), (0, pad_width)), mode="constant")
+
+	raise ValueError(f"Unsupported model input rank for shape: {model_input_shape}")
 
 
 def load_processed_dataset(processed_dir: Path, splits: Iterable[str]) -> tuple[np.ndarray, np.ndarray]:
@@ -78,6 +146,9 @@ def compute_average_poses(x: np.ndarray, y: np.ndarray, num_classes: int) -> tup
 			- avg_poses: shape `(num_classes, 21, 3)` with class-wise mean landmarks.
 			- class_counts: shape `(num_classes,)` with sample count per class.
 	"""
+	# convert flattened feature vectors (63/73/...) to pure keypoint pose tensors
+	x = adapt_features_for_keypoint_pose(x)
+
 	# allocate output arrays for means and counts
 	avg_poses = np.zeros((num_classes, 21, 3), dtype=np.float32)
 	class_counts = np.zeros(num_classes, dtype=np.int64)
@@ -154,25 +225,26 @@ def write_average_positions_3d(avg_poses: np.ndarray, labels: list[str], output_
 	output_path.write_text("\n".join(lines), encoding="utf-8")
 
 def calc_error_rate_pairwise(model, x_test, y_test, class_labels):
-    """Calculate pairwise error rates between classes using the provided model and test data.
+	"""Calculate pairwise error rates between classes using the provided model and test data.
 
-    Returns a matrix where entry (i, j) is the fraction of samples of class i predicted as class j.
-    """
+	Returns a matrix where entry (i, j) is the fraction of samples of class i predicted as class j.
+	"""
 
-    # get model predictions
-    y_pred = model.predict(x_test).argmax(axis=1)
+	# adapt features to model input and get predictions
+	x_test = adapt_features_for_model(x_test, model)
+	y_pred = model.predict(x_test).argmax(axis=1)
 
-    # confusion matrix
-    conf_matrix = confusion_matrix(y_test, y_pred, labels=np.arange(len(class_labels)))
+	# confusion matrix
+	conf_matrix = confusion_matrix(y_test, y_pred, labels=np.arange(len(class_labels)))
 
-    # convert to pairwise error rates (row-normalized)
-    error_rates = np.zeros_like(conf_matrix, dtype=np.float32)
-    for i in range(len(class_labels)):
-        row_sum = conf_matrix[i].sum()
-        if row_sum > 0:
-            error_rates[i] = conf_matrix[i] / row_sum  # normalized probabilities
+	# convert to pairwise error rates (row-normalized)
+	error_rates = np.zeros_like(conf_matrix, dtype=np.float32)
+	for i in range(len(class_labels)):
+		row_sum = conf_matrix[i].sum()
+		if row_sum > 0:
+			error_rates[i] = conf_matrix[i] / row_sum  # normalized probabilities
 
-    return error_rates
+	return error_rates
 
 def plot_error_rate_heatmap(error_rates_matrix, class_labels, output_path):
 	"""Plot and save a heatmap of pairwise error rates between classes."""

@@ -7,6 +7,10 @@ import seaborn as sns
 from datetime import datetime
 from sklearn.metrics import confusion_matrix, classification_report
 
+NUM_LANDMARKS = 21
+COORD_DIMS = 3
+BASE_KEYPOINT_FEATURES = NUM_LANDMARKS * COORD_DIMS
+
 # =========================
 # CONFIG
 # =========================
@@ -36,12 +40,86 @@ os.makedirs(analysis_dir, exist_ok=True)
 # =========================
 model = tf.keras.models.load_model(latest_model_path)
 
+
+def adapt_features_for_model(x_data, keras_model):
+    x_data = np.asarray(x_data, dtype=np.float32)
+    model_input_shape = keras_model.input_shape
+
+    if isinstance(model_input_shape, list):
+        model_input_shape = model_input_shape[0]
+
+    if not isinstance(model_input_shape, tuple):
+        raise ValueError(f"Unsupported model input shape format: {model_input_shape}")
+
+    if len(model_input_shape) == 3:
+        expected_steps = model_input_shape[1]
+        expected_dims = model_input_shape[2]
+
+        if expected_steps != NUM_LANDMARKS or expected_dims != COORD_DIMS:
+            raise ValueError(
+                f"Unsupported 3D model input shape: {model_input_shape}. "
+                f"Expected (None, {NUM_LANDMARKS}, {COORD_DIMS})."
+            )
+
+        if x_data.ndim == 3 and x_data.shape[1:] == (NUM_LANDMARKS, COORD_DIMS):
+            print(f"Using 3D test data as-is: {x_data.shape}")
+            return x_data
+
+        if x_data.ndim == 2 and x_data.shape[1] >= BASE_KEYPOINT_FEATURES:
+            extra_feature_count = x_data.shape[1] - BASE_KEYPOINT_FEATURES
+            adapted = x_data[:, :BASE_KEYPOINT_FEATURES].reshape(-1, NUM_LANDMARKS, COORD_DIMS)
+            print(
+                f"Detected flattened test data with {x_data.shape[1]} features "
+                f"({BASE_KEYPOINT_FEATURES} keypoint + {extra_feature_count} extra). "
+                f"Using keypoint part for model input: {adapted.shape}"
+            )
+            return adapted
+
+        raise ValueError(
+            f"Cannot adapt test data with shape {x_data.shape} for model input {model_input_shape}."
+        )
+
+    if len(model_input_shape) == 2:
+        expected_features = model_input_shape[1]
+        if expected_features is None:
+            raise ValueError("Model expects dynamic feature size, cannot adapt safely.")
+
+        if x_data.ndim == 3 and x_data.shape[1:] == (NUM_LANDMARKS, COORD_DIMS):
+            x_data = x_data.reshape(x_data.shape[0], -1)
+            print(f"Flattened 3D test data to 2D features: {x_data.shape}")
+        elif x_data.ndim != 2:
+            raise ValueError(
+                f"Cannot adapt test data with shape {x_data.shape} for model input {model_input_shape}."
+            )
+
+        current_features = x_data.shape[1]
+        if current_features == expected_features:
+            print(f"Using 2D test data as-is: {x_data.shape}")
+            return x_data
+
+        if current_features > expected_features:
+            adapted = x_data[:, :expected_features]
+            print(
+                f"Trimmed test features from {current_features} to {expected_features}: {adapted.shape}"
+            )
+            return adapted
+
+        pad_width = expected_features - current_features
+        adapted = np.pad(x_data, ((0, 0), (0, pad_width)), mode="constant")
+        print(
+            f"Padded test features from {current_features} to {expected_features}: {adapted.shape}"
+        )
+        return adapted
+
+    raise ValueError(f"Unsupported model input rank for shape: {model_input_shape}")
+
 # =========================
 # LOAD TEST DATA
 # =========================
 data = np.load(TEST_DATA_PATH)
 X_test = data["X"]
 y_test = data["y"]
+X_test = adapt_features_for_model(X_test, model)
 
 # =========================
 # PREDICT
