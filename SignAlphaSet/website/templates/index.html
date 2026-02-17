@@ -12,6 +12,12 @@
     <div class="controls">
         <button onclick="startCamera()">Start Camera</button>
         <button onclick="stopCamera()">Stop Camera</button>
+        <label for="model-version">Model Version:</label>
+        <select id="model-version">
+            {% for version in model_versions %}
+            <option value="{{ version }}" {% if version == default_model_version %}selected{% endif %}>v{{ version }}</option>
+            {% endfor %}
+        </select>
         <label class="toggle-switch">
             <input type="checkbox" id="debug-toggle" onchange="toggleDebug()">
             <span class="slider"></span>

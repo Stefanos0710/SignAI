@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import re
 import numpy as np
 import cv2
 
@@ -19,7 +20,7 @@ app = Flask(__name__)
 # 1. ROBUST PATH SETUP
 # -------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, '..', 'models', 'signalphaset_v2.keras')
+MODELS_DIR = os.path.join(BASE_DIR, '..', 'models')
 
 # Path to the raw dataset to get class names
 DATASET_DIR = os.path.join(BASE_DIR, '..', 'data', 'SignAlphaSet', 'SignAlphaSet') 
@@ -30,20 +31,62 @@ PICTURES_DIR = os.path.join(BASE_DIR, 'pic')
 logging.basicConfig(level=logging.INFO)
 logging.info("="*50)
 logging.info(f"Starting App")
-logging.info(f"Model Path: {MODEL_PATH}")
+logging.info(f"Models Dir: {MODELS_DIR}")
+
+NUM_LANDMARKS = 21
+COORD_DIMS = 3
+BASE_KEYPOINT_FEATURES = NUM_LANDMARKS * COORD_DIMS
+
+
+def discover_model_versions(models_dir):
+    version_pattern = re.compile(r"signalphaset_v(\d+)\.keras$")
+    versions = []
+
+    if not os.path.isdir(models_dir):
+        return versions
+
+    for name in os.listdir(models_dir):
+        match = version_pattern.match(name)
+        if match:
+            versions.append(int(match.group(1)))
+
+    return sorted(versions)
+
+
+def get_model_path_by_version(model_version):
+    return os.path.join(MODELS_DIR, f"signalphaset_v{model_version}.keras")
 
 # -------------------------------------------------------------
 # 2. LOAD RESOURCES & LABELS
 # -------------------------------------------------------------
-model = None
-if os.path.exists(MODEL_PATH):
+AVAILABLE_MODEL_VERSIONS = discover_model_versions(MODELS_DIR)
+DEFAULT_MODEL_VERSION = AVAILABLE_MODEL_VERSIONS[-1] if AVAILABLE_MODEL_VERSIONS else None
+model_cache = {}
+
+
+def load_model_for_version(model_version):
+    if model_version in model_cache:
+        logging.info(f"Using cached model v{model_version}: {get_model_path_by_version(model_version)}")
+        return model_cache[model_version]
+
+    model_path = get_model_path_by_version(model_version)
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model v{model_version} not found at {model_path}")
+
+    loaded_model = tf.keras.models.load_model(model_path)
+    model_cache[model_version] = loaded_model
+    logging.info(f"Loaded model v{model_version} from disk: {model_path}")
+    return loaded_model
+
+
+if DEFAULT_MODEL_VERSION is not None:
     try:
-        model = tf.keras.models.load_model(MODEL_PATH)
-        logging.info("Model loaded.")
+        load_model_for_version(DEFAULT_MODEL_VERSION)
+        logging.info(f"Default model loaded (v{DEFAULT_MODEL_VERSION}).")
     except Exception as e:
-        logging.error(f"Could not load model: {e}")
+        logging.error(f"Could not load default model v{DEFAULT_MODEL_VERSION}: {e}")
 else:
-    logging.critical(f"Model file NOT found at {MODEL_PATH}")
+    logging.critical(f"No model versions found in {MODELS_DIR}")
 
 # load and map class labels from dataset folder
 idx_to_label = {}
@@ -129,7 +172,77 @@ def normalize_keypoints(keypoints):
     normalized_keypoints = keypoints / scale
     return normalized_keypoints, scale
 
-def preprocess_keypoints(image, debug=False):
+
+def calculate_extra_features(keypoints):
+    thumb_tip = keypoints[4]
+    index_tip = keypoints[8]
+    index_dip = keypoints[7]
+    middle_tip = keypoints[12]
+    middle_dip = keypoints[11]
+    ring_tip = keypoints[16]
+    ring_dip = keypoints[15]
+    ring_pip = keypoints[14]
+    pinky_dip = keypoints[19]
+    pinky_pip = keypoints[18]
+    middle_pip = keypoints[10]
+    index_pip = keypoints[6]
+
+    features = [
+        np.linalg.norm(index_tip - middle_tip),
+        np.linalg.norm(middle_tip - ring_tip),
+        np.linalg.norm(thumb_tip - index_dip),
+        np.linalg.norm(thumb_tip - index_pip),
+        np.linalg.norm(thumb_tip - middle_dip),
+        np.linalg.norm(thumb_tip - middle_pip),
+        np.linalg.norm(thumb_tip - ring_dip),
+        np.linalg.norm(thumb_tip - ring_pip),
+        np.linalg.norm(thumb_tip - pinky_dip),
+        np.linalg.norm(thumb_tip - pinky_pip),
+    ]
+
+    wrist = keypoints[0]
+    middle_finger_tip = keypoints[12]
+    scale = np.linalg.norm(middle_finger_tip - wrist)
+    if scale < 1e-8:
+        scale = 1.0
+
+    return np.asarray([f / scale for f in features], dtype=np.float32)
+
+
+def adapt_features_for_model(normalized_keypoints, model):
+    model_input_shape = model.input_shape
+    if isinstance(model_input_shape, list):
+        model_input_shape = model_input_shape[0]
+
+    keypoints_3d = np.asarray(normalized_keypoints, dtype=np.float32)
+    flat_63 = keypoints_3d.reshape(-1)
+    extra_features = calculate_extra_features(keypoints_3d)
+    flat_73 = np.concatenate([flat_63, extra_features], axis=0).astype(np.float32)
+
+    if len(model_input_shape) == 3:
+        if model_input_shape[1:] != (NUM_LANDMARKS, COORD_DIMS):
+            raise ValueError(f"Unsupported 3D model input shape: {model_input_shape}")
+        return np.expand_dims(keypoints_3d, axis=0)
+
+    if len(model_input_shape) == 2:
+        expected_features = model_input_shape[1]
+        if expected_features is None:
+            raise ValueError("Model expects dynamic 2D feature size; not supported for live input.")
+
+        if expected_features == BASE_KEYPOINT_FEATURES:
+            features = flat_63
+        elif expected_features == flat_73.shape[0]:
+            features = flat_73
+        elif expected_features < flat_73.shape[0]:
+            features = flat_73[:expected_features]
+        else:
+            features = np.pad(flat_73, (0, expected_features - flat_73.shape[0]), mode="constant")
+
+        return np.expand_dims(features.astype(np.float32), axis=0)
+
+    raise ValueError(f"Unsupported model input rank for shape: {model_input_shape}")
+
+def preprocess_keypoints(image, model, debug=False):
     # 1. Extract keypoints
     if debug:
         pass
@@ -145,8 +258,8 @@ def preprocess_keypoints(image, debug=False):
     # 3. Normalize keypoints
     normalized_keypoints, scale = normalize_keypoints(centered_keypoints)
 
-    # 4. Reshape for model input
-    input_data = np.expand_dims(normalized_keypoints, axis=0)
+    # 4. Adapt features to selected model input
+    input_data = adapt_features_for_model(normalized_keypoints, model)
     
     extra_info = {
         'handedness': hand_info,
@@ -164,7 +277,12 @@ def preprocess_keypoints(image, debug=False):
 @app.route('/')
 def home():
     labels = list(idx_to_label.values())
-    return render_template('index.html', labels=labels)
+    return render_template(
+        'index.html',
+        labels=labels,
+        model_versions=AVAILABLE_MODEL_VERSIONS,
+        default_model_version=DEFAULT_MODEL_VERSION,
+    )
 
 @app.route('/dataset_img/<label>')
 def dataset_img(label):
@@ -180,12 +298,30 @@ import time
 @app.route('/predict', methods=['POST'])
 def predict():
     start_time = time.time()
-    if model is None:
-        return jsonify({'error': 'Model not loaded', 'prediction': 'Error'}), 500
 
     data = request.json
     if 'image' not in data:
         return jsonify({'error': 'No image received'}), 400
+
+    model_version = data.get('model_version', DEFAULT_MODEL_VERSION)
+    try:
+        model_version = int(model_version)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid model_version'}), 400
+
+    if model_version not in AVAILABLE_MODEL_VERSIONS:
+        return jsonify({
+            'error': f'Model version v{model_version} not available',
+            'available_versions': AVAILABLE_MODEL_VERSIONS,
+        }), 400
+
+    try:
+        model = load_model_for_version(model_version)
+    except Exception as e:
+        logging.error(f"Could not load model v{model_version}: {e}")
+        return jsonify({'error': f'Model v{model_version} could not be loaded'}), 500
+
+    model_path = get_model_path_by_version(model_version)
 
     debug_mode = data.get('debug', False)
 
@@ -200,7 +336,7 @@ def predict():
 
         # 2. Preprocessing
         prep_start = time.time()
-        input_data, raw_kps, norm_kps, extra_info = preprocess_keypoints(image, debug=debug_mode)
+        input_data, raw_kps, norm_kps, extra_info = preprocess_keypoints(image, model, debug=debug_mode)
         prep_time = (time.time() - prep_start) * 1000
 
         if input_data is None:
@@ -219,7 +355,8 @@ def predict():
 
         response = {
             'prediction': predicted_label,
-            'confidence': confidence
+            'confidence': confidence,
+            'model_version': model_version,
         }
 
         if debug_mode:
@@ -242,7 +379,8 @@ def predict():
             response['meta'] = {
                 'handedness': f"{h_label} ({h_score*100:.1f}%)",
                 'scale': f"{extra_info['scale_factor']:.4f}",
-                'input_shape': str(extra_info['input_shape'])
+                'input_shape': str(extra_info['input_shape']),
+                'model_path': model_path,
             }
 
             response['timing'] = {

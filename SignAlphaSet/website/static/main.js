@@ -14,6 +14,7 @@ const handCutout = document.getElementById('hand-cutout');
 const timingStats = document.getElementById('timing-stats');
 const metaStats = document.getElementById('meta-stats');
 const top5List = document.getElementById('top5-list');
+const modelVersionSelect = document.getElementById('model-version');
 
 let intervalId = null;
 let isProcessing = false;
@@ -167,7 +168,8 @@ function processFrame() {
     // Prepare payload
     const payload = {
         image: dataURL,
-        debug: debugMode
+        debug: debugMode,
+        model_version: modelVersionSelect ? modelVersionSelect.value : null
     };
 
     fetch('/predict', {
@@ -179,8 +181,12 @@ function processFrame() {
     .then(data => {
         if (data.error) {
             console.error(data.error);
+            if (statusDiv) statusDiv.innerText = `Error: ${data.error}`;
         } else {
             resultDiv.innerText = data.prediction;
+            if (statusDiv && data.model_version !== undefined) {
+                statusDiv.innerText = `Using model v${data.model_version}`;
+            }
             // Color code confidence
             const confPercent = Math.round(data.confidence * 100);
             confDiv.innerText = `Confidence: ${confPercent}%`;
