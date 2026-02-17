@@ -466,3 +466,12 @@ function toggleSettings() {
     controlsPanel.classList.toggle('collapsed');
     if (settingsBtn) settingsBtn.classList.toggle('active');
 }
+
+// ===== DICTIONARY OVERLAY =====
+function toggleDictionaryOverlay() {
+    const overlay = document.getElementById('dictionary-overlay');
+    const dictBtn = document.getElementById('dictionary-toggle');
+    if (!overlay) return;
+    overlay.classList.toggle('visible');
+    if (dictBtn) dictBtn.classList.toggle('active');
+}

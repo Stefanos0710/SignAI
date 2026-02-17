@@ -55,48 +55,73 @@ h1 {
 }
 
 /* Settings toggle button - hidden by default, shown in fullscreen */
-#settings-toggle {
+#settings-toggle,
+#dictionary-toggle {
     display: none;
 }
 
 .settings-toggle-btn {
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     padding: 0 !important;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50% !important;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
-    color: white;
-    box-shadow: 0 6px 16px rgba(75, 92, 251, 0.28);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-radius: 14px !important;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.92) 0%, rgba(240, 243, 255, 0.85) 100%) !important;
+    color: var(--primary);
+    border: 1px solid rgba(75, 92, 251, 0.2) !important;
+    box-shadow: 0 4px 16px rgba(75, 92, 251, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform 0.35s cubic-bezier(.34, 1.56, .64, 1), box-shadow 0.35s ease, border-color 0.3s ease, background 0.3s ease;
     flex-shrink: 0;
+    cursor: pointer;
 }
 
 .settings-toggle-btn:hover {
-    transform: translateY(-2px) scale(1.05);
-    box-shadow: 0 8px 22px rgba(75, 92, 251, 0.38);
+    transform: translateY(-2px) scale(1.08);
+    box-shadow: 0 8px 28px rgba(75, 92, 251, 0.22), 0 0 0 3px rgba(75, 92, 251, 0.08);
+    border-color: rgba(75, 92, 251, 0.4) !important;
+}
+
+.settings-toggle-btn:active {
+    transform: translateY(0) scale(0.95);
 }
 
 .settings-toggle-btn.active {
-    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--secondary) 100%) !important;
-    box-shadow: 0 2px 8px rgba(75, 92, 251, 0.2);
+    background: linear-gradient(145deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
+    color: white;
+    border-color: rgba(75, 92, 251, 0.5) !important;
+    box-shadow: 0 4px 20px rgba(75, 92, 251, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.15);
 }
 
 .settings-toggle-btn svg {
-    transition: transform 0.4s cubic-bezier(.4, 0, .2, 1);
+    width: 22px;
+    height: 22px;
+    transition: transform 0.5s cubic-bezier(.34, 1.56, .64, 1);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
 }
 
 .settings-toggle-btn.active svg {
-    transform: rotate(90deg);
+    transform: rotate(180deg);
 }
 
 /* Controls transition for collapse */
 .controls {
     max-height: 200px;
     opacity: 1;
-    transition: max-height 0.35s cubic-bezier(.4, 0, .2, 1), opacity 0.25s ease, padding 0.35s ease, margin 0.35s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    transform: translateY(0) scaleY(1);
+    transform-origin: top center;
+    transition:
+        max-height 0.45s cubic-bezier(.4, 0, .2, 1),
+        opacity 0.35s cubic-bezier(.4, 0, .2, 1),
+        transform 0.4s cubic-bezier(.34, 1.56, .64, 1),
+        padding 0.4s cubic-bezier(.4, 0, .2, 1),
+        margin 0.4s cubic-bezier(.4, 0, .2, 1),
+        border-color 0.3s ease,
+        box-shadow 0.3s ease,
+        filter 0.35s ease;
 }
 
 /* Button Styling */
@@ -513,6 +538,12 @@ button:hover::before {
     border-radius: calc(var(--radius) - 4px);
     background-color: #000;
     display: block;
+    outline: 5px solid var(--primary);
+    outline-offset: -5px;
+}
+
+#video:hover {
+    outline-color: var(--primary-dark);
 }
 
 /* Overlay / Results */
@@ -705,6 +736,7 @@ body.fullscreen-mode h1 {
 
 body.fullscreen-mode .fullscreen-header {
     margin-bottom: 0.8rem;
+    position: relative;
 }
 
 body.fullscreen-mode .controls {
@@ -725,26 +757,42 @@ body.fullscreen-mode .controls.collapsed {
     border-color: transparent;
     box-shadow: none;
     pointer-events: none;
+    transform: translateY(-10px) scaleY(0.9);
+    filter: blur(4px);
 }
 
 body.fullscreen-mode #settings-toggle {
     display: inline-flex;
+    position: fixed;
+    top: 1.2rem;
+    right: 1.5rem;
+    z-index: 200;
+}
+
+body.fullscreen-mode #dictionary-toggle {
+    display: inline-flex;
+    position: fixed;
+    top: 1.2rem;
+    right: 5.5rem;
+    z-index: 200;
 }
 
 body.fullscreen-mode .app-layout {
     flex: 1;
-    max-width: 1600px;
+    max-width: 100%;
     margin-bottom: 0.8rem;
     gap: 1.5rem;
     flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
     min-height: 0;
+    overflow: hidden;
 }
 
 body.fullscreen-mode #container {
-    flex: none;
+    flex: 1 1 auto;
     width: auto;
+    min-width: 0;
     max-width: 100%;
     height: 100%;
     max-height: 100%;
@@ -752,6 +800,10 @@ body.fullscreen-mode #container {
     justify-content: center;
     align-items: center;
     overflow: hidden;
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    padding: 0;
 }
 
 body.fullscreen-mode #video {
@@ -760,6 +812,7 @@ body.fullscreen-mode #video {
     height: 100%;
     max-height: 100%;
     object-fit: contain;
+    background: transparent;
 }
 
 body.fullscreen-mode #landmarks {
@@ -777,13 +830,143 @@ body.fullscreen-mode #dictionary-section {
 
 body.fullscreen-mode #debug-panel {
     width: 420px;
+    min-width: 360px;
     flex-shrink: 0;
     height: 100%;
-    max-height: none;
+    max-height: 100%;
     overflow-y: auto;
 }
 
 /* When debug is open in fullscreen, ensure proper layout */
 body.fullscreen-mode.debug-open .app-layout {
     flex-wrap: nowrap;
+}
+
+/* ===== DICTIONARY OVERLAY ===== */
+.dict-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+}
+
+.dict-overlay.visible {
+    display: flex;
+}
+
+.dict-overlay-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 12, 26, 0.55);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    animation: dictFadeIn 0.35s ease forwards;
+}
+
+.dict-overlay-content {
+    position: relative;
+    z-index: 1;
+    width: 92vw;
+    max-width: 1300px;
+    max-height: 88vh;
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.97) 0%, rgba(244, 247, 255, 0.94) 100%);
+    border-radius: 24px;
+    border: 1px solid rgba(75, 92, 251, 0.18);
+    box-shadow: 0 24px 80px rgba(26, 29, 46, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+    padding: 2rem 2.5rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: dictSlideIn 0.4s cubic-bezier(.34, 1.56, .64, 1) forwards;
+}
+
+.dict-overlay-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    flex-shrink: 0;
+}
+
+.dict-overlay-header h2 {
+    color: var(--primary);
+    font-size: 1.8rem;
+    font-weight: 900;
+    margin: 0;
+}
+
+.dict-close-btn {
+    width: 42px;
+    height: 42px;
+    padding: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px !important;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.92) 0%, rgba(240, 243, 255, 0.85) 100%) !important;
+    color: var(--text-secondary);
+    border: 1px solid rgba(75, 92, 251, 0.15) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: transform 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    cursor: pointer;
+}
+
+.dict-close-btn:hover {
+    color: #e53e3e;
+    border-color: rgba(229, 62, 62, 0.3) !important;
+    transform: scale(1.08);
+    box-shadow: 0 4px 14px rgba(229, 62, 62, 0.15);
+}
+
+.dict-overlay-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 1rem;
+    overflow-y: auto;
+    flex: 1;
+    padding-right: 0.5rem;
+}
+
+.dict-overlay-grid::-webkit-scrollbar {
+    width: 6px;
+}
+
+.dict-overlay-grid::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.dict-overlay-grid::-webkit-scrollbar-thumb {
+    background: rgba(75, 92, 251, 0.2);
+    border-radius: 999px;
+}
+
+.dict-overlay-grid::-webkit-scrollbar-thumb:hover {
+    background: rgba(75, 92, 251, 0.4);
+}
+
+.dict-overlay-grid .sign-card {
+    padding: 0.6rem;
+    border-radius: 12px;
+}
+
+.dict-overlay-grid .sign-label {
+    font-size: 1rem;
+}
+
+@keyframes dictFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes dictSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
