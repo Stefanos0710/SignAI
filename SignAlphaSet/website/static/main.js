@@ -15,14 +15,13 @@ const timingStats = document.getElementById('timing-stats');
 const metaStats = document.getElementById('meta-stats');
 const top5List = document.getElementById('top5-list');
 const modelVersionSelect = document.getElementById('model-version');
-const cameraStats = document.getElementById('camera-stats');
-const systemStats = document.getElementById('system-stats');
 const predictionStats = document.getElementById('prediction-stats');
-const debugJson = document.getElementById('debug-json');
 const dbgFps = document.getElementById('dbg-fps');
 const dbgRoundtrip = document.getElementById('dbg-roundtrip');
-const dbgFrameCount = document.getElementById('dbg-frame-count');
-const dbgLastUpdate = document.getElementById('dbg-last-update');
+const toggleV3Features = document.getElementById('toggle-v3-features');
+
+const DEBUG_KEYPOINT_RADIUS = 6;
+const NORMAL_KEYPOINT_RADIUS = 3;
 
 let intervalId = null;
 let isProcessing = false;
@@ -32,6 +31,7 @@ let debugFrameCount = 0;
 let lastFrameTs = null;
 let smoothedFps = 0;
 let isFullscreen = false;
+let showV3FeatureOverlay = true;
 
 const container = document.getElementById('container');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
@@ -74,8 +74,6 @@ function toggleDebug() {
         smoothedFps = 0;
         if (dbgFps) dbgFps.textContent = '-';
         if (dbgRoundtrip) dbgRoundtrip.textContent = '-';
-        if (dbgFrameCount) dbgFrameCount.textContent = '0';
-        if (dbgLastUpdate) dbgLastUpdate.textContent = '-';
         // Force loop restart to adjust interval if needed
         if (intervalId) {
             clearInterval(intervalId);
@@ -129,61 +127,29 @@ function updateDebugSummary(roundtripMs) {
 
     if (dbgFps) dbgFps.textContent = smoothedFps ? `${smoothedFps.toFixed(1)}` : '-';
     if (dbgRoundtrip) dbgRoundtrip.textContent = formatMs(roundtripMs);
-    if (dbgFrameCount) dbgFrameCount.textContent = `${debugFrameCount}`;
-    if (dbgLastUpdate) dbgLastUpdate.textContent = formatTime(Date.now());
 }
 
 function renderDebugData(data, contextInfo) {
     if (!debugMode) return;
 
-    const top5 = Array.isArray(data.top_5) ? data.top_5 : [];
     const confPercent = data.confidence !== undefined ? Math.round(Number(data.confidence) * 100) : null;
-    const top1 = top5[0];
-    const top2 = top5[1];
+    const top5 = Array.isArray(data.top_5) ? data.top_5 : [];
+    const top1 = top5[0] || null;
+    const top2 = top5[1] || null;
     const topGap = top1 && top2 ? Math.round((top1.confidence - top2.confidence) * 100) : null;
-    const landmarks = data.debug_info && data.debug_info.raw_landmarks ? data.debug_info.raw_landmarks : [];
-
-    if (cameraStats) {
-        cameraStats.innerHTML = `
-            <li>${t('state')}: <span>${stream ? t('active') : t('inactive')}</span></li>
-            <li>${t('resolution')}: <span>${video.videoWidth || 0}x${video.videoHeight || 0}</span></li>
-            <li>${t('jpegQuality')}: <span>${Math.round(contextInfo.quality * 100)}%</span></li>
-            <li>${t('payloadSize')}: <span>${contextInfo.payloadKb} KB</span></li>
-            <li>${t('landmarks')}: <span>${landmarks.length}</span></li>
-        `;
-    }
-
-    if (systemStats) {
-        systemStats.innerHTML = `
-            <li>${t('loopDelay')}: <span>${debugMode ? '60ms' : '30ms'}</span></li>
-            <li>${t('canvas')}: <span>${canvas.width}x${canvas.height}</span></li>
-            <li>${t('processing')}: <span>${isProcessing ? t('busy') : t('idle')}</span></li>
-            <li>${t('modelSelected')}: <span>v${modelVersionSelect ? modelVersionSelect.value : '-'}</span></li>
-            <li>${t('modelActive')}: <span>v${data.model_version ?? '-'}</span></li>
-        `;
-    }
 
     if (predictionStats) {
         const localizedPrediction = localizePredictionLabel(data.prediction ?? '-');
+        const top1Label = top1 ? localizePredictionLabel(top1.label) : '-';
+        const top2Label = top2 ? localizePredictionLabel(top2.label) : '-';
+        const top1Conf = top1 ? `${Math.round(top1.confidence * 100)}%` : '-';
+        const top2Conf = top2 ? `${Math.round(top2.confidence * 100)}%` : '-';
         predictionStats.innerHTML = `
             <li>${t('prediction')}: <span>${localizedPrediction}</span></li>
             <li>${t('confidence')}: <span>${confPercent !== null ? `${confPercent}%` : '-'}</span></li>
             <li>${t('top1Top2Gap')}: <span>${topGap !== null ? `${topGap}%` : '-'}</span></li>
             <li>${t('requestRtt')}: <span>${formatMs(contextInfo.roundtripMs)}</span></li>
-            <li>${t('status')}: <span>${data.error ? t('error') : t('ok')}</span></li>
         `;
-    }
-
-    if (debugJson) {
-        const rawPreview = {
-            prediction: data.prediction,
-            confidence: data.confidence,
-            model_version: data.model_version,
-            timing: data.timing,
-            meta: data.meta,
-            top_5: top5.slice(0, 5)
-        };
-        debugJson.textContent = JSON.stringify(rawPreview, null, 2);
     }
 }
 
@@ -266,11 +232,53 @@ function drawLandmarks(landmarks) {
 
     // Draw points
     landmarksCtx.fillStyle = "#FF5722"; // Accent
+    const pointRadius = debugMode ? DEBUG_KEYPOINT_RADIUS : NORMAL_KEYPOINT_RADIUS;
     for (const point of landmarks) {
         landmarksCtx.beginPath();
-        landmarksCtx.arc(point[0] * width, point[1] * height, 3, 0, 2 * Math.PI);
+        landmarksCtx.arc(point[0] * width, point[1] * height, pointRadius, 0, 2 * Math.PI);
         landmarksCtx.fill();
     }
+}
+
+function drawV3FeatureLines(landmarks, featureLines) {
+    if (!landmarksCtx || !landmarksCanvas) return;
+    if (!Array.isArray(landmarks) || !Array.isArray(featureLines) || featureLines.length === 0) return;
+
+    const width = landmarksCanvas.width;
+    const height = landmarksCanvas.height;
+
+    landmarksCtx.save();
+    landmarksCtx.strokeStyle = 'rgba(255, 193, 7, 0.95)';
+    landmarksCtx.fillStyle = 'rgba(255, 193, 7, 0.95)';
+    landmarksCtx.lineWidth = 3;
+    landmarksCtx.font = 'bold 12px Arial';
+
+    for (const line of featureLines) {
+        const fromIdx = Number(line.from);
+        const toIdx = Number(line.to);
+        const p1 = landmarks[fromIdx];
+        const p2 = landmarks[toIdx];
+        if (!p1 || !p2) continue;
+
+        const x1 = p1[0] * width;
+        const y1 = p1[1] * height;
+        const x2 = p2[0] * width;
+        const y2 = p2[1] * height;
+
+        landmarksCtx.beginPath();
+        landmarksCtx.moveTo(x1, y1);
+        landmarksCtx.lineTo(x2, y2);
+        landmarksCtx.stroke();
+
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+        const value = Number(line.value);
+        if (!Number.isNaN(value)) {
+            landmarksCtx.fillText(value.toFixed(2), midX + 6, midY - 6);
+        }
+    }
+
+    landmarksCtx.restore();
 }
 
 function renderTop5(top5data) {
@@ -279,9 +287,10 @@ function renderTop5(top5data) {
     let html = '';
     top5data.forEach(item => {
         const percent = Math.round(item.confidence * 100);
+        const localizedLabel = localizePredictionLabel(item.label);
         html += `
         <div class="top5-item">
-            <div class="top5-label">${item.label}</div>
+            <div class="top5-label">${localizedLabel}</div>
             <div class="bar-container">
                 <div class="bar-fill" style="width: ${percent}%"></div>
             </div>
@@ -353,11 +362,20 @@ function processFrame() {
                 // 3. Landmarks
                 if (data.debug_info.raw_landmarks) {
                     drawLandmarks(data.debug_info.raw_landmarks);
+
+                    if (
+                        showV3FeatureOverlay &&
+                        Number(data.model_version) === 3 &&
+                        Array.isArray(data.debug_info.v3_feature_lines)
+                    ) {
+                        drawV3FeatureLines(data.debug_info.raw_landmarks, data.debug_info.v3_feature_lines);
+                    }
                 }
 
                 // 4. Timing
                 if (data.timing && timingStats) {
                     timingStats.innerHTML = `
+                        <li>${t('decode')}: <span>${data.timing.decode ?? '-'}</span></li>
                         <li>${t('inference')}: <span>${data.timing.inference}</span></li>
                         <li>${t('preprocess')}: <span>${data.timing.preprocess}</span></li>
                         <li>${t('total')}: <span>${data.timing.total}</span></li>
@@ -367,9 +385,9 @@ function processFrame() {
                 // 5. Hand Metadata
                 if (data.meta && metaStats) {
                     metaStats.innerHTML = `
-                        <li>${t('hand')}: <span>${data.meta.handedness}</span></li>
-                        <li>${t('scale')}: <span>${data.meta.scale}</span></li>
-                        <li>${t('shape')}: <span>${data.meta.input_shape}</span></li>
+                        <li>${t('hand')}: <span>${data.meta.mediapipe_label ?? data.meta.handedness ?? '-'}</span></li>
+                        <li>${t('mediapipeAccuracy')}: <span>${data.meta.mediapipe_confidence ?? '-'}</span></li>
+                        <li>${t('mediapipeMinDetection')}: <span>${data.meta.mediapipe_min_detection_confidence ?? '-'}</span></li>
                     `;
                 }
 
@@ -542,11 +560,25 @@ const translations = {
         error: 'Error',
         ok: 'ok',
         inference: 'Inference',
+        decode: 'Decode',
         preprocess: 'Preprocess',
+        processFlow: 'Process Flow',
         total: 'Total',
         hand: 'Hand',
+        topCandidate: 'Top Candidate',
+        secondCandidate: 'Second Candidate',
+        mediapipeAccuracy: 'MediaPipe Accuracy',
+        mediapipeLabel: 'MediaPipe Hand Label',
+        mediapipeModelComplexity: 'MediaPipe Model Complexity',
+        mediapipeMinDetection: 'MediaPipe Min Detection',
+        mediapipeStaticMode: 'MediaPipe Static Mode',
         scale: 'Scale',
         shape: 'Shape',
+        modelVersionInfo: 'Model Version',
+        modelPath: 'Model Path',
+        overlayOptions: 'Overlay Options',
+        showLandmarks: 'Show Landmarks',
+        showV3Features: 'Show v3 Feature Lines',
     },
     de: {
         pageTitle: 'SignAI Live Demo',
@@ -604,11 +636,25 @@ const translations = {
         error: 'Fehler',
         ok: 'ok',
         inference: 'Inference',
+        decode: 'Decode',
         preprocess: 'Vorverarbeitung',
+        processFlow: 'Prozessablauf',
         total: 'Gesamt',
         hand: 'Hand',
+        topCandidate: 'Top Kandidat',
+        secondCandidate: 'Zweiter Kandidat',
+        mediapipeAccuracy: 'MediaPipe Genauigkeit',
+        mediapipeLabel: 'MediaPipe Hand-Label',
+        mediapipeModelComplexity: 'MediaPipe Modellkomplexität',
+        mediapipeMinDetection: 'MediaPipe Min. Erkennung',
+        mediapipeStaticMode: 'MediaPipe Statischer Modus',
         scale: 'Skalierung',
         shape: 'Form',
+        modelVersionInfo: 'Modellversion',
+        modelPath: 'Modellpfad',
+        overlayOptions: 'Overlay Optionen',
+        showLandmarks: 'Landmarks anzeigen',
+        showV3Features: 'v3 Feature-Linien anzeigen',
     }
 };
 
@@ -622,7 +668,6 @@ function applyTranslations() {
         const text = t(key);
         if (!text) return;
         if (el.id === 'result' && stream) return;
-        if (el.id === 'debug-json' && el.textContent && el.textContent.trim().startsWith('{')) return;
         el.textContent = text;
     });
 
@@ -655,6 +700,13 @@ function toggleLanguage() {
     const langBtn = document.getElementById('lang-toggle');
     if (langBtn) langBtn.classList.toggle('active', currentLang === 'de');
     applyTranslations();
+}
+
+if (toggleV3Features) {
+    showV3FeatureOverlay = toggleV3Features.checked;
+    toggleV3Features.addEventListener('change', () => {
+        showV3FeatureOverlay = toggleV3Features.checked;
+    });
 }
 
 applyTranslations();

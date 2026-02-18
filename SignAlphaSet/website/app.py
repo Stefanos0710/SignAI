@@ -42,6 +42,19 @@ COORD_DIMS = 3
 BASE_KEYPOINT_FEATURES = NUM_LANDMARKS * COORD_DIMS
 REC_LETTERS = list(string.ascii_uppercase)
 
+EXTRA_FEATURE_SPECS = [
+    ("index_middle_tip", 8, 12),
+    ("middle_ring_tip", 12, 16),
+    ("thumb_index_dip", 4, 7),
+    ("thumb_index_pip", 4, 6),
+    ("thumb_middle_dip", 4, 11),
+    ("thumb_middle_pip", 4, 10),
+    ("thumb_ring_dip", 4, 15),
+    ("thumb_ring_pip", 4, 14),
+    ("thumb_pinky_dip", 4, 19),
+    ("thumb_pinky_pip", 4, 18),
+]
+
 rec_state_lock = threading.Lock()
 rec_session = None
 
@@ -323,11 +336,16 @@ logging.info("="*50)
 # ----------------------------
 mp_hands = mp.solutions.hands
 
+MP_STATIC_IMAGE_MODE = True
+MP_MAX_NUM_HANDS = 1
+MP_MIN_DETECTION_CONFIDENCE = 0.5
+MP_MODEL_COMPLEXITY = 1
+
 hands = mp_hands.Hands(
-    static_image_mode=True,
-    max_num_hands=1,
-    min_detection_confidence=0.5,
-    model_complexity=1
+    static_image_mode=MP_STATIC_IMAGE_MODE,
+    max_num_hands=MP_MAX_NUM_HANDS,
+    min_detection_confidence=MP_MIN_DETECTION_CONFIDENCE,
+    model_complexity=MP_MODEL_COMPLEXITY
 )
 
 # ----------------------------
@@ -381,39 +399,33 @@ def normalize_keypoints(keypoints):
 
 
 def calculate_extra_features(keypoints):
-    thumb_tip = keypoints[4]
-    index_tip = keypoints[8]
-    index_dip = keypoints[7]
-    middle_tip = keypoints[12]
-    middle_dip = keypoints[11]
-    ring_tip = keypoints[16]
-    ring_dip = keypoints[15]
-    ring_pip = keypoints[14]
-    pinky_dip = keypoints[19]
-    pinky_pip = keypoints[18]
-    middle_pip = keypoints[10]
-    index_pip = keypoints[6]
-
-    features = [
-        np.linalg.norm(index_tip - middle_tip),
-        np.linalg.norm(middle_tip - ring_tip),
-        np.linalg.norm(thumb_tip - index_dip),
-        np.linalg.norm(thumb_tip - index_pip),
-        np.linalg.norm(thumb_tip - middle_dip),
-        np.linalg.norm(thumb_tip - middle_pip),
-        np.linalg.norm(thumb_tip - ring_dip),
-        np.linalg.norm(thumb_tip - ring_pip),
-        np.linalg.norm(thumb_tip - pinky_dip),
-        np.linalg.norm(thumb_tip - pinky_pip),
-    ]
-
     wrist = keypoints[0]
     middle_finger_tip = keypoints[12]
     scale = np.linalg.norm(middle_finger_tip - wrist)
     if scale < 1e-8:
         scale = 1.0
 
-    return np.asarray([f / scale for f in features], dtype=np.float32)
+    features = []
+    for _, idx_a, idx_b in EXTRA_FEATURE_SPECS:
+        dist = np.linalg.norm(keypoints[idx_a] - keypoints[idx_b])
+        features.append(dist / scale)
+
+    return np.asarray(features, dtype=np.float32)
+
+
+def build_extra_feature_debug_data(keypoints):
+    values = calculate_extra_features(keypoints)
+    feature_lines = []
+
+    for index, (name, idx_a, idx_b) in enumerate(EXTRA_FEATURE_SPECS):
+        feature_lines.append({
+            'name': name,
+            'from': idx_a,
+            'to': idx_b,
+            'value': float(values[index]),
+        })
+
+    return feature_lines
 
 
 def adapt_features_for_model(normalized_keypoints, model):
@@ -740,8 +752,14 @@ def predict():
             
             response['meta'] = {
                 'handedness': f"{h_label} ({h_score*100:.1f}%)",
+                'mediapipe_confidence': f"{h_score*100:.1f}%",
+                'mediapipe_label': h_label,
+                'mediapipe_model_complexity': MP_MODEL_COMPLEXITY,
+                'mediapipe_min_detection_confidence': MP_MIN_DETECTION_CONFIDENCE,
+                'mediapipe_static_image_mode': MP_STATIC_IMAGE_MODE,
                 'scale': f"{extra_info['scale_factor']:.4f}",
                 'input_shape': str(extra_info['input_shape']),
+                'model_version': model_version,
                 'model_path': model_path,
             }
 
@@ -773,11 +791,16 @@ def predict():
             _, buffer = cv2.imencode('.jpg', cutout, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
             cutout_b64 = base64.b64encode(buffer).decode('utf-8')
             
-            response['debug_info'] = {
+            debug_info = {
                 'raw_landmarks': raw_kps.tolist(),
                # 'norm_landmarks': norm_kps.tolist(), # Skip sending this to save bandwidth
                 'hand_cutout': f"data:image/jpeg;base64,{cutout_b64}"
             }
+
+            if model_version == 3 and norm_kps is not None:
+                debug_info['v3_feature_lines'] = build_extra_feature_debug_data(norm_kps)
+
+            response['debug_info'] = debug_info
 
         return jsonify(response)
 

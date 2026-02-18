@@ -53,6 +53,7 @@
         <div id="debug-panel" style="display:none;">
             <h3 data-i18n="debugCenter">Debug Center</h3>
 
+
             <div class="debug-summary">
                 <div class="summary-chip">
                     <span>FPS</span>
@@ -62,30 +63,9 @@
                     <span data-i18n="roundtrip">Roundtrip</span>
                     <strong id="dbg-roundtrip">-</strong>
                 </div>
-                <div class="summary-chip">
-                    <span data-i18n="frames">Frames</span>
-                    <strong id="dbg-frame-count">0</strong>
-                </div>
-                <div class="summary-chip">
-                    <span data-i18n="lastUpdate">Last Update</span>
-                    <strong id="dbg-last-update">-</strong>
-                </div>
             </div>
             
             <div class="debug-grid">
-                <!-- Visuals -->
-                <div class="debug-col">
-                    <div class="debug-card">
-                        <h4 data-i18n="handCutout">Hand Cutout</h4>
-                        <img id="hand-cutout" data-i18n-alt="noHand" alt="No Hand">
-                    </div>
-                    <div class="debug-card">
-                        <h4 data-i18n="cameraStream">Camera / Stream</h4>
-                        <ul id="camera-stats" class="stats-list">
-                            <li data-i18n="waitingCamera">Waiting for camera...</li>
-                        </ul>
-                    </div>
-                </div>
 
                 <!-- Stats -->
                 <div class="debug-col">
@@ -93,12 +73,6 @@
                         <h4 data-i18n="performance">Performance</h4>
                         <ul id="timing-stats" class="stats-list">
                             <li data-i18n="waitingData">Waiting for data...</li>
-                        </ul>
-                    </div>
-                    <div class="debug-card">
-                        <h4 data-i18n="system">System</h4>
-                        <ul id="system-stats" class="stats-list">
-                            <li>-</li>
                         </ul>
                     </div>
                 </div>
@@ -122,11 +96,6 @@
             <div class="debug-card full-width">
                 <h4 data-i18n="top5Predictions">Top 5 Predictions</h4>
                 <div id="top5-list"></div>
-            </div>
-
-            <div class="debug-card full-width">
-                <h4 data-i18n="rawResponse">Raw Response (Live)</h4>
-                <pre id="debug-json" data-i18n="waitingDebugData">Waiting for debug data...</pre>
             </div>
         </div>
     </div>
