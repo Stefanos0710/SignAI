@@ -244,21 +244,46 @@ def get_model_path_by_version(model_version):
 AVAILABLE_MODEL_VERSIONS = discover_model_versions(MODELS_DIR)
 DEFAULT_MODEL_VERSION = AVAILABLE_MODEL_VERSIONS[-1] if AVAILABLE_MODEL_VERSIONS else None
 model_cache = {}
+model_runner_cache = {}
+model_cache_lock = threading.Lock()
+
+
+def _build_model_runner(model):
+    @tf.function(reduce_retracing=True)
+    def run_inference(inputs):
+        return model(inputs, training=False)
+
+    return run_inference
 
 
 def load_model_for_version(model_version):
-    if model_version in model_cache:
-        logging.info(f"Using cached model v{model_version}: {get_model_path_by_version(model_version)}")
-        return model_cache[model_version]
+    cached_model = model_cache.get(model_version)
+    if cached_model is not None:
+        return cached_model
 
-    model_path = get_model_path_by_version(model_version)
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model v{model_version} not found at {model_path}")
+    with model_cache_lock:
+        cached_model = model_cache.get(model_version)
+        if cached_model is not None:
+            return cached_model
 
-    loaded_model = tf.keras.models.load_model(model_path)
-    model_cache[model_version] = loaded_model
-    logging.info(f"Loaded model v{model_version} from disk: {model_path}")
-    return loaded_model
+        model_path = get_model_path_by_version(model_version)
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model v{model_version} not found at {model_path}")
+
+        loaded_model = tf.keras.models.load_model(model_path)
+        model_cache[model_version] = loaded_model
+        model_runner_cache[model_version] = _build_model_runner(loaded_model)
+        logging.info(f"Loaded model v{model_version} from disk: {model_path}")
+        return loaded_model
+
+
+def get_model_runner_for_version(model_version):
+    runner = model_runner_cache.get(model_version)
+    if runner is not None:
+        return runner
+
+    load_model_for_version(model_version)
+    return model_runner_cache[model_version]
 
 
 if DEFAULT_MODEL_VERSION is not None:
@@ -652,6 +677,7 @@ def predict():
 
     try:
         model = load_model_for_version(model_version)
+        model_runner = get_model_runner_for_version(model_version)
     except Exception as e:
         logging.error(f"Could not load model v{model_version}: {e}")
         return jsonify({'error': f'Model v{model_version} could not be loaded'}), 500
@@ -679,7 +705,8 @@ def predict():
 
         # 3. Prediction
         inference_start = time.time()
-        prediction = model.predict(input_data, verbose=0)[0]
+        prediction_tensor = model_runner(tf.convert_to_tensor(input_data, dtype=tf.float32))
+        prediction = np.asarray(prediction_tensor)[0]
         inference_time = (time.time() - inference_start) * 1000
         
         predicted_idx = np.argmax(prediction)
