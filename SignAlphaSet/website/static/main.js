@@ -579,6 +579,7 @@ const translations = {
         overlayOptions: 'Overlay Options',
         showLandmarks: 'Show Landmarks',
         showV3Features: 'Show v3 Feature Lines',
+        extraFeatures: 'Extra Features',
     },
     de: {
         pageTitle: 'SignAI Live Demo',
@@ -655,6 +656,7 @@ const translations = {
         overlayOptions: 'Overlay Optionen',
         showLandmarks: 'Landmarks anzeigen',
         showV3Features: 'v3 Feature-Linien anzeigen',
+        extraFeatures: 'Zusatzfunktionen',
     }
 };
 
