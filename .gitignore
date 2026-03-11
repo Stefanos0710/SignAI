@@ -132,3 +132,5 @@ app/final/
 SignAlphaSet/data/*
 
 models/*
+
+SignAlphaSet/data/ASL_dynamic/
