@@ -1,8 +1,10 @@
+import csv
+import logging
+import multiprocessing
+import os
+
 import cv2
 import mediapipe as mp
-import csv
-import os
-import logging
 import numpy as np
 
 # Set up logging
@@ -12,38 +14,18 @@ logging.basicConfig(
 )
 
 
-# set up md settings (hand and pose tracking, face)
+# MediaPipe solution references (instances are created per worker process)
 mp_hands = mp.solutions.hands
 mp_face_mesh = mp.solutions.face_mesh
 mp_pose = mp.solutions.pose
 
+# Placeholders — initialized inside each worker via init_worker()
+hands = None
+face  = None
+pose  = None
 
-# set up hands
-hands = mp_hands.Hands(
-    static_image_mode=False,
-    max_num_hands=2,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5, # upgrade this later with tests
-    model_complexity=0, # upgrade this later with tests
-)
-
-
-#set up face mesh
-face = mp_face_mesh.FaceMesh(
-    static_image_mode=False,
-    max_num_faces=1,
-    min_detection_confidence=0.3, # upgrade this later with tests
-    min_tracking_confidence=0.3, # upgrade this later with tests
-)
-
-
-# set up the
-pose = mp_pose.Pose(
-    static_image_mode=False,
-    model_complexity=0, # upgrade this later with tests
-    min_detection_confidence=0.5, # upgrade this later with tests
-    min_tracking_confidence=0.5 # upgrade this later with tests
-)
+# Number of parallel workers
+NUM_WORKERS = 12
 
 
 FACE_LANDMARKS = [
@@ -78,6 +60,60 @@ POSE_LANDMARKS = [
     15,  # left wrist
     16   # right wrist
 ]
+
+
+def init_worker():
+    """Initialize one set of MediaPipe objects per worker process."""
+    global hands, face, pose
+    hands = mp_hands.Hands(
+        static_image_mode=False,
+        max_num_hands=2,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
+        model_complexity=0,
+    )
+    face = mp_face_mesh.FaceMesh(
+        static_image_mode=False,
+        max_num_faces=1,
+        min_detection_confidence=0.3,
+        min_tracking_confidence=0.3,
+    )
+    pose = mp_pose.Pose(
+        static_image_mode=False,
+        model_complexity=0,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
+    )
+
+
+def process_subfolder(subfolder_path):
+    """Process a single subfolder: extract keypoints and save to CSV."""
+    subfolder_name = os.path.basename(subfolder_path)
+    logging.info(f"Currently processing folder: {subfolder_name}")
+
+    gloss = extract_gloss(subfolder_path)
+    logging.info(f"  -> Extracted gloss: {gloss}")
+
+    video_file = None
+    for file_name in os.listdir(subfolder_path):
+        if file_name.lower().endswith('.mp4'):
+            video_file = os.path.join(subfolder_path, file_name)
+            break
+
+    if video_file is None:
+        logging.warning(f"  -> No .mp4 file found in {subfolder_path}, skipping.")
+        return
+
+    frames = extract_frames(video_file)
+    if not frames:
+        logging.warning(f"  -> No frames extracted, skipping.")
+        return
+
+    pose_keypoints = extract_pose_keypoints(frames)
+    hand_keypoints = extract_hand_keypoints(frames)
+    face_keypoints = extract_face_keypoints(frames)
+
+    save_in_csv(pose_keypoints, hand_keypoints, face_keypoints, gloss, subfolder_name)
 
 
 def extract_gloss(folder_path):
@@ -262,41 +298,13 @@ if __name__ == "__main__":
 
     raw_vid = os.path.join("data", "raw_data", "train")
 
-    # go through all the files in the raw data folder and process them one by one
-    for supfolder in sorted(os.listdir(raw_vid)):
-        subfolder_name = supfolder
-        subfolder_path = os.path.join(raw_vid, subfolder_name)
+    subfolders = [
+        os.path.join(raw_vid, d)
+        for d in sorted(os.listdir(raw_vid))
+        if os.path.isdir(os.path.join(raw_vid, d))
+    ]
 
-        if not os.path.isdir(subfolder_path):
-            continue
+    logging.info(f"Found {len(subfolders)} subfolders — starting {NUM_WORKERS} workers...")
 
-        logging.info(f"Currently processing folder: {supfolder}")
-
-        # get gloss
-        gloss = extract_gloss(subfolder_path)
-        logging.info(f"  -> Extracted gloss: {gloss}")
-
-        # find video file in the subfolder
-        video_file = None
-        for file_name in os.listdir(subfolder_path):
-            if file_name.lower().endswith('.mp4'):
-                video_file = os.path.join(subfolder_path, file_name)
-                break
-
-        if video_file is None:
-            logging.warning(f"  -> No .mp4 file found in {subfolder_path}, skipping.")
-            continue
-
-        # extract all frames from the video
-        frames = extract_frames(video_file)
-        if not frames:
-            logging.warning(f"  -> No frames extracted, skipping.")
-            continue
-
-        # extract keypoints from the frames
-        pose_keypoints = extract_pose_keypoints(frames)
-        hand_keypoints = extract_hand_keypoints(frames)
-        face_keypoints = extract_face_keypoints(frames)
-
-        # save keypoints to csv
-        save_in_csv(pose_keypoints, hand_keypoints, face_keypoints, gloss, subfolder_name)
+    with multiprocessing.Pool(processes=NUM_WORKERS, initializer=init_worker) as pool:
+        pool.map(process_subfolder, subfolders)

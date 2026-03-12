@@ -28,6 +28,8 @@ import concurrent.futures
 import warnings
 import pickle
 import random
+import jiwer
+from sacrebleu.metrics import BLEU
 
 # NOTE: Set random seeds for reproducibility
 import keras
@@ -39,15 +41,15 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# NOTE: I think the biggest problems lay here, in the fact that we don't have enough features for this difficult task -> 151 and every second frame is not enough
-# expected number of features per frame
-EXPECTED_FEATURES = 151
-# minimal accepted numeric values in a parsed frame (flexible fallback)
-MIN_ACCEPTED_FEATURES = 50
+# expected number of features per frame from preprocessing_train_data.py
+# pose(7*3=21) + left_hand(21*3=63) + right_hand(21*3=63) + face(93*3=279) = 426
+EXPECTED_FEATURES = 426
+# minimal accepted numeric values in a parsed frame (rows below this are likely malformed)
+MIN_ACCEPTED_FEATURES = 32
 
 # silence specific DeprecationWarning noise that originates from csv parsing of some files
 warnings.filterwarnings("ignore", message="string or file could not be read to its end due to unmatched data")
-    
+
 class TransformerSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
     """Learning rate schedule from 'Attention Is All You Need' paper"""
     def __init__(self, d_model, warmup_steps=4000):
@@ -87,84 +89,59 @@ def _parse_csv_text(file_name: str, text: str, used_encoding: str = 'utf-8') -> 
         - A pandas fallback is attempted when simple line parsing yields no frames.
         - Small parsing errors result in an error code that helps debugging.
     """
-    # detect delimiter using csv.Sniffer on a small sample
-    detected_sep = None
-    try:
-        sample = '\n'.join(text.splitlines()[:20])
-        dialect = csv.Sniffer().sniff(sample)
-        detected_sep = dialect.delimiter
-    except Exception:
-        detected_sep = None
-
-    # fallback: count common delimiters in first lines
-    if detected_sep is None:
-        try:
-            first_lines = [l for l in text.splitlines()[:10] if l.strip()]
-            sep_counts = {',': 0, ';': 0, ' ': 0, '\t': 0}
-            for l in first_lines:
-                for s in sep_counts:
-                    sep_counts[s] += l.count(s)
-            best = max(sep_counts.items(), key=lambda x: x[1])
-            if best[1] > 0:
-                detected_sep = best[0]
-        except Exception:
-            detected_sep = None
-
     rows = []
-    skipped_lines = 0
-    line_num = 0
 
-    # try to parse each line
-    for raw_line in text.splitlines():
-        line_num += 1
-        line = raw_line.strip()
-        if not line:
-            skipped_lines += 1
-            continue
+    try:
+        rdr = csv.reader(io.StringIO(text))
+        first = True
+        for row in rdr:
+            if not row:
+                continue
 
-        vals = None
-        tried_seps = []
-        if detected_sep is not None:
-            tried_seps.append(detected_sep)
-        tried_seps.extend([',', ';', ' ', '\t'])
-        for sep in tried_seps:
-            try:
-                # np.fromstring is very fast for purely-numeric lines but fails when lines start with strings
-                # try simple numeric extraction using splitting and converting tokens to float
-                if sep in [',',';','\t',' ']:
-                    toks = re.split(r'[{},\t ]+'.format(re.escape(sep)), line) if sep != ' ' else re.split(r'\s+', line)
-                else:
-                    toks = re.split(re.escape(sep), line)
-                num_vals = []
-                for t in toks:
+            # expected header: name,GLOSS,Frame,...
+            if first:
+                first = False
+                if len(row) >= 3 and row[2].strip().lower() == "frame":
+                    continue
+
+            # numeric features usually start after 3 metadata columns (name, gloss, frame)
+            if len(row) - 3 >= EXPECTED_FEATURES:
+                start_idx = 3
+            elif len(row) - 2 >= EXPECTED_FEATURES:
+                start_idx = 2
+            else:
+                # fallback: find first numeric token
+                start_idx = 0
+                while start_idx < len(row):
                     try:
-                        if t is None:
-                            continue
-                        vv = float(t)
-                        num_vals.append(vv)
+                        float(row[start_idx])
+                        break
                     except Exception:
-                        # skip non-numeric tokens (e.g., Video_Name, Gloss)
-                        continue
-                if len(num_vals) > 0:
-                    vals = np.array(num_vals, dtype=np.float32)
-                    break
-            except Exception:
-                vals = None
-        if vals is None or vals.size == 0:
-            skipped_lines += 1
-            continue
+                        start_idx += 1
 
-        # accept frames with at least a minimal number of numeric features
-        if vals.size >= (EXPECTED_FEATURES if EXPECTED_FEATURES and EXPECTED_FEATURES > 0 else MIN_ACCEPTED_FEATURES):
-            # if EXPECTED_FEATURES is set and larger than actual, we'll trim/pad later in build_encoder_input
-            frame = vals[:EXPECTED_FEATURES].astype(np.float32) if (EXPECTED_FEATURES and vals.size >= EXPECTED_FEATURES) else vals.astype(np.float32)
+            vals_list = []
+            for tok in row[start_idx:]:
+                try:
+                    vals_list.append(float(tok))
+                except Exception:
+                    continue
+
+            if len(vals_list) < MIN_ACCEPTED_FEATURES:
+                continue
+
+            vals = np.array(vals_list, dtype=np.float32)
+            if vals.size >= EXPECTED_FEATURES:
+                frame = vals[:EXPECTED_FEATURES]
+            else:
+                frame = np.pad(vals, (0, EXPECTED_FEATURES - vals.size), mode='constant', constant_values=0.0)
+
             if np.isnan(frame).any() or np.isinf(frame).any():
                 frame = np.nan_to_num(frame, nan=0.0, posinf=0.0, neginf=0.0)
-            rows.append(frame)
-        else:
-            # if not enough numeric tokens, skip
-            skipped_lines += 1
-            continue
+            rows.append(frame.astype(np.float32))
+
+    except Exception:
+        # if csv parse fails, keep pandas fallback below
+        rows = []
 
     # if no rows found, try pandas fallback
     if len(rows) == 0:
@@ -533,6 +510,106 @@ def build_decoder_data(all_samples, tokenizer):
     logging.info(f"  Last non-zero in decoder_target[0]: {decoder_target_data[0][np.nonzero(decoder_target_data[0])[0][-1] if np.any(decoder_target_data[0]) else 0]} (should be {end_id})")
     
     return decoder_input_data, decoder_target_data
+
+
+def greedy_decode(model, encoder_input, tokenizer, max_len):
+    """Greedy token-by-token decoding until <end> or max_len is reached."""
+    start_id = tokenizer.word_index.get("<start>")
+    end_id = tokenizer.word_index.get("<end>")
+    if start_id is None or end_id is None:
+        raise ValueError("Tokenizer must contain <start> and <end> tokens.")
+
+    if encoder_input.ndim == 2:
+        encoder_input_batch = np.expand_dims(encoder_input, axis=0)
+    else:
+        encoder_input_batch = encoder_input
+
+    decoded_ids = [start_id]
+    for _ in range(max_len):
+        decoder_input = np.array([decoded_ids], dtype=np.int32)
+        logits = model.predict([encoder_input_batch, decoder_input], verbose=0)
+        next_id = int(np.argmax(logits[0, len(decoded_ids) - 1]))
+        decoded_ids.append(next_id)
+        if next_id == end_id:
+            break
+
+    words = []
+    for token_id in decoded_ids[1:]:
+        if token_id == end_id:
+            break
+        if token_id == 0 or token_id == start_id:
+            continue
+        words.append(tokenizer.index_word.get(token_id, "<unk>"))
+    return " ".join(words).strip()
+
+
+class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
+    """Evaluate WER and BLEU(1-4) on a small unseen validation subset each epoch."""
+
+    def __init__(self, val_encoder, val_references, tokenizer, max_len, sample_size=32, seed=42):
+        super().__init__()
+        self.val_encoder = val_encoder
+        self.val_references = val_references
+        self.tokenizer = tokenizer
+        self.max_len = max_len
+        self.sample_size = sample_size
+        self.seed = seed
+        self.bleu_metrics = {
+            1: BLEU(max_ngram_order=1, effective_order=True),
+            2: BLEU(max_ngram_order=2, effective_order=True),
+            3: BLEU(max_ngram_order=3, effective_order=True),
+            4: BLEU(max_ngram_order=4, effective_order=True),
+        }
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        if self.val_encoder is None or len(self.val_references) == 0:
+            return
+
+        n_total = len(self.val_references)
+        n_eval = min(self.sample_size, n_total)
+        rng = np.random.default_rng(self.seed + epoch)
+        eval_indices = rng.choice(n_total, size=n_eval, replace=False)
+
+        references = []
+        predictions = []
+        for idx in eval_indices:
+            ref = str(self.val_references[idx]).strip()
+            pred = greedy_decode(self.model, self.val_encoder[idx], self.tokenizer, self.max_len)
+            references.append(ref)
+            predictions.append(pred)
+
+        wer_values = []
+        for ref, pred in zip(references, predictions):
+            if not ref and not pred:
+                wer_values.append(0.0)
+            else:
+                wer_values.append(float(jiwer.wer(ref, pred)))
+        avg_wer = float(np.mean(wer_values)) if wer_values else 0.0
+
+        bleu_scores = {}
+        for n, bleu_metric in self.bleu_metrics.items():
+            bleu_scores[n] = float(bleu_metric.corpus_score(predictions, [references]).score)
+
+        logs["val_wer"] = avg_wer
+        logs["val_bleu1"] = bleu_scores[1]
+        logs["val_bleu2"] = bleu_scores[2]
+        logs["val_bleu3"] = bleu_scores[3]
+        logs["val_bleu4"] = bleu_scores[4]
+
+        logging.info(
+            "Epoch %d evaluation -> WER: %.4f | BLEU-1: %.2f | BLEU-2: %.2f | BLEU-3: %.2f | BLEU-4: %.2f",
+            epoch + 1,
+            avg_wer,
+            bleu_scores[1],
+            bleu_scores[2],
+            bleu_scores[3],
+            bleu_scores[4],
+        )
+
+        if references:
+            logging.info("Sample reference: %s", references[0])
+            logging.info("Sample prediction: %s", predictions[0])
 
 # NOTE: Positional Encoding Layer for Transformer Model Decoder
 class SinePositionEncoding(tf.keras.layers.Layer):
@@ -1125,8 +1202,8 @@ def train_main(
         # v33 is transformer architecture
         epochs=10,
         batch_size=16,
-        validation_split=0.2,
-        input_sequence_length=1,
+        validation_split=0.1,
+        input_sequence_length=None,
         embedding_dim=512,
         hidden_dim=1024,
         dropout_rate=0.3,
@@ -1178,6 +1255,11 @@ def train_main(
             logging.info(f"Augmented samples: original={len(samples)} -> augmented_total={len(augmented)}")
             samples = augmented
 
+        # keep only samples with usable gloss text to ensure aligned encoder/decoder arrays
+        samples = [s for s in samples if str(s.get("gloss", "")).strip()]
+        if not samples:
+            raise ValueError("No samples with valid gloss text found after filtering.")
+
         # 2. create tokenizer
         tokenizer = build_tokenizer(samples)
 
@@ -1193,11 +1275,47 @@ def train_main(
         logging.info(f"Decoder input shape: {decoder_input_data.shape}")
         logging.info(f"Decoder target shape: {decoder_target_data.shape}")
 
+        # 4.1 Build explicit 10% unseen validation split (instead of Keras validation_split)
+        n_samples = encoder_input_data.shape[0]
+        if n_samples != decoder_input_data.shape[0] or n_samples != decoder_target_data.shape[0]:
+            raise ValueError("Encoder/decoder sample count mismatch after preprocessing.")
+
+        gloss_refs = [s["gloss"] for s in samples]
+
+        if n_samples < 2:
+            raise ValueError("Need at least 2 samples to create a train/validation split.")
+
+        val_fraction = 0.1
+        val_size = max(1, int(round(n_samples * val_fraction)))
+        val_size = min(val_size, n_samples - 1)
+
+        rng = np.random.default_rng(42)
+        indices = np.arange(n_samples)
+        rng.shuffle(indices)
+
+        val_idx = indices[:val_size]
+        train_idx = indices[val_size:]
+
+        x_enc_train = encoder_input_data[train_idx]
+        x_dec_train = decoder_input_data[train_idx]
+        y_train = decoder_target_data[train_idx]
+
+        x_enc_val = encoder_input_data[val_idx]
+        x_dec_val = decoder_input_data[val_idx]
+        y_val = decoder_target_data[val_idx]
+        val_gloss_refs = [gloss_refs[i] for i in val_idx]
+
+        logging.info(
+            "Split data into train/val with fixed 10%% validation: train=%d, val=%d",
+            len(train_idx),
+            len(val_idx),
+        )
+
         # 5. create model
         target_vocab_size = len(tokenizer.word_index) + 1
         logging.info(f"Building model with architecture: {architecture}")
         model = build_seq2seq_model(
-            max_frames=input_sequence_length,
+            max_frames=used_max_frames,
             num_features=input_feature_dim,
             vocab_size=target_vocab_size,
             embedding_dim=embedding_dim,
@@ -1302,15 +1420,23 @@ def train_main(
                 histogram_freq=1,
                 write_graph=True,
                 update_freq='epoch'
+            ),
+            SignLanguageEvaluationCallback(
+                val_encoder=x_enc_val,
+                val_references=val_gloss_refs,
+                tokenizer=tokenizer,
+                max_len=decoder_target_data.shape[1],
+                sample_size=min(32, len(val_gloss_refs)),
+                seed=42,
             )
         ]
         # training
         history = model.fit(
-            [encoder_input_data, decoder_input_data],
-            decoder_target_data,
+            [x_enc_train, x_dec_train],
+            y_train,
             batch_size=batch_size,
             epochs=epochs,
-            validation_split=validation_split,
+            validation_data=([x_enc_val, x_dec_val], y_val),
             callbacks=callbacks,
             shuffle=True
         )
@@ -1571,7 +1697,7 @@ if __name__ == "__main__":
             "version_model": 29,
             "epochs": 100,
             "batch_size": 8,
-            "validation_split": 0.2,
+            "validation_split": 0.1,
             "input_sequence_length": None,
             "embedding_dim": 256,
             "hidden_dim": 512,  
