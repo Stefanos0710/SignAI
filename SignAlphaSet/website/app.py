@@ -42,6 +42,19 @@ COORD_DIMS = 3
 BASE_KEYPOINT_FEATURES = NUM_LANDMARKS * COORD_DIMS
 REC_LETTERS = list(string.ascii_uppercase)
 
+EXTRA_FEATURE_SPECS = [
+    ("index_middle_tip", 8, 12),
+    ("middle_ring_tip", 12, 16),
+    ("thumb_index_dip", 4, 7),
+    ("thumb_index_pip", 4, 6),
+    ("thumb_middle_dip", 4, 11),
+    ("thumb_middle_pip", 4, 10),
+    ("thumb_ring_dip", 4, 15),
+    ("thumb_ring_pip", 4, 14),
+    ("thumb_pinky_dip", 4, 19),
+    ("thumb_pinky_pip", 4, 18),
+]
+
 rec_state_lock = threading.Lock()
 rec_session = None
 
@@ -244,21 +257,46 @@ def get_model_path_by_version(model_version):
 AVAILABLE_MODEL_VERSIONS = discover_model_versions(MODELS_DIR)
 DEFAULT_MODEL_VERSION = AVAILABLE_MODEL_VERSIONS[-1] if AVAILABLE_MODEL_VERSIONS else None
 model_cache = {}
+model_runner_cache = {}
+model_cache_lock = threading.Lock()
+
+
+def _build_model_runner(model):
+    @tf.function(reduce_retracing=True)
+    def run_inference(inputs):
+        return model(inputs, training=False)
+
+    return run_inference
 
 
 def load_model_for_version(model_version):
-    if model_version in model_cache:
-        logging.info(f"Using cached model v{model_version}: {get_model_path_by_version(model_version)}")
-        return model_cache[model_version]
+    cached_model = model_cache.get(model_version)
+    if cached_model is not None:
+        return cached_model
 
-    model_path = get_model_path_by_version(model_version)
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model v{model_version} not found at {model_path}")
+    with model_cache_lock:
+        cached_model = model_cache.get(model_version)
+        if cached_model is not None:
+            return cached_model
 
-    loaded_model = tf.keras.models.load_model(model_path)
-    model_cache[model_version] = loaded_model
-    logging.info(f"Loaded model v{model_version} from disk: {model_path}")
-    return loaded_model
+        model_path = get_model_path_by_version(model_version)
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model v{model_version} not found at {model_path}")
+
+        loaded_model = tf.keras.models.load_model(model_path)
+        model_cache[model_version] = loaded_model
+        model_runner_cache[model_version] = _build_model_runner(loaded_model)
+        logging.info(f"Loaded model v{model_version} from disk: {model_path}")
+        return loaded_model
+
+
+def get_model_runner_for_version(model_version):
+    runner = model_runner_cache.get(model_version)
+    if runner is not None:
+        return runner
+
+    load_model_for_version(model_version)
+    return model_runner_cache[model_version]
 
 
 if DEFAULT_MODEL_VERSION is not None:
@@ -298,11 +336,16 @@ logging.info("="*50)
 # ----------------------------
 mp_hands = mp.solutions.hands
 
+MP_STATIC_IMAGE_MODE = True
+MP_MAX_NUM_HANDS = 1
+MP_MIN_DETECTION_CONFIDENCE = 0.5
+MP_MODEL_COMPLEXITY = 1
+
 hands = mp_hands.Hands(
-    static_image_mode=True,
-    max_num_hands=1,
-    min_detection_confidence=0.5,
-    model_complexity=1
+    static_image_mode=MP_STATIC_IMAGE_MODE,
+    max_num_hands=MP_MAX_NUM_HANDS,
+    min_detection_confidence=MP_MIN_DETECTION_CONFIDENCE,
+    model_complexity=MP_MODEL_COMPLEXITY
 )
 
 # ----------------------------
@@ -356,39 +399,33 @@ def normalize_keypoints(keypoints):
 
 
 def calculate_extra_features(keypoints):
-    thumb_tip = keypoints[4]
-    index_tip = keypoints[8]
-    index_dip = keypoints[7]
-    middle_tip = keypoints[12]
-    middle_dip = keypoints[11]
-    ring_tip = keypoints[16]
-    ring_dip = keypoints[15]
-    ring_pip = keypoints[14]
-    pinky_dip = keypoints[19]
-    pinky_pip = keypoints[18]
-    middle_pip = keypoints[10]
-    index_pip = keypoints[6]
-
-    features = [
-        np.linalg.norm(index_tip - middle_tip),
-        np.linalg.norm(middle_tip - ring_tip),
-        np.linalg.norm(thumb_tip - index_dip),
-        np.linalg.norm(thumb_tip - index_pip),
-        np.linalg.norm(thumb_tip - middle_dip),
-        np.linalg.norm(thumb_tip - middle_pip),
-        np.linalg.norm(thumb_tip - ring_dip),
-        np.linalg.norm(thumb_tip - ring_pip),
-        np.linalg.norm(thumb_tip - pinky_dip),
-        np.linalg.norm(thumb_tip - pinky_pip),
-    ]
-
     wrist = keypoints[0]
     middle_finger_tip = keypoints[12]
     scale = np.linalg.norm(middle_finger_tip - wrist)
     if scale < 1e-8:
         scale = 1.0
 
-    return np.asarray([f / scale for f in features], dtype=np.float32)
+    features = []
+    for _, idx_a, idx_b in EXTRA_FEATURE_SPECS:
+        dist = np.linalg.norm(keypoints[idx_a] - keypoints[idx_b])
+        features.append(dist / scale)
+
+    return np.asarray(features, dtype=np.float32)
+
+
+def build_extra_feature_debug_data(keypoints):
+    values = calculate_extra_features(keypoints)
+    feature_lines = []
+
+    for index, (name, idx_a, idx_b) in enumerate(EXTRA_FEATURE_SPECS):
+        feature_lines.append({
+            'name': name,
+            'from': idx_a,
+            'to': idx_b,
+            'value': float(values[index]),
+        })
+
+    return feature_lines
 
 
 def adapt_features_for_model(normalized_keypoints, model):
@@ -652,6 +689,7 @@ def predict():
 
     try:
         model = load_model_for_version(model_version)
+        model_runner = get_model_runner_for_version(model_version)
     except Exception as e:
         logging.error(f"Could not load model v{model_version}: {e}")
         return jsonify({'error': f'Model v{model_version} could not be loaded'}), 500
@@ -679,7 +717,8 @@ def predict():
 
         # 3. Prediction
         inference_start = time.time()
-        prediction = model.predict(input_data, verbose=0)[0]
+        prediction_tensor = model_runner(tf.convert_to_tensor(input_data, dtype=tf.float32))
+        prediction = np.asarray(prediction_tensor)[0]
         inference_time = (time.time() - inference_start) * 1000
         
         predicted_idx = np.argmax(prediction)
@@ -713,8 +752,14 @@ def predict():
             
             response['meta'] = {
                 'handedness': f"{h_label} ({h_score*100:.1f}%)",
+                'mediapipe_confidence': f"{h_score*100:.1f}%",
+                'mediapipe_label': h_label,
+                'mediapipe_model_complexity': MP_MODEL_COMPLEXITY,
+                'mediapipe_min_detection_confidence': MP_MIN_DETECTION_CONFIDENCE,
+                'mediapipe_static_image_mode': MP_STATIC_IMAGE_MODE,
                 'scale': f"{extra_info['scale_factor']:.4f}",
                 'input_shape': str(extra_info['input_shape']),
+                'model_version': model_version,
                 'model_path': model_path,
             }
 
@@ -746,11 +791,16 @@ def predict():
             _, buffer = cv2.imencode('.jpg', cutout, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
             cutout_b64 = base64.b64encode(buffer).decode('utf-8')
             
-            response['debug_info'] = {
+            debug_info = {
                 'raw_landmarks': raw_kps.tolist(),
                # 'norm_landmarks': norm_kps.tolist(), # Skip sending this to save bandwidth
                 'hand_cutout': f"data:image/jpeg;base64,{cutout_b64}"
             }
+
+            if model_version == 3 and norm_kps is not None:
+                debug_info['v3_feature_lines'] = build_extra_feature_debug_data(norm_kps)
+
+            response['debug_info'] = debug_info
 
         return jsonify(response)
 
