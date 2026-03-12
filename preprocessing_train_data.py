@@ -5,9 +5,6 @@ import os
 import logging
 import numpy as np
 
-
-
-
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -37,8 +34,6 @@ face = mp_face_mesh.FaceMesh(
     max_num_faces=1,
     min_detection_confidence=0.3, # upgrade this later with tests
     min_tracking_confidence=0.3, # upgrade this later with tests
-
-
 )
 
 
@@ -52,21 +47,16 @@ pose = mp_pose.Pose(
 
 
 FACE_LANDMARKS = [
-
-
     # ===== EYEBROWS =====
     46,53,52,65,55,70,63,105,66,107,          # left eyebrow
     276,283,282,295,285,336,296,334,293,300,  # right eyebrow
-
 
     # ===== EYES =====
     33,160,158,133,153,144,163,7,246,161,159,157,      # left eye
     362,385,387,263,373,380,390,249,466,388,386,384,   # right eye
 
-
     # ===== NOSE =====
     1,2,98,327,168,
-
 
     # ===== MOUTH / LIPS  =====
     61,146,91,181,84,17,314,405,321,375,291,308,  # outer lip contour
@@ -74,17 +64,12 @@ FACE_LANDMARKS = [
     185,40,39,37,0,267,269,270,409,               # upper lip region
     191,80,81,82,13,312,311,310,415,              # lower lip region
 
-
     # ===== CHEEKS =====
     50,280,187,425
-
-
 ]
 
 
 POSE_LANDMARKS = [
-
-
     0,   # nose
     11,  # left shoulder
     12,  # right shoulder
@@ -106,8 +91,6 @@ def extract_gloss(folder_path):
     return "not_found"
 
 
-
-
 def extract_frames(video_path):
     """Read a video file and return a list of all frames."""
     frames = []
@@ -125,8 +108,6 @@ def extract_frames(video_path):
     return frames
 
 
-
-
 def extract_pose_keypoints(frames):
     """Extract pose keypoints for each frame, filtered to POSE_LANDMARKS indices."""
     all_pose_keypoints = []
@@ -136,7 +117,6 @@ def extract_pose_keypoints(frames):
         results = pose.process(image)
         image.flags.writeable = True
 
-
         if results.pose_landmarks:
             all_lm = results.pose_landmarks.landmark
             keypoints = [(all_lm[i].x, all_lm[i].y, all_lm[i].z)
@@ -145,8 +125,6 @@ def extract_pose_keypoints(frames):
             keypoints = None
         all_pose_keypoints.append((idx, keypoints))
     return all_pose_keypoints
-
-
 
 
 def extract_hand_keypoints(frames):
@@ -162,10 +140,8 @@ def extract_hand_keypoints(frames):
         results = hands.process(image)
         image.flags.writeable = True
 
-
         left_hand = None
         right_hand = None
-
 
         if results.multi_hand_landmarks and results.multi_handedness:
             for hand_landmarks, handedness in zip(results.multi_hand_landmarks, results.multi_handedness):
@@ -176,11 +152,8 @@ def extract_hand_keypoints(frames):
                 else:
                     right_hand = keypoints
 
-
         all_hand_keypoints.append((idx, left_hand, right_hand))
     return all_hand_keypoints
-
-
 
 
 def extract_face_keypoints(frames):
@@ -192,7 +165,6 @@ def extract_face_keypoints(frames):
         results = face.process(image)
         image.flags.writeable = True
 
-
         if results.multi_face_landmarks:
             all_lm = results.multi_face_landmarks[0].landmark
             keypoints = [(all_lm[i].x, all_lm[i].y, all_lm[i].z)
@@ -203,6 +175,34 @@ def extract_face_keypoints(frames):
     return all_face_keypoints
 
 
+def center_keypoints(keypoints):
+    """Center all keypoints around the midpoint between the shoulders in all 3 dimensions (x, y, z).
+    Expects keypoints as a numpy array of shape (N, 3) with pose landmarks first,
+    where index 1 = left shoulder and index 2 = right shoulder (per POSE_LANDMARKS).
+    """
+    kp = np.array(keypoints, dtype=float)
+    left_shoulder  = kp[1]
+    right_shoulder = kp[2]
+    center = (left_shoulder + right_shoulder) / 2.0
+    centered_keypoints = kp - center
+    return centered_keypoints
+
+
+def normalize_keypoints(keypoints):
+    """Normalize keypoints so that the distance between the shoulders equals 1.
+    Expects keypoints as a numpy array of shape (N, 3) with pose landmarks first,
+    where index 1 = left shoulder and index 2 = right shoulder (per POSE_LANDMARKS).
+    """
+    kp = np.array(keypoints, dtype=float)
+    left_shoulder  = kp[1]
+    right_shoulder = kp[2]
+    dist = np.linalg.norm(right_shoulder - left_shoulder)
+    if dist == 0:
+        return kp
+    normalized_keypoints = kp / dist
+    return normalized_keypoints
+
+
 def save_in_csv(pose_keypoints, hand_keypoints, face_keypoints, gloss, subfolder_name):
     """Save the extracted keypoints into a CSV file.
     Format: name, GLOSS, Frame, pose keypoints, left hand keypoints, right hand keypoints, face keypoints
@@ -211,15 +211,8 @@ def save_in_csv(pose_keypoints, hand_keypoints, face_keypoints, gloss, subfolder
     os.makedirs(output_folder, exist_ok=True)
     csv_file_path = os.path.join(output_folder, f"{subfolder_name}_traindata.csv")
 
-
-    EMPTY_HAND = [0.0] * (21 * 3)                    # 21 landmarks * (x, y, z)
-    EMPTY_POSE = [0.0] * (len(POSE_LANDMARKS) * 3)   # filtered landmarks * (x, y, z)
-    EMPTY_FACE = [0.0] * (len(FACE_LANDMARKS) * 3)   # filtered landmarks * (x, y, z)
-
-
     with open(csv_file_path, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-
 
         # Build header using actual landmark indices from the filter lists
         header = ["name", "GLOSS", "Frame"]
@@ -229,64 +222,59 @@ def save_in_csv(pose_keypoints, hand_keypoints, face_keypoints, gloss, subfolder
         header += [f"face_{i}_{a}" for i in FACE_LANDMARKS for a in ["x", "y", "z"]]
         writer.writerow(header)
 
+        n_pose = len(POSE_LANDMARKS)
+        n_hand = 21
+        n_face = len(FACE_LANDMARKS)
 
         for i in range(len(pose_keypoints)):
             frame_idx = pose_keypoints[i][0]
 
-
-            # Pose: flatten (x, y, z) for each landmark
+            # Build per-part arrays (N, 3)
             pose_kp = pose_keypoints[i][1]
-            if pose_kp:
-                flat_pose = [v for lm in pose_kp for v in lm]
-            else:
-                flat_pose = EMPTY_POSE
+            pose_arr = np.array(pose_kp, dtype=float) if pose_kp else np.zeros((n_pose, 3))
 
-
-            # Hands: left and right separately
             _, left_hand, right_hand = hand_keypoints[i]
-            flat_left  = [v for lm in left_hand  for v in lm] if left_hand  else EMPTY_HAND
-            flat_right = [v for lm in right_hand for v in lm] if right_hand else EMPTY_HAND
+            left_arr  = np.array(left_hand,  dtype=float) if left_hand  else np.zeros((n_hand, 3))
+            right_arr = np.array(right_hand, dtype=float) if right_hand else np.zeros((n_hand, 3))
 
-
-            # Face: flatten (x, y, z) for each landmark
             face_kp = face_keypoints[i][1]
-            if face_kp:
-                flat_face = [v for lm in face_kp for v in lm]
-            else:
-                flat_face = EMPTY_FACE
+            face_arr = np.array(face_kp, dtype=float) if face_kp else np.zeros((n_face, 3))
 
+            # Combine all landmarks, then center and normalize (only when pose is detected)
+            all_kp = np.concatenate([pose_arr, left_arr, right_arr, face_arr], axis=0)
+            if pose_kp:
+                all_kp = center_keypoints(all_kp)
+                all_kp = normalize_keypoints(all_kp)
+
+            # Split back and flatten
+            flat_pose  = all_kp[:n_pose].flatten().tolist()
+            flat_left  = all_kp[n_pose:n_pose + n_hand].flatten().tolist()
+            flat_right = all_kp[n_pose + n_hand:n_pose + 2 * n_hand].flatten().tolist()
+            flat_face  = all_kp[n_pose + 2 * n_hand:].flatten().tolist()
 
             writer.writerow([subfolder_name, gloss, frame_idx]
                             + flat_pose + flat_left + flat_right + flat_face)
 
-
     logging.info(f"  -> Saved keypoints to {csv_file_path}")
-
 
 if __name__ == "__main__":
     logging.info("this script is made for the preprocessing of datasets (Phoenix 2014 T)")
 
-
     raw_vid = os.path.join("data", "raw_data", "train")
-
 
     # go through all the files in the raw data folder and process them one by one
     for supfolder in sorted(os.listdir(raw_vid)):
         subfolder_name = supfolder
         subfolder_path = os.path.join(raw_vid, subfolder_name)
 
-
         if not os.path.isdir(subfolder_path):
             continue
 
-
         logging.info(f"Currently processing folder: {supfolder}")
-
 
         # get gloss
         gloss = extract_gloss(subfolder_path)
         logging.info(f"  -> Extracted gloss: {gloss}")
-
 
         # find video file in the subfolder
         video_file = None
@@ -295,11 +283,9 @@ if __name__ == "__main__":
                 video_file = os.path.join(subfolder_path, file_name)
                 break
 
-
         if video_file is None:
             logging.warning(f"  -> No .mp4 file found in {subfolder_path}, skipping.")
             continue
-
 
         # extract all frames from the video
         frames = extract_frames(video_file)
@@ -307,12 +293,10 @@ if __name__ == "__main__":
             logging.warning(f"  -> No frames extracted, skipping.")
             continue
 
-
         # extract keypoints from the frames
         pose_keypoints = extract_pose_keypoints(frames)
         hand_keypoints = extract_hand_keypoints(frames)
         face_keypoints = extract_face_keypoints(frames)
-
 
         # save keypoints to csv
         save_in_csv(pose_keypoints, hand_keypoints, face_keypoints, gloss, subfolder_name)
