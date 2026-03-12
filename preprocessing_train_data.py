@@ -36,12 +36,30 @@ mp_pose = mp_pose.Pose(
     min_tracking_confidence=0.5
 )
 
+HAND_LANDMARKS = list(range(21))  # all 21 hand landmarks (0-20)
+
 FACE_MESH_LANDMARKS = [
-# define here which should be used
+    # Lips outer
+    61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291,
+    # Lips inner
+    78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308,
+    # Left eye
+    263, 249, 390, 373, 374, 380, 381, 382, 362,
+    # Right eye
+    33, 7, 163, 144, 145, 153, 154, 155, 133,
+    # Nose tip
+    1, 2, 98, 327,
 ]
 
 POSE_LANDMARKS = [
-# define here which should be used
+    0,        # nose
+    11, 12,   # shoulders
+    13, 14,   # elbows
+    15, 16,   # wrists
+    17, 18,   # pinky fingers
+    19, 20,   # index fingers
+    21, 22,   # thumbs
+    23, 24,   # hips
 ]
 
 def get_gloss(subfolder_path):
@@ -69,10 +87,78 @@ def get_frames(video_path):
     cap.release()
     return frames
 
+def get_hand_keypoints(frames, hand_results):
+    all_kps = []
+    for frame_idx, result in enumerate(hand_results):
+        kps = []
+        if result.multi_hand_landmarks:
+            for hand_lm in result.multi_hand_landmarks:
+                for idx in HAND_LANDMARKS:
+                    lm = hand_lm.landmark[idx]
+                    kps.extend([lm.x, lm.y, lm.z])
+        if not kps:
+            kps = [0.0] * (len(HAND_LANDMARKS) * 3)
+        print(f"  [Hand] Frame {frame_idx}: {kps}")
+        all_kps.append(kps)
+    return all_kps
+
+
+def get_face_keypoints(frames, face_results):
+    all_kps = []
+    for frame_idx, result in enumerate(face_results):
+        kps = []
+        if result.multi_face_landmarks:
+            for face_lm in result.multi_face_landmarks:
+                for idx in FACE_MESH_LANDMARKS:
+                    lm = face_lm.landmark[idx]
+                    kps.extend([lm.x, lm.y, lm.z])
+        if not kps:
+            kps = [0.0] * (len(FACE_MESH_LANDMARKS) * 3)
+        print(f"  [Face] Frame {frame_idx}: {kps}")
+        all_kps.append(kps)
+    return all_kps
+
+
+def get_pose_keypoints(frames, pose_results):
+    all_kps = []
+    for frame_idx, result in enumerate(pose_results):
+        kps = []
+        if result.pose_landmarks:
+            for idx in POSE_LANDMARKS:
+                lm = result.pose_landmarks.landmark[idx]
+                kps.extend([lm.x, lm.y, lm.z])
+        if not kps:
+            kps = [0.0] * (len(POSE_LANDMARKS) * 3)
+        print(f"  [Pose] Frame {frame_idx}: {kps}")
+        all_kps.append(kps)
+    return all_kps
+
+
+def process_frames(frames):
+    """Run all three models on each frame once."""
+    hand_results, face_results, pose_results = [], [], []
+    for frame in frames:
+        hand_results.append(hands.process(frame))
+        face_results.append(mp_face_mesh.process(frame))
+        pose_results.append(mp_pose.process(frame))
+    return hand_results, face_results, pose_results
+
+def build_headers():
+    headers = ["name", "GLOSS", "Frame"]
+    headers += [f"hand_{i}_{ax}" for i in range(len(HAND_LANDMARKS)) for ax in ("x", "y", "z")]
+    headers += [f"face_{i}_{ax}" for i in range(len(FACE_MESH_LANDMARKS)) for ax in ("x", "y", "z")]
+    headers += [f"pose_{i}_{ax}" for i in range(len(POSE_LANDMARKS)) for ax in ("x", "y", "z")]
+    return headers
+
+def save_to_csv(rows, csv_path):
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+    with open(csv_path, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        writer.writerow(build_headers())
+        writer.writerows(rows)
+
 if __name__ == "__main__":
     logging.info("Starting video processing for training data generation")
-
-    
 
     # go through all videos in data/raw_data/train
     for subfolder in os.listdir("data/raw_data"):
@@ -83,13 +169,31 @@ if __name__ == "__main__":
 
         # get gloss from subfolder
         gloss = get_gloss(subfolder_path)
-        logging.info(f"Gloss for {subfolder}: {gloss}")
 
         # load frames
         frames = get_frames(os.path.join(subfolder_path, f"video.mp4"))
-        logging.info(f"Total frames extracted from {subfolder}: {len(frames)}\n")
+        logging.info(f"Total frames extracted from {subfolder}: {len(frames)} - Gloss: {gloss}\n")
+
+        # run all models once per frame
+        hand_results, face_results, pose_results = process_frames(frames)
 
         # extract certain keypoints for each frame
+        face_keypoints = get_face_keypoints(frames, face_results)
+        pose_keypoints = get_pose_keypoints(frames, pose_results)
+        hand_keypoints = get_hand_keypoints(frames, hand_results)
+        logging.info(f"Finished processing {subfolder}. Hand keypoints: {len(hand_keypoints)}, Face keypoints: {len(face_keypoints)}, Pose keypoints: {len(pose_keypoints)}\n\n")
+
+        # combine all data and save as csv in data/train_data/
+        rows = []
+        for frame_idx in range(len(frames)):
+            row = [subfolder, gloss, frame_idx] + hand_keypoints[frame_idx] + face_keypoints[frame_idx] + pose_keypoints[frame_idx]
+            rows.append(row)
+
+        csv_path = os.path.join("data", f"{subfolder}_traindata.csv")
+        save_to_csv(rows, csv_path)
+        logging.info(f"Saved {len(rows)} frames to {csv_path}")
+
+        break # for testing, remove in production
 
 
 """
