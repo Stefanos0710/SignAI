@@ -1,27 +1,98 @@
+import logging
+import cv2
+import mediapipe as mp
+import csv
+import os
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s' )
+
+# ----------------------------
+# Initialization of MediaPipe Hands
+# ----------------------------
+mp_hands = mp.solutions.hands
+mp_face_mesh = mp.solutions.face_mesh
+mp_pose = mp.solutions.pose
+
+hands = mp_hands.Hands(
+    static_image_mode=False,
+    max_num_hands=1,
+    min_detection_confidence=0.5, # with 0.7 we get 3.12% invalid samples, with 0.5 we get 1.67% invalid samples, 
+    model_complexity=1
+)
+
+mp_face_mesh = mp_face_mesh.FaceMesh(
+    static_image_mode=False,
+    max_num_faces=1,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5
+)
+
+mp_pose = mp_pose.Pose(
+    static_image_mode=False,
+    model_complexity=1,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5
+)
+
+FACE_MESH_LANDMARKS = [
+# define here which should be used
+]
+
+POSE_LANDMARKS = [
+# define here which should be used
+]
+
+def get_gloss(subfolder_path):
+    gloss_file = None
+    for file_name in os.listdir(subfolder_path):
+        if file_name.lower().endswith('.txt'):
+            gloss_text = open(os.path.join(subfolder_path, file_name), 'r', encoding='utf-8').read().strip()
+            return gloss_text
+
+        elif not gloss_file:
+            logging.warning(f"No gloss file found in {subfolder_path}")
+            return "gloss_not_found"
+        
+def get_frames(video_path):
+    frames = []
+    cap = cv2.VideoCapture(video_path)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        frames.append(rgb_frame)
+    cap.release()
+    return frames
+
+if __name__ == "__main__":
+    logging.info("Starting video processing for training data generation")
+
+    
+
+    # go through all videos in data/raw_data/train
+    for subfolder in os.listdir("data/raw_data"):
+        subfolder_path = os.path.join("data/raw_data", subfolder)
+        if not os.path.isdir(subfolder_path):
+            continue
+        print(f"Processing folder: {subfolder}")
+
+        # get gloss from subfolder
+        gloss = get_gloss(subfolder_path)
+        logging.info(f"Gloss for {subfolder}: {gloss}")
+
+        # load frames
+        frames = get_frames(os.path.join(subfolder_path, f"video.mp4"))
+        logging.info(f"Total frames extracted from {subfolder}: {len(frames)}\n")
+
+        # extract certain keypoints for each frame
+
+
 """
-SignAI - Sign Language Translator
-Preprocessing Training Data Module
-
-This script processes sign language videos to detect and track facial expressions,
-hand gestures, and body poses using MediaPipe. It extracts keypoint data and saves
-it to CSV files for model training.
-
-Key Features:
-- Face detection and landmark tracking
-- Hand gesture recognition
-- Body pose estimation
-- Multi-frame processing with visualization
-- Data normalization and scaling
-- CSV output generation
-- Enhanced UI and visualization
-- Improved hand detection stability
-
-Author: Stefanos Koufogazos Loukianov
-Created: 2024-10-24
-Updated: 2025-06-04 17:56:56
-
-"""
-
 import cv2
 import mediapipe as mp
 import csv
@@ -90,17 +161,7 @@ HAND_PADDING = 25      # Padding around hand ROI
 HAND_BOX_SIZE = 70     # Size of hand detection box
 
 
-class VideoProcessor:
-    """
-    Video processing class optimized for headless fast keypoint extraction.
 
-    Key speedups applied:
-    - GUI disabled (no namedWindow/imshow/waitKey) when use_gui=False
-    - Face keypoints extraction disabled (USE_FACE=False) to reduce features to 150
-    - MediaPipe Hands and Pose use tracking mode (static_image_mode=False) and low model_complexity
-    - Optional frame skipping to drastically reduce processing (FRAME_SKIP)
-    - Drawing and heavy visualization disabled when use_gui=False
-    """
 
     def __init__(self, accuracy=0.3, rotation=0, use_gui=USE_GUI, use_face=USE_FACE, frame_skip=FRAME_SKIP):
         self.rotation = rotation
@@ -365,8 +426,7 @@ class VideoProcessor:
             return None, frame
 
     def process_video(self, video_path, output_csv_path, video_name, gloss_text, fps):
-        """Streaming frame-by-frame processing without caching frames to memory. This is faster and uses less RAM.
-        """
+
         cam = cv2.VideoCapture(video_path)
         if not cam.isOpened():
             logging.error(f"Could not open video: {video_path}")
@@ -465,9 +525,7 @@ def get_video_orientation():
 
 
 def get_fps_from_user():
-    """Return FPS to use. In non-interactive or headless mode returns FPS_TARGET.
-    Allows overriding via environment variable SIGNAI_FPS.
-    """
+
     # 1) environment override
     env = os.environ.get('SIGNAI_FPS')
     if env:
@@ -518,9 +576,7 @@ def get_fps_from_user():
 
 
 def process_single_video(task):
-    """Top-level worker function for multiprocessing.
-    task: dict with keys: video_file, csv_file_path, subfolder_name, gloss_text, fps, rotation, use_face, frame_skip
-    """
+
     try:
         video_file = task['video_file']
         csv_file_path = task['csv_file_path']
@@ -643,3 +699,4 @@ if __name__ == '__main__':
                 cv2.destroyAllWindows()
             except Exception:
                 pass
+"""
