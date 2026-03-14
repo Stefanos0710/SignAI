@@ -18,7 +18,7 @@ import tensorflow as tf
 import pandas as pd
 import io
 import re
-from typing import List, Dict, Union, Tuple
+from typing import List, Dict, Union, Tuple, Optional
 import time
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
@@ -49,27 +49,6 @@ MIN_ACCEPTED_FEATURES = 32
 
 # silence specific DeprecationWarning noise that originates from csv parsing of some files
 warnings.filterwarnings("ignore", message="string or file could not be read to its end due to unmatched data")
-
-class TransformerSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
-    """Learning rate schedule from 'Attention Is All You Need' paper"""
-    def __init__(self, d_model, warmup_steps=4000):
-        super().__init__()
-        self.d_model = d_model
-        self.d_model_float = tf.cast(d_model, tf.float32)
-        self.warmup_steps = warmup_steps
-
-    def __call__(self, step):
-        step = tf.cast(step, tf.float32)
-        arg1 = tf.math.rsqrt(step)
-        arg2 = step * (self.warmup_steps ** -1.5)
-        return tf.math.rsqrt(self.d_model_float) * tf.math.minimum(arg1, arg2)
-
-    def get_config(self):
-        return {
-            "d_model": self.d_model,
-            "warmup_steps": self.warmup_steps
-        }
-            
 
 
 def _parse_csv_text(file_name: str, text: str, used_encoding: str = 'utf-8') -> Tuple[Union[Dict, None], Union[Tuple[str, str], None]]:
@@ -543,305 +522,238 @@ def greedy_decode(model, encoder_input, tokenizer, max_len):
     return " ".join(words).strip()
 
 
-class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
-    """Evaluate WER and BLEU(1-4) on a small unseen validation subset each epoch."""
+def _safe_tokens(text: str) -> List[str]:
+    return [t for t in str(text).strip().split() if t]
 
-    def __init__(self, val_encoder, val_references, tokenizer, max_len, sample_size=32, seed=42):
+
+def _ngram_counter(tokens: List[str], n: int) -> Dict[Tuple[str, ...], int]:
+    counts: Dict[Tuple[str, ...], int] = {}
+    if len(tokens) < n or n <= 0:
+        return counts
+    for i in range(len(tokens) - n + 1):
+        ng = tuple(tokens[i:i + n])
+        counts[ng] = counts.get(ng, 0) + 1
+    return counts
+
+
+def _rouge_n_pair(ref_tokens: List[str], hyp_tokens: List[str], n: int) -> Tuple[float, float, float]:
+    ref_counts = _ngram_counter(ref_tokens, n)
+    hyp_counts = _ngram_counter(hyp_tokens, n)
+
+    ref_total = sum(ref_counts.values())
+    hyp_total = sum(hyp_counts.values())
+
+    if ref_total == 0 and hyp_total == 0:
+        return 1.0, 1.0, 1.0
+    if ref_total == 0 or hyp_total == 0:
+        return 0.0, 0.0, 0.0
+
+    overlap = 0
+    for ng, c in hyp_counts.items():
+        overlap += min(c, ref_counts.get(ng, 0))
+
+    precision = overlap / hyp_total if hyp_total > 0 else 0.0
+    recall = overlap / ref_total if ref_total > 0 else 0.0
+    f1 = 0.0 if (precision + recall) == 0 else (2 * precision * recall) / (precision + recall)
+    return precision, recall, f1
+
+
+def _lcs_length(a: List[str], b: List[str]) -> int:
+    if not a or not b:
+        return 0
+    prev = [0] * (len(b) + 1)
+    for i in range(1, len(a) + 1):
+        cur = [0] * (len(b) + 1)
+        ai = a[i - 1]
+        for j in range(1, len(b) + 1):
+            if ai == b[j - 1]:
+                cur[j] = prev[j - 1] + 1
+            else:
+                cur[j] = max(prev[j], cur[j - 1])
+        prev = cur
+    return prev[-1]
+
+
+def _rouge_l_pair(ref_tokens: List[str], hyp_tokens: List[str]) -> Tuple[float, float, float]:
+    if len(ref_tokens) == 0 and len(hyp_tokens) == 0:
+        return 1.0, 1.0, 1.0
+    if len(ref_tokens) == 0 or len(hyp_tokens) == 0:
+        return 0.0, 0.0, 0.0
+
+    lcs = _lcs_length(ref_tokens, hyp_tokens)
+    precision = lcs / len(hyp_tokens)
+    recall = lcs / len(ref_tokens)
+    f1 = 0.0 if (precision + recall) == 0 else (2 * precision * recall) / (precision + recall)
+    return precision, recall, f1
+
+
+def compute_corpus_rouge(references: List[str], hypotheses: List[str]) -> Dict[str, float]:
+    r1_p, r1_r, r1_f = [], [], []
+    r2_p, r2_r, r2_f = [], [], []
+    rl_p, rl_r, rl_f = [], [], []
+
+    for ref, hyp in zip(references, hypotheses):
+        ref_t = _safe_tokens(ref)
+        hyp_t = _safe_tokens(hyp)
+
+        p, r, f = _rouge_n_pair(ref_t, hyp_t, n=1)
+        r1_p.append(p)
+        r1_r.append(r)
+        r1_f.append(f)
+
+        p, r, f = _rouge_n_pair(ref_t, hyp_t, n=2)
+        r2_p.append(p)
+        r2_r.append(r)
+        r2_f.append(f)
+
+        p, r, f = _rouge_l_pair(ref_t, hyp_t)
+        rl_p.append(p)
+        rl_r.append(r)
+        rl_f.append(f)
+
+    return {
+        "rouge1_p": float(np.mean(r1_p)) if r1_p else 0.0,
+        "rouge1_r": float(np.mean(r1_r)) if r1_r else 0.0,
+        "rouge1_f": float(np.mean(r1_f)) if r1_f else 0.0,
+        "rouge2_p": float(np.mean(r2_p)) if r2_p else 0.0,
+        "rouge2_r": float(np.mean(r2_r)) if r2_r else 0.0,
+        "rouge2_f": float(np.mean(r2_f)) if r2_f else 0.0,
+        "rougel_p": float(np.mean(rl_p)) if rl_p else 0.0,
+        "rougel_r": float(np.mean(rl_r)) if rl_r else 0.0,
+        "rougel_f": float(np.mean(rl_f)) if rl_f else 0.0,
+    }
+
+
+class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
+    """Evaluate text-generation quality on validation set after each epoch."""
+
+    def __init__(
+            self,
+            val_encoder: np.ndarray,
+            val_references: List[str],
+            tokenizer,
+            max_len: int,
+            sample_size: Optional[int] = 256,
+            seed: int = 42,
+    ):
         super().__init__()
         self.val_encoder = val_encoder
         self.val_references = val_references
         self.tokenizer = tokenizer
-        self.max_len = max_len
-        self.sample_size = sample_size
-        self.seed = seed
-        self.bleu_metrics = {
-            1: BLEU(max_ngram_order=1, effective_order=True),
-            2: BLEU(max_ngram_order=2, effective_order=True),
-            3: BLEU(max_ngram_order=3, effective_order=True),
-            4: BLEU(max_ngram_order=4, effective_order=True),
-        }
+        self.max_len = int(max_len)
+
+        n = len(self.val_references)
+        if n == 0:
+            self.eval_indices = np.array([], dtype=np.int64)
+        elif sample_size is None or sample_size <= 0 or sample_size >= n:
+            self.eval_indices = np.arange(n, dtype=np.int64)
+        else:
+            rng = np.random.default_rng(seed)
+            self.eval_indices = rng.choice(np.arange(n), size=int(sample_size), replace=False)
+
+        self.bleu = BLEU(effective_order=True)
+        self.bleu1 = BLEU(max_ngram_order=1, effective_order=True)
+        self.bleu2 = BLEU(max_ngram_order=2, effective_order=True)
+        self.bleu3 = BLEU(max_ngram_order=3, effective_order=True)
+        self.bleu4 = BLEU(max_ngram_order=4, effective_order=True)
 
     def on_epoch_end(self, epoch, logs=None):
-        logs = logs or {}
-        if self.val_encoder is None or len(self.val_references) == 0:
+        if logs is None:
+            logs = {}
+        if self.eval_indices.size == 0:
             return
 
-        n_total = len(self.val_references)
-        n_eval = min(self.sample_size, n_total)
-        rng = np.random.default_rng(self.seed + epoch)
-        eval_indices = rng.choice(n_total, size=n_eval, replace=False)
+        refs = []
+        hyps = []
 
-        references = []
-        predictions = []
-        for idx in eval_indices:
-            ref = str(self.val_references[idx]).strip()
-            pred = greedy_decode(self.model, self.val_encoder[idx], self.tokenizer, self.max_len)
-            references.append(ref)
-            predictions.append(pred)
+        for i in self.eval_indices:
+            pred = greedy_decode(self.model, self.val_encoder[i], self.tokenizer, self.max_len)
+            ref = self.val_references[i]
+            hyps.append(pred if pred else "")
+            refs.append(ref if ref else "")
 
-        wer_values = []
-        for ref, pred in zip(references, predictions):
-            if not ref and not pred:
-                wer_values.append(0.0)
-            else:
-                wer_values.append(float(jiwer.wer(ref, pred)))
-        avg_wer = float(np.mean(wer_values)) if wer_values else 0.0
+        val_wer = float(jiwer.wer(refs, hyps))
+        val_bleu = float(self.bleu.corpus_score(hyps, [refs]).score)
+        val_bleu1 = float(self.bleu1.corpus_score(hyps, [refs]).score)
+        val_bleu2 = float(self.bleu2.corpus_score(hyps, [refs]).score)
+        val_bleu3 = float(self.bleu3.corpus_score(hyps, [refs]).score)
+        val_bleu4 = float(self.bleu4.corpus_score(hyps, [refs]).score)
+        rouge_scores = compute_corpus_rouge(refs, hyps)
 
-        bleu_scores = {}
-        for n, bleu_metric in self.bleu_metrics.items():
-            bleu_scores[n] = float(bleu_metric.corpus_score(predictions, [references]).score)
+        logs["val_wer"] = val_wer
+        logs["val_bleu"] = val_bleu
+        logs["val_bleu1"] = val_bleu1
+        logs["val_bleu2"] = val_bleu2
+        logs["val_bleu3"] = val_bleu3
+        logs["val_bleu4"] = val_bleu4
 
-        logs["val_wer"] = avg_wer
-        logs["val_bleu1"] = bleu_scores[1]
-        logs["val_bleu2"] = bleu_scores[2]
-        logs["val_bleu3"] = bleu_scores[3]
-        logs["val_bleu4"] = bleu_scores[4]
+        logs["val_rouge1_p"] = rouge_scores["rouge1_p"]
+        logs["val_rouge1_r"] = rouge_scores["rouge1_r"]
+        logs["val_rouge1_f"] = rouge_scores["rouge1_f"]
+        logs["val_rouge2_p"] = rouge_scores["rouge2_p"]
+        logs["val_rouge2_r"] = rouge_scores["rouge2_r"]
+        logs["val_rouge2_f"] = rouge_scores["rouge2_f"]
+        logs["val_rougel_p"] = rouge_scores["rougel_p"]
+        logs["val_rougel_r"] = rouge_scores["rougel_r"]
+        logs["val_rougel_f"] = rouge_scores["rougel_f"]
 
         logging.info(
-            "Epoch %d evaluation -> WER: %.4f | BLEU-1: %.2f | BLEU-2: %.2f | BLEU-3: %.2f | BLEU-4: %.2f",
+            "Epoch %d text-metrics | WER=%.4f BLEU=%.2f B1=%.2f B2=%.2f B3=%.2f B4=%.2f "
+            "R1-F=%.4f R2-F=%.4f RL-F=%.4f",
             epoch + 1,
-            avg_wer,
-            bleu_scores[1],
-            bleu_scores[2],
-            bleu_scores[3],
-            bleu_scores[4],
+            val_wer,
+            val_bleu,
+            val_bleu1,
+            val_bleu2,
+            val_bleu3,
+            val_bleu4,
+            rouge_scores["rouge1_f"],
+            rouge_scores["rouge2_f"],
+            rouge_scores["rougel_f"],
         )
 
-        if references:
-            logging.info("Sample reference: %s", references[0])
-            logging.info("Sample prediction: %s", predictions[0])
 
-# NOTE: Positional Encoding Layer for Transformer Model Decoder
-class SinePositionEncoding(tf.keras.layers.Layer):
-    """
-    Sinusoidal positional encoding as described in "Attention Is All You Need" (Vaswani et al., 2017).
-    
-    Adds position information to embeddings using sine and cosine functions of different frequencies.
-    This allows the model to learn to attend by relative positions.
-    
-    The positional encoding has the same dimension as the embeddings so they can be summed.
-    PE(pos, 2i) = sin(pos / 10000^(2i/d_model))
-    PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))
-    
-    where pos is the position and i is the dimension.
-    """
-    
-    def __init__(self, **kwargs):
-        super(SinePositionEncoding, self).__init__(**kwargs)
-        
-    def call(self, inputs):
-        """
-        Args:
-            inputs: Tensor of shape (batch_size, seq_length, d_model)
-            
-        Returns:
-            Tensor of shape (batch_size, seq_length, d_model) with positional encodings added
-        """
-        batch_size = tf.shape(inputs)[0]
-        seq_length = tf.shape(inputs)[1]
-        d_model = tf.shape(inputs)[2]
-        
-        # Create position indices: [0, 1, 2, ..., seq_length-1]
-        position = tf.cast(tf.range(seq_length), dtype=tf.float32)
-        position = position[tf.newaxis, :, tf.newaxis]  # Shape: (1, seq_length, 1)
-        
-        # Create dimension indices: [0, 1, 2, ..., d_model-1]
-        i = tf.cast(tf.range(d_model), dtype=tf.float32)
-        
-        # Calculate the angles
-        # For even indices: use i, for odd indices: use i-1
-        # This ensures alternating sin/cos pattern
-        angle_rates = 1.0 / tf.pow(10000.0, (2 * (i // 2)) / tf.cast(d_model, tf.float32))
-        angle_rates = angle_rates[tf.newaxis, tf.newaxis, :]  # Shape: (1, 1, d_model)
-        
-        # Calculate angles: position * angle_rates
-        angle_rads = position * angle_rates  # Shape: (1, seq_length, d_model)
-        
-        # Apply sin to even indices (0, 2, 4, ...) and cos to odd indices (1, 3, 5, ...)
-        # Create indices array and check if even/odd
-        indices = tf.range(d_model)
-        
-        # Use where to select sin or cos based on even/odd
-        angle_rads_sin = tf.sin(angle_rads)
-        angle_rads_cos = tf.cos(angle_rads)
-        
-        # Alternate between sin and cos
-        pos_encoding = tf.where(
-            tf.equal(indices % 2, 0),
-            angle_rads_sin,
-            angle_rads_cos
-        )
-        
-        # Add positional encoding to inputs
-        # Broadcasting will handle batch dimension automatically
-        return inputs + pos_encoding
-    
-    def get_config(self):
-        config = super(SinePositionEncoding, self).get_config()
-        return config
+class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
+    """Batch-wise loader to avoid materializing the full training tensors on GPU."""
 
-# NOTE: Helper function to verify positional encoding correctness
-def verify_positional_encoding():
-    """
-    Test function to verify SinePositionEncoding is working correctly.
-    
-    Checks:
-    1. Output shape matches input shape
-    2. Positional encoding adds information (output != input)
-    3. Same positions get same encodings (deterministic)
-    4. Different positions get different encodings
-    5. Sin/cos pattern alternates correctly
-    """
-    print("\n" + "="*80)
-    print("POSITIONAL ENCODING VERIFICATION")
-    print("="*80)
-    
-    # Create test input: (batch=2, seq_len=10, d_model=64)
-    batch_size, seq_len, d_model = 2, 10, 64
-    test_input = tf.random.normal((batch_size, seq_len, d_model))
-    
-    # Apply positional encoding
-    pe_layer = SinePositionEncoding()
-    output = pe_layer(test_input)
-    
-    # Check 1: Shape preservation
-    assert output.shape == test_input.shape, f"Shape mismatch: {output.shape} vs {test_input.shape}"
-    print("✓ Shape preserved:", output.shape.as_list())
-    
-    # Check 2: Output is different from input (encoding was added)
-    difference = tf.reduce_mean(tf.abs(output - test_input))
-    assert difference > 0.01, f"Output too similar to input (diff={difference:.4f})"
-    print(f"✓ Encoding added (mean abs diff: {difference:.4f})")
-    
-    # Check 3: Deterministic - same input gives same output
-    output2 = pe_layer(test_input)
-    assert tf.reduce_all(tf.equal(output, output2)), "Non-deterministic output!"
-    print("✓ Deterministic (same input → same output)")
-    
-    # Check 4: Different positions have different encodings
-    # Extract positional encodings by subtracting original input
-    pos_encoding = output - test_input
-    pos_enc_batch1 = pos_encoding[0]  # (seq_len, d_model)
-    
-    # Check first vs second position are different
-    diff_positions = tf.reduce_sum(tf.abs(pos_enc_batch1[0] - pos_enc_batch1[1]))
-    assert diff_positions > 0.1, f"Positions too similar (diff={diff_positions:.4f})"
-    print(f"✓ Different positions have different encodings (diff: {diff_positions:.4f})")
-    
-    # Check 5: Same position across batches gets same encoding
-    pos_enc_batch2 = pos_encoding[1]
-    same_pos_diff = tf.reduce_sum(tf.abs(pos_enc_batch1[0] - pos_enc_batch2[0]))
-    assert same_pos_diff < 1e-5, f"Same position different encoding across batches (diff={same_pos_diff:.4f})"
-    print(f"✓ Same position gets same encoding across batches (diff: {same_pos_diff:.6f})")
-    
-    # Check 6: Sin/cos pattern verification
-    # For a zero input, we can see the raw positional encoding
-    zero_input = tf.zeros((1, 5, 8))  # Small size for inspection
-    pos_only = pe_layer(zero_input)[0]  # (5, 8)
-    
-    # Check that even and odd dimensions have different patterns
-    even_dims = pos_only[:, 0::2]  # Columns 0, 2, 4, 6 (sin)
-    odd_dims = pos_only[:, 1::2]   # Columns 1, 3, 5, 7 (cos)
-    
-    # They should be different
-    sin_cos_diff = tf.reduce_mean(tf.abs(even_dims - odd_dims))
-    assert sin_cos_diff > 0.1, f"Sin/cos pattern not clear (diff={sin_cos_diff:.4f})"
-    print(f"✓ Sin/cos alternating pattern detected (diff: {sin_cos_diff:.4f})")
-    
-    # Check 7: Verify frequency increases with dimension
-    # Lower dimensions should change faster across positions
-    pos_only_np = pos_only.numpy()
-    
-    # Compare variance across positions for first vs last dimension pair
-    var_first_dim = np.var(pos_only_np[:, 0])  # First dimension (low frequency)
-    var_last_dim = np.var(pos_only_np[:, -2])  # Second-to-last dimension (high frequency)
-    
-    print(f"  - First dimension variance: {var_first_dim:.4f}")
-    print(f"  - Last dimension variance: {var_last_dim:.4f}")
-    print(f"✓ Frequency pattern correct (higher dims have lower variance)")
-    
-    # Display sample encoding for first 3 positions, first 8 dimensions
-    print("\nSample positional encodings (positions 0-2, dims 0-7):")
-    print(pos_only_np[:3, :8])
-    
-    print("="*80)
-    print("Positional encoding working correctly!\n")
+    def __init__(
+            self,
+            encoder_data: np.ndarray,
+            decoder_data: np.ndarray,
+            target_data: np.ndarray,
+            indices: np.ndarray,
+            batch_size: int,
+            shuffle: bool = True,
+            seed: Optional[int] = 42,
+    ):
+        self.encoder_data = encoder_data
+        self.decoder_data = decoder_data
+        self.target_data = target_data
+        self.base_indices = np.asarray(indices, dtype=np.int64)
+        self.batch_size = max(1, int(batch_size))
+        self.shuffle = bool(shuffle)
+        self.rng = np.random.default_rng(seed)
+        self.indices = self.base_indices.copy()
+        self.on_epoch_end()
+
+    def __len__(self):
+        return int(np.ceil(len(self.indices) / self.batch_size))
+
+    def __getitem__(self, idx):
+        start = idx * self.batch_size
+        end = min(start + self.batch_size, len(self.indices))
+        batch_idx = self.indices[start:end]
+        x_enc = self.encoder_data[batch_idx]
+        x_dec = self.decoder_data[batch_idx]
+        y = self.target_data[batch_idx]
+        return (x_enc, x_dec), y
+
+    def on_epoch_end(self):
+        self.indices = self.base_indices.copy()
+        if self.shuffle:
+            self.rng.shuffle(self.indices)
 
 
-def build_seq2seq_model_baseline(
-        max_frames, num_features, vocab_size,
-        embedding_dim=64,
-        encoder_units=128,
-        decoder_units=256,
-        dropout_rate=0.3,
-        recurrent_dropout_rate=0.1
-):
-    """
-    Build the sequence-to-sequence model using the requested architecture.
-
-    Encoder: Input(shape=(None, num_features)) -> Masking -> Bidirectional(LSTM(encoder_units, return_sequences=True, return_state=True,...))
-    Decoder: Input(shape=(None,)) -> Embedding(vocab_size, embedding_dim) -> LSTM(decoder_units, return_sequences=True, return_state=True, initial_state=[state_h, state_c])
-    Attention: AdditiveAttention between decoder outputs and encoder outputs, then Concatenate and Dense softmax to produce token probabilities.
-    """
-    # encoder
-    encoder_inputs = Input(shape=(None, num_features), name="encoder_inputs")
-    # NOTE: Ensure correct masking of padded frames => we need to extract the mask for attention later (should work without it here also due to LSTM, but for Transformer it is problematic)
-    masking_layer = Masking(mask_value=0.0, name="encoder_masking_layer")
-    x = masking_layer(encoder_inputs)
-    encoder_attention_mask = masking_layer.compute_mask(encoder_inputs)
-
-    encoder_lstm = Bidirectional(
-        LSTM(
-            encoder_units,
-            return_sequences=True,
-            return_state=True,
-            dropout=dropout_rate,
-            recurrent_dropout=recurrent_dropout_rate,
-        ),
-        name="encoder_bidirectional"
-    )
-
-    encoder_outputs_and_states = encoder_lstm(x)
-    # encoder_outputs_and_states: (outputs, f_h, f_c, b_h, b_c)
-    encoder_outputs = encoder_outputs_and_states[0]
-    f_h = encoder_outputs_and_states[1]
-    f_c = encoder_outputs_and_states[2]
-    b_h = encoder_outputs_and_states[3]
-    b_c = encoder_outputs_and_states[4]
-
-    state_h = Concatenate(name="encoder_state_h")([f_h, b_h])
-    state_c = Concatenate(name="encoder_state_c")([f_c, b_c])
-
-    # decoder
-    decoder_inputs = Input(shape=(None,), name="decoder_inputs")
-    decoder_embedding = Embedding(vocab_size, embedding_dim, mask_zero=True, name="decoder_embedding")(decoder_inputs)
-
-    decoder_lstm = LSTM(
-        decoder_units,
-        return_sequences=True,
-        return_state=True,
-        dropout=dropout_rate,
-        recurrent_dropout=recurrent_dropout_rate,
-        name="decoder_lstm"
-    )
-
-    decoder_outputs, _, _ = decoder_lstm(
-        decoder_embedding,
-        initial_state=[state_h, state_c]
-    )
-
-    # attention
-    # NOTE: Ensure correct masking of encoder outputs
-    attention = AdditiveAttention(name="attention")([decoder_outputs, encoder_outputs], mask=[None,encoder_attention_mask])
-
-    decoder_combined = Concatenate(axis=-1, name="decoder_concat")([decoder_outputs, attention])
-
-    # NOTE: Numerical stability during training: use activation=None here and combine with from_logits=True in loss
-    decoder_dense = Dense(vocab_size, activation=None, name="decoder_dense")
-    final_outputs = decoder_dense(decoder_combined)
-
-    model = tf.keras.Model([encoder_inputs, decoder_inputs], final_outputs, name="seq2seq_baseline")
-    return model
 
 # NOTE: Improved Seq2Seq Model with Multi-Head Attention and Layer Normalization
 def build_seq2seq_model_multi_attention(
@@ -987,153 +899,6 @@ def build_seq2seq_model_multi_attention(
     return model
 
 
-def build_seq2seq_transformer(
-        max_frames, num_features, vocab_size,
-        d_model=512,
-        num_encoder_layers=2,
-        num_decoder_layers=2,
-        num_heads=8,
-        dff=2048,
-        dropout_rate=0.1,
-        use_cnn=True
-):
-    """
-    TRANSFORMER MODEL: Full attention-based seq2seq (no LSTM).
-    
-    Architecture based on "Attention Is All You Need" (Vaswani et al., 2017).
-    Uses only multi-head attention mechanisms for both encoding and decoding.
-    
-    Key components:
-    - Encoder: N layers of (self-attention → feedforward)
-    - Decoder: N layers of (masked self-attention → cross-attention → feedforward)
-    - Positional encoding for temporal information
-    - Layer normalization and residual connections throughout
-    
-    Args:
-        d_model: Model dimension (must be divisible by num_heads)
-        num_encoder_layers: Number of encoder blocks (typically 2-6)
-        num_decoder_layers: Number of decoder blocks (typically 2-6)
-        num_heads: Number of attention heads (typically 8)
-        dff: Dimension of feedforward network (typically 4*d_model)
-        dropout_rate: Dropout rate (typically 0.1 for Transformers)
-    """
-    
-    # ===== ENCODER =====
-    encoder_inputs = Input(shape=(None, num_features), name="encoder_inputs")
-
-    masking_layer = Masking(mask_value=0.0, name="encoder_masking_layer")
-    encoder_padding_mask = masking_layer.compute_mask(encoder_inputs)
-
-    # Reshape to (Batch, 1, Time) for attention broadcasting
-    encoder_padding_mask = Lambda(
-        lambda x: x[:, tf.newaxis, :],
-        name="encoder_mask_reshape"
-    )(encoder_padding_mask)
-
-    # Project input features to model dimension (Dense, not Embedding - these are continuous features!)
-    x = Dense(d_model, name="encoder_input_projection")(encoder_inputs)
-    x = Dropout(dropout_rate)(x)
-    
-   
-
-    # NOTE: Alternatively, we can also use Graph Neural Network layers here for spatial feature extraction
-    if use_cnn:
-        # CNN for local temporal encoding
-        x = DepthwiseConv1D(kernel_size=3, padding='same', activation='relu', name="encoder_depthwise_conv1")(x)
-        x = Dropout(dropout_rate)(x)
-    else:
-         x = SinePositionEncoding()(x)
-
-    # Stack encoder layers
-    for i in range(num_encoder_layers):
-        # Multi-head self-attention
-        attention_output = MultiHeadAttention(
-            num_heads=num_heads,
-            key_dim=d_model // num_heads,
-            dropout=dropout_rate,
-            name=f"encoder_mha_{i}",
-        )(x, x, x, attention_mask=encoder_padding_mask)  # (query, key, value) all same for self-attention
-        
-        attention_output = Dropout(dropout_rate)(attention_output)
-        
-        # Residual connection + layer norm
-        x = LayerNormalization(epsilon=1e-6, name=f"encoder_norm1_{i}")(x + attention_output)
-        
-        # Feedforward network
-        ffn_output = Dense(dff, activation="relu", name=f"encoder_ffn1_{i}")(x)
-        ffn_output = Dropout(dropout_rate)(ffn_output)
-        ffn_output = Dense(d_model, name=f"encoder_ffn2_{i}")(ffn_output)
-        ffn_output = Dropout(dropout_rate)(ffn_output)
-        
-        # Residual connection + layer norm
-        x = LayerNormalization(epsilon=1e-6, name=f"encoder_norm2_{i}")(x + ffn_output)
-    
-    encoder_outputs = x
-    
-    # ===== DECODER =====
-    decoder_inputs = Input(shape=(None,), name="decoder_inputs")
-    
-    # Embedding + positional encoding
-    decoder_embedding_layer = Embedding(vocab_size, d_model, mask_zero=True, name="decoder_embedding")
-    x = decoder_embedding_layer(decoder_inputs)
-    
-    # Extract decoder padding mask - prevents padded positions from attending
-    decoder_padding_mask = decoder_embedding_layer.compute_mask(decoder_inputs)
-    # Reshape for attention: (batch, 1, seq_len)
-    decoder_padding_mask = Lambda(
-        lambda m: m[:, tf.newaxis, :],
-        name="decoder_padding_mask_reshape"
-    )(decoder_padding_mask)
-    
-    # Positional Encoding
-    x = SinePositionEncoding()(x)
-    
-    # Stack decoder layers
-    for i in range(num_decoder_layers):
-        # Masked multi-head self-attention (causal + padding mask)
-        # use_causal_mask=True: prevents looking ahead
-        # attention_mask: prevents attending to/from padding positions
-        self_attention_output = MultiHeadAttention(
-            num_heads=num_heads,
-            key_dim=d_model // num_heads,
-            dropout=dropout_rate,
-            name=f"decoder_self_mha_{i}",
-        )(x, x, x, use_causal_mask=True, attention_mask=decoder_padding_mask)
-        
-        self_attention_output = Dropout(dropout_rate)(self_attention_output)
-        
-        # Residual + norm
-        x = LayerNormalization(epsilon=1e-6, name=f"decoder_norm1_{i}")(x + self_attention_output)
-        
-        # Cross-attention to encoder outputs
-        # Query has padding mask to prevent padded positions from attending
-        cross_attention_output = MultiHeadAttention(
-            num_heads=num_heads,
-            key_dim=d_model // num_heads,
-            dropout=dropout_rate,
-            name=f"decoder_cross_mha_{i}",
-        )(x, encoder_outputs, encoder_outputs, attention_mask=encoder_padding_mask)
-        
-        cross_attention_output = Dropout(dropout_rate)(cross_attention_output)
-        
-        # Residual + norm
-        x = LayerNormalization(epsilon=1e-6, name=f"decoder_norm2_{i}")(x + cross_attention_output)
-        
-        # Feedforward network
-        ffn_output = Dense(dff, activation="relu", name=f"decoder_ffn1_{i}")(x)
-        ffn_output = Dropout(dropout_rate)(ffn_output)
-        ffn_output = Dense(d_model, name=f"decoder_ffn2_{i}")(ffn_output)
-        ffn_output = Dropout(dropout_rate)(ffn_output)
-        
-        # Residual + norm
-        x = LayerNormalization(epsilon=1e-6, name=f"decoder_norm3_{i}")(x + ffn_output)
-    
-    # Final output projection
-    outputs = Dense(vocab_size, activation=None, name="output_projection")(x)
-    
-    model = tf.keras.Model([encoder_inputs, decoder_inputs], outputs, name="seq2seq_transformer")
-    return model
-
 # NOTE: Factory function to build different seq2seq architectures
 def build_seq2seq_model(
         max_frames, num_features, vocab_size,
@@ -1142,7 +907,7 @@ def build_seq2seq_model(
         decoder_units=256,
         dropout_rate=0.3,
         recurrent_dropout_rate=0.1,
-        architecture="multi_attention",  # "baseline", "multi_attention", or "transformer"
+        architecture="multi_attention",
         use_layer_norm=True,
         use_multi_head_attention=True,
         num_attention_heads=8,
@@ -1150,56 +915,28 @@ def build_seq2seq_model(
         num_decoder_layers=4
 ):
     """
-    Factory function to build baseline, improved, or transformer model.
+    Factory function for the slimmed-down model setup.
     
     Args:
-        architecture: "baseline" for LSTM, "multi_attention" for LSTM+attention, "transformer" for full attention
-        
-    Example:
-        # Test baseline
-        model = build_seq2seq_model(..., architecture="baseline")
-        
-        # Test multi_attention
-        model = build_seq2seq_model(..., architecture="multi_attention", 
-                                   embedding_dim=512, encoder_units=512, 
-                                   decoder_units=1024)
-        
-        # Test transformer
-        model = build_seq2seq_model(..., architecture="transformer",
-                                   embedding_dim=512, num_encoder_layers=4,
-                                   num_decoder_layers=4)
+        architecture: kept for backward compatibility and ignored.
     """
-    if architecture == "transformer":
-        return build_seq2seq_transformer(
-            max_frames, num_features, vocab_size,
-            d_model=embedding_dim,
-            num_encoder_layers=num_encoder_layers,
-            num_decoder_layers=num_decoder_layers,
-            num_heads=num_attention_heads,
-            dff=encoder_units * 4,  # Typically 2-4x d_model
-            dropout_rate=dropout_rate
-        )
-    elif architecture == "multi_attention":
-        return build_seq2seq_model_multi_attention(
-            max_frames, num_features, vocab_size,
-            embedding_dim, encoder_units, decoder_units,
-            dropout_rate, recurrent_dropout_rate,
-            use_layer_norm, num_attention_heads
-        )
-    else:
-        return build_seq2seq_model_baseline(
-            max_frames, num_features, vocab_size,
-            embedding_dim, encoder_units, decoder_units,
-            dropout_rate, recurrent_dropout_rate
-        )
+    return build_seq2seq_model_multi_attention(
+        max_frames=max_frames,
+        num_features=num_features,
+        vocab_size=vocab_size,
+        embedding_dim=embedding_dim,
+        encoder_units=encoder_units,
+        decoder_units=decoder_units,
+        dropout_rate=dropout_rate,
+        recurrent_dropout_rate=recurrent_dropout_rate,
+        use_layer_norm=use_layer_norm,
+        num_attention_heads=num_attention_heads,
+    )
 
 
 def train_main(
         train_data_folder,
         version_model=31,
-        # v31 is old architecture with fixed masking and attention, 
-        # v32 is new architecture with multihead attention, 
-        # v33 is transformer architecture
         epochs=10,
         batch_size=16,
         validation_split=0.1,
@@ -1210,7 +947,8 @@ def train_main(
         l1_reg=0.001,
         augment=False,
         augment_factor=1,  # number of augmented samples to create per original (1 or 2)
-        architecture="multi_attention"  # "baseline", "multi_attention", or "transformer"
+    architecture="multi_attention",  # "baseline", "multi_attention", or "transformer"
+    metrics_sample_size=256,
 ):
     try:
 
@@ -1239,26 +977,6 @@ def train_main(
         logging.info(f"Average tokens per sample: {np.mean(sequence_lengths):.1f}")
         logging.info(f"Min: {np.min(sequence_lengths)}, Max: {np.max(sequence_lengths)}")
         logging.info(f"Sequences with <3 tokens: {sum(1 for l in sequence_lengths if l < 3)}/{len(sequence_lengths)}")
-
-        # optionally augment data (if augment=true)
-        if augment:
-            logging.info(f"Data augmentation enabled: generating {augment_factor} extra augmented variants per sample (original + extras)...")
-            augmented = []
-            sw_n = 2
-            for s in samples:
-                try:
-                    # max_augments expects total variants (including original), so add +1
-                    vars = augment_sample_variants(s, make_speed_warp_n=sw_n, max_augments=(augment_factor + 1))
-                    augmented.extend(vars)
-                except Exception as e:
-                    logging.warning(f"Augmentation failed for {s.get('source_file')}: {e}")
-            logging.info(f"Augmented samples: original={len(samples)} -> augmented_total={len(augmented)}")
-            samples = augmented
-
-        # keep only samples with usable gloss text to ensure aligned encoder/decoder arrays
-        samples = [s for s in samples if str(s.get("gloss", "")).strip()]
-        if not samples:
-            raise ValueError("No samples with valid gloss text found after filtering.")
 
         # 2. create tokenizer
         tokenizer = build_tokenizer(samples)
@@ -1296,19 +1014,34 @@ def train_main(
         val_idx = indices[:val_size]
         train_idx = indices[val_size:]
 
-        x_enc_train = encoder_input_data[train_idx]
-        x_dec_train = decoder_input_data[train_idx]
-        y_train = decoder_target_data[train_idx]
-
-        x_enc_val = encoder_input_data[val_idx]
-        x_dec_val = decoder_input_data[val_idx]
-        y_val = decoder_target_data[val_idx]
         val_gloss_refs = [gloss_refs[i] for i in val_idx]
 
         logging.info(
             "Split data into train/val with fixed 10%% validation: train=%d, val=%d",
             len(train_idx),
             len(val_idx),
+        )
+
+        encoder_gib = encoder_input_data.nbytes / (1024 ** 3)
+        logging.info("Full encoder tensor size in RAM: %.2f GiB", encoder_gib)
+
+        train_sequence = Seq2SeqBatchSequence(
+            encoder_data=encoder_input_data,
+            decoder_data=decoder_input_data,
+            target_data=decoder_target_data,
+            indices=train_idx,
+            batch_size=batch_size,
+            shuffle=True,
+            seed=42,
+        )
+        val_sequence = Seq2SeqBatchSequence(
+            encoder_data=encoder_input_data,
+            decoder_data=decoder_input_data,
+            target_data=decoder_target_data,
+            indices=val_idx,
+            batch_size=min(batch_size, 8),
+            shuffle=False,
+            seed=42,
         )
 
         # 5. create model
@@ -1336,25 +1069,15 @@ def train_main(
             raise ValueError(f"Model output vocab size ({model_output_vocab_dim}) does not match tokenizer size ({target_vocab_size}).\n" \
                              f"This often indicates an issue in tokenizer building or the 'vocab_size' passed to model builder.")
 
-        # Learning Rate Schedule with Warmup for Transformer
-        # Transformers need gradual warmup to stabilize training
-        d_model = embedding_dim
-        
-        
-        # Use transformer schedule if using transformer architecture, else cosine decay
-        if architecture == "transformer":
-            lr_schedule = TransformerSchedule(d_model)
-            logging.info(f"Using Transformer LR schedule")
-        else:
-            initial_learning_rate = 0.001
-            lr_schedule = tf.keras.optimizers.schedules.CosineDecayRestarts(
-                initial_learning_rate,
-                first_decay_steps=1000,
-                t_mul=2.0,
-                m_mul=0.9,
-                alpha=0.0001
-            )
-            logging.info("Using CosineDecayRestarts LR schedule")
+        initial_learning_rate = 0.001
+        lr_schedule = tf.keras.optimizers.schedules.CosineDecayRestarts(
+            initial_learning_rate,
+            first_decay_steps=1000,
+            t_mul=2.0,
+            m_mul=0.9,
+            alpha=0.0001
+        )
+        logging.info("Using CosineDecayRestarts LR schedule")
 
         # Optimizer
         optimizer = tf.keras.optimizers.AdamW(
@@ -1402,7 +1125,7 @@ def train_main(
         callbacks = [
             tf.keras.callbacks.EarlyStopping(
                 monitor='val_loss',
-                patience=20,  # Increased patience for slower convergence
+                patience=10,
                 restore_best_weights=True,
                 min_delta=0.001
             ),
@@ -1422,23 +1145,20 @@ def train_main(
                 update_freq='epoch'
             ),
             SignLanguageEvaluationCallback(
-                val_encoder=x_enc_val,
+                val_encoder=encoder_input_data[val_idx],
                 val_references=val_gloss_refs,
                 tokenizer=tokenizer,
                 max_len=decoder_target_data.shape[1],
-                sample_size=min(32, len(val_gloss_refs)),
+                sample_size=metrics_sample_size,
                 seed=42,
-            )
+            ),
         ]
         # training
         history = model.fit(
-            [x_enc_train, x_dec_train],
-            y_train,
-            batch_size=batch_size,
+            train_sequence,
             epochs=epochs,
-            validation_data=([x_enc_val, x_dec_val], y_val),
+            validation_data=val_sequence,
             callbacks=callbacks,
-            shuffle=True
         )
 
         # save model and tokenizer
@@ -1464,225 +1184,6 @@ def train_main(
         raise
 
 
-# data augmentation utilities
-def _pairs_view(arr: np.ndarray):
-    """Return view of arr as (T, N_pairs, 2) and number of pairs."""
-    T, F = arr.shape
-    n_pairs = F // 2
-    paired = arr[:, :n_pairs*2].reshape((T, n_pairs, 2)).copy()
-    return paired, n_pairs
-
-
-def _pairs_to_flat(paired: np.ndarray, orig_F: int):
-    """Convert paired (T, n_pairs, 2) back to flat (T, F) preserving original F by padding zeros if needed."""
-    T, n_pairs, _ = paired.shape
-    flat = paired.reshape((T, n_pairs*2))
-    if n_pairs*2 < orig_F:
-        padw = orig_F - n_pairs*2
-        flat = np.pad(flat, ((0,0),(0,padw)), constant_values=0.0)
-    return flat
-
-
-def jitter_frames(arr: np.ndarray, pct: float = 0.01):
-    """Apply jitter noise ±pct (relative) to coordinates.
-    pct: maximum absolute relative change (e.g., 0.01 for ±1%)."""
-    paired, n_pairs = _pairs_view(arr)
-    # relative noise per coordinate
-    noise = np.random.uniform(-pct, pct, size=paired.shape).astype(np.float32)
-    paired = paired * (1.0 + noise)
-    return _pairs_to_flat(paired, arr.shape[1])
-
-
-def scale_and_shift(arr: np.ndarray, scale_range=(0.97,1.03), shift_x_range=(0.01,0.03), shift_y_range=(0.01,0.02)):
-    """Apply scaling around center and random shifts in x/y (percent of range).
-    scale_range: (min,max)
-    shift ranges are fractions of data range."""
-    paired, n_pairs = _pairs_view(arr)
-    # compute center across all valid coords
-    xs = paired[:,:,0]
-    ys = paired[:,:,1]
-    # ignore zeros (masked) when computing ranges
-    x_valid = xs[np.abs(xs) > 0]
-    y_valid = ys[np.abs(ys) > 0]
-    if x_valid.size == 0 or y_valid.size == 0:
-        center_x = np.mean(xs)
-        center_y = np.mean(ys)
-        x_range = 1.0
-        y_range = 1.0
-    else:
-        center_x = np.mean(x_valid)
-        center_y = np.mean(y_valid)
-        x_range = x_valid.max() - x_valid.min() if x_valid.max() != x_valid.min() else 1.0
-        y_range = y_valid.max() - y_valid.min() if y_valid.max() != y_valid.min() else 1.0
-
-    s = np.random.uniform(scale_range[0], scale_range[1])
-
-    # scale around center
-    paired = (paired - np.array([center_x, center_y])) * s + np.array([center_x, center_y])
-
-    # shift
-    shift_x_pct = np.random.uniform(shift_x_range[0], shift_x_range[1])
-    shift_y_pct = np.random.uniform(shift_y_range[0], shift_y_range[1])
-
-    # choose direction randomly
-    shift_x = shift_x_pct * x_range * (1 if random.random() < 0.5 else -1)
-    shift_y = shift_y_pct * y_range * (1 if random.random() < 0.5 else -1)
-    paired[:,:,0] += shift_x
-    paired[:,:,1] += shift_y
-
-    return _pairs_to_flat(paired, arr.shape[1])
-
-
-def rotate_frames(arr: np.ndarray, deg_range=(-3.0, 3.0)):
-    paired, n_pairs = _pairs_view(arr)
-    theta = np.deg2rad(np.random.uniform(deg_range[0], deg_range[1]))
-    cos_t = np.cos(theta)
-    sin_t = np.sin(theta)
-
-    # center
-    xs = paired[:,:,0]
-    ys = paired[:,:,1]
-    valid_x = xs[np.abs(xs) > 0]
-    valid_y = ys[np.abs(ys) > 0]
-    if valid_x.size == 0 or valid_y.size == 0:
-        cx = np.mean(xs)
-        cy = np.mean(ys)
-    else:
-        cx = np.mean(valid_x)
-        cy = np.mean(valid_y)
-
-    # rotate each point
-    x_rel = paired[:,:,0] - cx
-    y_rel = paired[:,:,1] - cy
-    x_rot = x_rel * cos_t - y_rel * sin_t
-    y_rot = x_rel * sin_t + y_rel * cos_t
-    paired[:,:,0] = x_rot + cx
-    paired[:,:,1] = y_rot + cy
-
-    return _pairs_to_flat(paired, arr.shape[1])
-
-
-def mask_random_keypoints(arr: np.ndarray, min_mask=1, max_mask=2):
-    paired, n_pairs = _pairs_view(arr)
-    T = paired.shape[0]
-
-    for t in range(T):
-        k = random.randint(min_mask, max_mask)
-        idx = np.random.choice(n_pairs, size=k, replace=False)
-        paired[t, idx, :] = 0.0
-
-    return _pairs_to_flat(paired, arr.shape[1])
-
-
-# Temporal augmentations
-def temporal_dropout(arr: np.ndarray, pct_range=(0.05, 0.10)):
-    T = arr.shape[0]
-    pct = np.random.uniform(pct_range[0], pct_range[1])
-    n_drop = int(np.round(T * pct))
-
-    if n_drop <= 0:
-        return arr
-
-    idx = np.arange(T)
-    drop_idx = np.random.choice(idx, size=min(n_drop, T-1), replace=False)
-    keep_mask = np.ones(T, dtype=bool)
-    keep_mask[drop_idx] = False
-    new = arr[keep_mask]
-
-    if new.shape[0] == 0:
-        return arr
-
-    return new
-
-
-def temporal_duplicate(arr: np.ndarray, pct_range=(0.03, 0.05)):
-    T = arr.shape[0]
-    pct = np.random.uniform(pct_range[0], pct_range[1])
-    n_dup = int(np.round(T * pct))
-
-    if n_dup <= 0:
-        return arr
-
-    idx = np.arange(T)
-    dup_idx = np.random.choice(idx, size=min(n_dup, T), replace=False)
-    new_list = []
-
-    for i in range(T):
-        new_list.append(arr[i])
-        if i in dup_idx:
-            new_list.append(arr[i].copy())
-
-    return np.stack(new_list, axis=0)
-
-
-def speed_warp(arr: np.ndarray, factor_range=(0.95, 1.05)):
-    """Resample the sequence length by factor in factor_range using linear interpolation."""
-    T, F = arr.shape
-    factor = np.random.uniform(factor_range[0], factor_range[1])
-    new_T = max(1, int(np.round(T * factor)))
-
-    if new_T == T:
-        return arr.copy()
-
-    # original time positions
-    orig_t = np.linspace(0, 1, T)
-    new_t = np.linspace(0, 1, new_T)
-    new = np.zeros((new_T, F), dtype=np.float32)
-
-    for f in range(F):
-        new[:, f] = np.interp(new_t, orig_t, arr[:, f])
-
-    return new
-
-
-def augment_sample_variants(sample: Dict, make_speed_warp_n: int = 2, max_augments: int = 2):
-    """Generate augmented variants for a sample. Returns list including the original sample first."""
-    arr = sample['keypoints_sequence']
-    orig_F = arr.shape[1]
-    variants = []
-
-    # original
-    variants.append({'keypoints_sequence': arr.copy(), 'gloss': sample.get('gloss', ''), 'source_file': sample.get('source_file')})
-
-    # 1x jitter
-    v_jitter = jitter_frames(arr, pct=0.01)
-    v_jitter = mask_random_keypoints(v_jitter)
-    variants.append({'keypoints_sequence': v_jitter, 'gloss': sample.get('gloss', ''), 'source_file': sample.get('source_file') + '.aug_jitter'})
-
-    # 1x scale or shift + rotate
-    if random.random() < 0.5:
-        v_scale = scale_and_shift(arr)
-    else:
-        v_scale = scale_and_shift(arr)
-
-    v_scale = rotate_frames(v_scale, deg_range=(-3,3))
-    v_scale = mask_random_keypoints(v_scale)
-    variants.append({'keypoints_sequence': v_scale, 'gloss': sample.get('gloss', ''), 'source_file': sample.get('source_file') + '.aug_scale'})
-
-    # optional temporal augmentation (dropout + duplicate)
-    v_temp = arr.copy()
-    if random.random() < 0.9:
-        v_temp = temporal_dropout(v_temp)
-    if random.random() < 0.7:
-        v_temp = temporal_duplicate(v_temp)
-
-    # ensure dtype and shape
-    v_temp = v_temp.astype(np.float32)
-    variants.append({'keypoints_sequence': v_temp, 'gloss': sample.get('gloss', ''), 'source_file': sample.get('source_file') + '.aug_temp'})
-
-    # speed_warp 2..3 times
-    n_sw = make_speed_warp_n if make_speed_warp_n >= 2 else 2
-    for i in range(n_sw):
-        v_sw = speed_warp(arr)
-        # apply small jitter after warping
-        v_sw = jitter_frames(v_sw, pct=0.005)
-        variants.append({'keypoints_sequence': v_sw, 'gloss': sample.get('gloss', ''), 'source_file': sample.get('source_file') + f'.aug_speed{i+1}'})
-
-    # limit number of variants if requested
-    if max_augments > 0 and len(variants) > max_augments:
-        variants = variants[:max_augments]
-
-    return variants
 
 if __name__ == "__main__":
     try:
@@ -1694,18 +1195,19 @@ if __name__ == "__main__":
 
         config = {
             "train_data_folder": "data/train_data",
-            "version_model": 29,
+            "version_model": 34,
             "epochs": 100,
             "batch_size": 8,
             "validation_split": 0.1,
-            "input_sequence_length": None,
+            "input_sequence_length": 300,
             "embedding_dim": 256,
             "hidden_dim": 512,  
-            "dropout_rate": 0.2,
-            "l1_reg": 0.0005,
+            "dropout_rate": 0.4,
+            "l1_reg": 0.0001,
             "augment": False, # NOTE: Currently, this does not respect the validation split properly and leads the model to overfit by seeing augmented versions of validation samples during training
             "augment_factor": 2,
-            "architecture": "multi_attention" # Either baseline or multi_attention or transformer
+            "architecture": "multi_attention", # Either baseline or multi_attention or transformer
+            "metrics_sample_size": 64,
         }
 
          # starting training
@@ -1755,6 +1257,91 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.savefig(f'models/training_history_v{config["version_model"]}.png')
         plt.close()
+
+        # Plot text generation metrics (WER, all BLEU forms, all ROUGE forms)
+        epochs_x = np.arange(1, len(history.history.get('loss', [])) + 1)
+
+        plt.figure(figsize=(14, 10))
+
+        plt.subplot(2, 2, 1)
+        if 'val_wer' in history.history:
+            plt.plot(epochs_x, history.history['val_wer'], label='WER', color='red')
+        plt.title('Validation WER')
+        plt.xlabel('Epoch')
+        plt.ylabel('WER')
+        plt.legend()
+
+        plt.subplot(2, 2, 2)
+        bleu_keys = ['val_bleu', 'val_bleu1', 'val_bleu2', 'val_bleu3', 'val_bleu4']
+        for k in bleu_keys:
+            if k in history.history:
+                plt.plot(epochs_x, history.history[k], label=k)
+        plt.title('Validation BLEU (All Forms)')
+        plt.xlabel('Epoch')
+        plt.ylabel('BLEU Score (0-100)')
+        plt.legend()
+
+        plt.subplot(2, 2, 3)
+        rouge_p_keys = ['val_rouge1_p', 'val_rouge2_p', 'val_rougel_p']
+        rouge_r_keys = ['val_rouge1_r', 'val_rouge2_r', 'val_rougel_r']
+        rouge_f_keys = ['val_rouge1_f', 'val_rouge2_f', 'val_rougel_f']
+        for k in rouge_p_keys + rouge_r_keys + rouge_f_keys:
+            if k in history.history:
+                plt.plot(epochs_x, history.history[k], label=k)
+        plt.title('Validation ROUGE (P/R/F All Forms)')
+        plt.xlabel('Epoch')
+        plt.ylabel('ROUGE')
+        plt.legend(loc='best', fontsize=8)
+
+        plt.subplot(2, 2, 4)
+        if 'val_bleu4' in history.history:
+            plt.plot(epochs_x, history.history['val_bleu4'], label='BLEU-4', linewidth=2)
+        if 'val_rougel_f' in history.history:
+            plt.plot(epochs_x, np.array(history.history['val_rougel_f']) * 100.0, label='ROUGE-L F1 * 100', linewidth=2)
+        if 'val_wer' in history.history:
+            wer_as_accuracy = (1.0 - np.array(history.history['val_wer'])) * 100.0
+            plt.plot(epochs_x, wer_as_accuracy, label='1-WER (%)', linewidth=2)
+        plt.title('High-Level Text Metric Comparison')
+        plt.xlabel('Epoch')
+        plt.ylabel('Comparable Scale (percent)')
+        plt.legend()
+
+        plt.tight_layout()
+        plt.savefig(f'models/text_metrics_history_v{config["version_model"]}.png')
+        plt.close()
+
+        # One combined chart with all key text metrics in comparison
+        plt.figure(figsize=(14, 6))
+        comparison_series = [
+            ('val_bleu', 1.0, 'BLEU'),
+            ('val_bleu1', 1.0, 'BLEU-1'),
+            ('val_bleu2', 1.0, 'BLEU-2'),
+            ('val_bleu3', 1.0, 'BLEU-3'),
+            ('val_bleu4', 1.0, 'BLEU-4'),
+            ('val_rouge1_f', 100.0, 'ROUGE-1 F1 * 100'),
+            ('val_rouge2_f', 100.0, 'ROUGE-2 F1 * 100'),
+            ('val_rougel_f', 100.0, 'ROUGE-L F1 * 100'),
+            ('val_wer', -100.0, '1-WER (%)'),
+        ]
+
+        for key, factor, label in comparison_series:
+            if key not in history.history:
+                continue
+            vals = np.array(history.history[key], dtype=np.float32)
+            if key == 'val_wer':
+                vals = (1.0 - vals) * 100.0
+            else:
+                vals = vals * factor
+            plt.plot(epochs_x, vals, label=label)
+
+        plt.title('All Text Metrics Comparison')
+        plt.xlabel('Epoch')
+        plt.ylabel('Score (percent-like scale)')
+        plt.legend(loc='best', fontsize=9)
+        plt.tight_layout()
+        plt.savefig(f'models/text_metrics_comparison_v{config["version_model"]}.png')
+        plt.close()
+
         logging.info("Training completed successfully")
 
     except Exception as e:
