@@ -13,6 +13,7 @@ import os
 import csv
 import json
 import logging
+import inspect
 import numpy as np
 import tensorflow as tf
 import pandas as pd
@@ -22,7 +23,7 @@ from typing import List, Dict, Union, Tuple, Optional
 import time
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, Masking, Bidirectional, Concatenate, Embedding, AdditiveAttention, LayerNormalization, MultiHeadAttention, Embedding, DepthwiseConv1D, Lambda
+from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, Masking, Bidirectional, Concatenate, Embedding, AdditiveAttention, LayerNormalization, MultiHeadAttention, Embedding, DepthwiseConv1D, Lambda, Add
 
 import concurrent.futures
 import warnings
@@ -49,6 +50,12 @@ MIN_ACCEPTED_FEATURES = 32
 
 # silence specific DeprecationWarning noise that originates from csv parsing of some files
 warnings.filterwarnings("ignore", message="string or file could not be read to its end due to unmatched data")
+
+
+def normalize_text(s):
+    s = s.lower().strip()
+    s = re.sub(r"\s+", " ", s)
+    return s
 
 
 def _parse_csv_text(file_name: str, text: str, used_encoding: str = 'utf-8') -> Tuple[Union[Dict, None], Union[Tuple[str, str], None]]:
@@ -172,6 +179,8 @@ def _parse_csv_text(file_name: str, text: str, used_encoding: str = 'utf-8') -> 
 
     # Try to find a gloss in header or first columns
     gloss_text = os.path.splitext(file_name)[0]
+    gloss_test = normalize_text(gloss_text)
+    
     if 'gloss' in text.lower() or 'Gloss' in text[:200]:
         try:
             sample_df = pd.read_csv(io.StringIO(text), nrows=1)
@@ -361,7 +370,11 @@ def build_tokenizer(all_samples, extra_tokens=("<start>", "<end>")):
     tokenizer = Tokenizer(oov_token="<unk>", lower=True, filters=custom_filters)
 
     # extract gloss texts and clean
-    gloss_texts = [s["gloss"].strip() if s.get("gloss") is not None else "" for s in all_samples]
+    gloss_texts = [
+        normalize_text(s["gloss"]) 
+        for s in all_samples 
+        if s.get("gloss") is not None and s["gloss"].strip()
+    ]
     gloss_texts = [g for g in gloss_texts if g]
 
     # log data
@@ -372,10 +385,10 @@ def build_tokenizer(all_samples, extra_tokens=("<start>", "<end>")):
     if len(gloss_texts) == 0:
         raise ValueError("No gloss texts available to build tokenizer. Check your CSV parsing and 'gloss' extraction.")
 
-    # # DEBUG: show sample texts
-    # logging.info("Sample texts before tokenization:")
-    # for text in gloss_texts[:5]:
-    #     logging.info(f"  {text}")
+    # DEBUG: show sample texts
+    logging.info("Sample texts before tokenization:")
+    for text in gloss_texts[:5]:
+        logging.info(f"  {text}")
 
     # train tokenizer on texts
     tokenizer.fit_on_texts(gloss_texts)
@@ -435,7 +448,11 @@ def build_decoder_data(all_samples, tokenizer):
     end_token = "<end>"
 
     # add start and end tokens to gloss texts
-    gloss_texts = [s.get("gloss", "").strip() for s in all_samples]
+    gloss_texts = [
+        normalize_text(s.get("gloss", "")) 
+        for s in all_samples 
+        if s.get("gloss")
+    ]
     gloss_texts = [g for g in gloss_texts if g]
     if len(gloss_texts) == 0:
         raise ValueError("No gloss texts available to build decoder sequences.")
@@ -470,6 +487,20 @@ def build_decoder_data(all_samples, tokenizer):
     # decoder input and target data
     decoder_input_data = pad_sequences(decoder_input_sequences, maxlen=max_len, padding='post')
     decoder_target_data = pad_sequences(decoder_target_sequences, maxlen=max_len, padding='post')
+
+    # Teacher-forcing sanity check: validate shift only on real token positions (ignore right-side padding).
+    if decoder_input_data.size > 0 and decoder_target_data.size > 0:
+        for row_idx in range(decoder_input_data.shape[0]):
+            real_len = int(np.count_nonzero(decoder_input_data[row_idx]))
+            if real_len <= 1:
+                continue
+            inp_shift = decoder_input_data[row_idx, 1:real_len]
+            tgt_shift = decoder_target_data[row_idx, :real_len - 1]
+            if not np.array_equal(inp_shift, tgt_shift):
+                raise ValueError(
+                    "Teacher forcing alignment check failed at row "
+                    f"{row_idx}: decoder_input/target are not correctly shifted."
+                )
 
     # DEBUGGING: Check for data leakage and token encoding
     logging.info(f"Decoder sequences padded to length: {max_len}")
@@ -635,12 +666,14 @@ class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
             max_len: int,
             sample_size: Optional[int] = 256,
             seed: int = 42,
+            log_file_path: Optional[str] = None,
     ):
         super().__init__()
         self.val_encoder = val_encoder
         self.val_references = val_references
         self.tokenizer = tokenizer
         self.max_len = int(max_len)
+        self.log_file_path = log_file_path
 
         n = len(self.val_references)
         if n == 0:
@@ -650,6 +683,20 @@ class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
         else:
             rng = np.random.default_rng(seed)
             self.eval_indices = rng.choice(np.arange(n), size=int(sample_size), replace=False)
+
+        # Pick 5 fixed indices for visually tracing translations across epochs
+        if len(self.eval_indices) >= 5:
+            rng_fixed = np.random.default_rng(seed)
+            self.fixed_5_indices = rng_fixed.choice(self.eval_indices, size=5, replace=False)
+        else:
+            self.fixed_5_indices = self.eval_indices
+
+        # Initialize the log file with a header if provided
+        if self.log_file_path:
+            import os
+            os.makedirs(os.path.dirname(self.log_file_path) or ".", exist_ok=True)
+            with open(self.log_file_path, "w", encoding="utf-8") as f:
+                f.write("=== Training Logs and Progress ===\n\n")
 
         self.bleu = BLEU(effective_order=True)
         self.bleu1 = BLEU(max_ngram_order=1, effective_order=True)
@@ -669,8 +716,8 @@ class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
         for i in self.eval_indices:
             pred = greedy_decode(self.model, self.val_encoder[i], self.tokenizer, self.max_len)
             ref = self.val_references[i]
-            hyps.append(pred if pred else "")
-            refs.append(ref if ref else "")
+            refs.append(normalize_text(ref) if ref else "")
+            hyps.append(normalize_text(pred) if pred else "")
 
         val_wer = float(jiwer.wer(refs, hyps))
         val_bleu = float(self.bleu.corpus_score(hyps, [refs]).score)
@@ -697,21 +744,43 @@ class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
         logs["val_rougel_r"] = rouge_scores["rougel_r"]
         logs["val_rougel_f"] = rouge_scores["rougel_f"]
 
-        logging.info(
-            "Epoch %d text-metrics | WER=%.4f BLEU=%.2f B1=%.2f B2=%.2f B3=%.2f B4=%.2f "
-            "R1-F=%.4f R2-F=%.4f RL-F=%.4f",
-            epoch + 1,
-            val_wer,
-            val_bleu,
-            val_bleu1,
-            val_bleu2,
-            val_bleu3,
-            val_bleu4,
-            rouge_scores["rouge1_f"],
-            rouge_scores["rouge2_f"],
-            rouge_scores["rougel_f"],
+        log_str = (
+            f"Epoch {epoch + 1} text-metrics | "
+            f"WER={val_wer:.4f} BLEU={val_bleu:.2f} B1={val_bleu1:.2f} B2={val_bleu2:.2f} "
+            f"B3={val_bleu3:.2f} B4={val_bleu4:.2f} "
+            f"R1-F={rouge_scores['rouge1_f']:.4f} R2-F={rouge_scores['rouge2_f']:.4f} RL-F={rouge_scores['rougel_f']:.4f}"
         )
+        
+        logging.info(log_str)
 
+        # Build nice string layout for the 5 fixed samples
+        samples_out_lines = []
+        samples_out_lines.append(f"\n--- Epoch {epoch + 1}: 5 Test Translation Samples ---")
+        for idx_sample in self.fixed_5_indices:
+            fixed_pred = greedy_decode(self.model, self.val_encoder[idx_sample], self.tokenizer, self.max_len)
+            fixed_ref = self.val_references[idx_sample]
+            samples_out_lines.append(f"  True Translation : {fixed_ref}")
+            samples_out_lines.append(f"  Model Prediction : {fixed_pred}")
+            samples_out_lines.append("  " + "-"*40)
+        
+        samples_str = "\n".join(samples_out_lines)
+
+        # Print to console for visual feedback
+        print(samples_str)
+
+        # Append to log file if path exists
+        if self.log_file_path:
+            with open(self.log_file_path, "a", encoding="utf-8") as f:
+                f.write(f"\n================ EPOCH {epoch + 1} ================\n")
+                
+                # Also log loss/acc if available in standard `logs`
+                general_metrics = " | ".join([f"{k}={v:.4f}" for k, v in logs.items() if not k.startswith("val_") and not "rouge" in k and not "bleu" in k])
+                if general_metrics:
+                    f.write(f"Train Metrics: {general_metrics}\n")
+                f.write(f"Eval  Metrics: WER={val_wer:.4f} BLEU={val_bleu:.2f} B1={val_bleu1:.2f} B2={val_bleu2:.2f} B3={val_bleu3:.2f} B4={val_bleu4:.2f}\n")
+                f.write(f"ROUGE Metrics: R1-F={rouge_scores['rouge1_f']:.4f} R2-F={rouge_scores['rouge2_f']:.4f} RL-F={rouge_scores['rougel_f']:.4f}\n")
+                
+                f.write(samples_str + "\n\n")
 
 class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
     """Batch-wise loader to avoid materializing the full training tensors on GPU."""
@@ -754,7 +823,6 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
             self.rng.shuffle(self.indices)
 
 
-
 # NOTE: Improved Seq2Seq Model with Multi-Head Attention and Layer Normalization
 def build_seq2seq_model_multi_attention(
         max_frames, num_features, vocab_size,
@@ -780,23 +848,11 @@ def build_seq2seq_model_multi_attention(
     # ===== ENCODER =====
     encoder_inputs = Input(shape=(None, num_features), name="encoder_inputs")
 
-    masking_layer = Masking(mask_value=0.0, name="encoder_masking_layer")
-    x = masking_layer(encoder_inputs) # Apply masking, but is not respected by MultiHeadAttention, but need to extract mask
-    lstm_mask = masking_layer.compute_mask(encoder_inputs)
-
-    # # 1. Compute 2D Mask for LSTM (manually)
-    # # (Batch, Time)
-    # lstm_mask = Lambda(
-    #     lambda t: tf.cast(tf.reduce_any(tf.not_equal(t, 0.0), axis=-1), 'bool'),
-    #     name="compute_lstm_mask"
-    # )(encoder_inputs)
-    
-    # Compute 3D Mask for Attention (MultiHeadAttention expects 3D mask)
-    # (Batch, 1, Time)
-    encoder_attention_mask = Lambda(
-        lambda x: x[:, tf.newaxis, :],
-        name="encoder_mask_reshape"
-    )(lstm_mask)
+    # define masking
+    lstm_mask = Lambda(
+        lambda t: tf.reduce_sum(tf.abs(t), axis=-1) > 1e-6,
+        name="encoder_mask"
+    )(encoder_inputs)
 
     # Spatial projection: helps model focus on important keypoint relationships
     x = Dense(encoder_units * 2, activation="relu", name="encoder_projection")(encoder_inputs)
@@ -821,7 +877,10 @@ def build_seq2seq_model_multi_attention(
         name="encoder_bidirectional"
     )
 
-    encoder_outputs_and_states = encoder_lstm(x)
+    encoder_outputs_and_states = encoder_lstm(
+        x,
+        mask=lstm_mask   # adding mask to LSTM for better handling of variable-length sequences!
+    )
     encoder_outputs = encoder_outputs_and_states[0]
     f_h = encoder_outputs_and_states[1]
     f_c = encoder_outputs_and_states[2]
@@ -864,11 +923,27 @@ def build_seq2seq_model_multi_attention(
     if use_layer_norm:
         decoder_outputs = LayerNormalization(name="decoder_lstm_norm")(decoder_outputs)
 
+    def create_cross_mask(inputs):
+        dec_mask, enc_mask = inputs
+        
+        dec_mask = tf.cast(dec_mask[:, :, tf.newaxis], tf.bool)   # (B, T_dec, 1)
+        enc_mask = tf.cast(enc_mask[:, tf.newaxis, :], tf.bool)   # (B, 1, T_enc)
+        
+        # Keep attention mask boolean to avoid float/bool casting edge cases.
+        return tf.cast(tf.logical_and(dec_mask, enc_mask), tf.bool)  # (B, T_dec, T_enc)
+
+    cross_mask = Lambda(create_cross_mask, name="cross_mask")([decoder_mask, lstm_mask])
+
     # ===== ATTENTION =====
     # Multi-head attention: learns different alignment patterns simultaneously
+    if (encoder_units * 2) % num_attention_heads != 0:
+        raise ValueError(
+            f"encoder_units*2 ({encoder_units * 2}) must be divisible by num_attention_heads ({num_attention_heads})."
+        )
+
     cross_attention_layer = MultiHeadAttention(
         num_heads=num_attention_heads,
-        key_dim=encoder_units * 2 // num_attention_heads,
+        key_dim=(encoder_units * 2) // num_attention_heads,
         dropout=dropout_rate,
         name="multi_head_attention"
     )
@@ -877,13 +952,15 @@ def build_seq2seq_model_multi_attention(
         query=decoder_outputs,
         value=encoder_outputs,
         key=encoder_outputs,
-        attention_mask=encoder_attention_mask
+        attention_mask=cross_mask
     )
+
+    attention = Add()([decoder_outputs, attention])  # Residual connection for better gradient flow 
 
     if use_layer_norm:
         attention = LayerNormalization(name="attention_norm")(attention)
 
-    decoder_combined = Concatenate(axis=-1, name="decoder_concat")([decoder_outputs, attention])
+    decoder_combined = Concatenate(axis=-1, name="decoder_concat")([attention, decoder_outputs])
     
     # Deeper feedforward network for better expressiveness
     decoder_combined = Dense(decoder_units, activation="relu", name="decoder_ff1")(decoder_combined)
@@ -892,7 +969,7 @@ def build_seq2seq_model_multi_attention(
         decoder_combined = LayerNormalization(name="decoder_ff_norm")(decoder_combined)
 
     # Numerical stability
-    decoder_dense = Dense(vocab_size, activation=None, name="decoder_dense")
+    decoder_dense = Dense(vocab_size, activation="softmax", name="decoder_dense")
     final_outputs = decoder_dense(decoder_combined)
 
     model = tf.keras.Model([encoder_inputs, decoder_inputs], final_outputs, name="seq2seq_improved")
@@ -902,10 +979,10 @@ def build_seq2seq_model_multi_attention(
 # NOTE: Factory function to build different seq2seq architectures
 def build_seq2seq_model(
         max_frames, num_features, vocab_size,
-        embedding_dim=64,
-        encoder_units=128,
-        decoder_units=256,
-        dropout_rate=0.3,
+        embedding_dim=128,
+        encoder_units=256,
+        decoder_units=512,
+        dropout_rate=0.5,
         recurrent_dropout_rate=0.1,
         architecture="multi_attention",
         use_layer_norm=True,
@@ -1095,10 +1172,17 @@ def train_main(
             raise ValueError(f"Vocabulary size too small ({target_vocab_size}). Ensure tokenization produced at least 1 real token + 1 padding token.")
 
         # NOTE: Use ignore_class to exclude padding from loss calculation
-        loss = tf.keras.losses.SparseCategoricalCrossentropy(
-            from_logits=True,
-            ignore_class=0  # Ignore padding token (0) in loss calculation
-        )
+        loss_kwargs = {
+            "from_logits": False,
+            "ignore_class": 0,  # Ignore padding token (0) in loss calculation
+        }
+        if "label_smoothing" in inspect.signature(tf.keras.losses.SparseCategoricalCrossentropy).parameters:
+            loss_kwargs["label_smoothing"] = 0.1
+            logging.info("Enabled label_smoothing=0.1 for SparseCategoricalCrossentropy")
+        else:
+            logging.info("SparseCategoricalCrossentropy has no label_smoothing in this TensorFlow version; skipping it")
+
+        loss = tf.keras.losses.SparseCategoricalCrossentropy(**loss_kwargs)
         metrics = [
             # NOTE: BLEU-4 or ROUGE should be monitored here
             tf.keras.metrics.SparseCategoricalAccuracy(
@@ -1151,6 +1235,7 @@ def train_main(
                 max_len=decoder_target_data.shape[1],
                 sample_size=metrics_sample_size,
                 seed=42,
+                log_file_path=f'./logs/model_v{version_model}/training_logs.txt'
             ),
         ]
         # training
@@ -1195,7 +1280,7 @@ if __name__ == "__main__":
 
         config = {
             "train_data_folder": "data/train_data",
-            "version_model": 34,
+            "version_model": 35,
             "epochs": 100,
             "batch_size": 8,
             "validation_split": 0.1,
