@@ -1146,7 +1146,7 @@ def train_main(
             raise ValueError(f"Model output vocab size ({model_output_vocab_dim}) does not match tokenizer size ({target_vocab_size}).\n" \
                              f"This often indicates an issue in tokenizer building or the 'vocab_size' passed to model builder.")
 
-        initial_learning_rate = 0.001
+        initial_learning_rate = 0.0001 # adjusted learning rate for more stable training; old was 0.001
         lr_schedule = tf.keras.optimizers.schedules.CosineDecayRestarts(
             initial_learning_rate,
             first_decay_steps=1000,
@@ -1280,7 +1280,7 @@ if __name__ == "__main__":
 
         config = {
             "train_data_folder": "data/train_data",
-            "version_model": 35,
+            "version_model": 36,
             "epochs": 100,
             "batch_size": 8,
             "validation_split": 0.1,
