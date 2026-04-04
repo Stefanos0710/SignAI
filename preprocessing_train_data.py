@@ -341,8 +341,9 @@ def save_in_csv(
             frame_ids.append(frame_idx)
             all_frames_keypoints.append(all_kp)
 
-        # Temporal smoothing over the complete sequence reduces frame-to-frame jitter.
-        smoothed_sequence = apply_temporal_savgol_smoothing(all_frames_keypoints, window_length=9, polyorder=2)
+        # Fill missing landmarks first, then smooth to reduce temporal jitter.
+        interpolated_sequence = interpolate_missing_keypoints(all_frames_keypoints)
+        smoothed_sequence = apply_temporal_savgol_smoothing(interpolated_sequence, window_length=9, polyorder=2)
 
         for i, frame_idx in enumerate(frame_ids):
             all_kp = smoothed_sequence[i]
@@ -387,6 +388,35 @@ def average_shoulder_kp(video_file):
 
     return avg_left_shoulder, avg_right_shoulder
 
+def interpolate_missing_keypoints(sequence):
+    """Interpolate missing keypoints (0,0,0) in the sequence using linear interpolation.
+    """
+    seq = np.array(sequence, dtype=float)
+    if seq.ndim != 3 or seq.shape[0] == 0:
+        return seq
+
+    num_frames, num_landmarks, num_dims = seq.shape
+    frame_idx = np.arange(num_frames)
+
+    # A landmark is treated as missing in a frame when all xyz values are exactly zero.
+    missing_mask = np.all(seq == 0.0, axis=2)
+
+    for lm_idx in range(num_landmarks):
+        missing_frames = missing_mask[:, lm_idx]
+        if not np.any(missing_frames):
+            continue
+
+        valid_frames = ~missing_frames
+        if not np.any(valid_frames):
+            # No valid observation for this landmark in the full clip.
+            continue
+
+        valid_x = frame_idx[valid_frames]
+        for dim_idx in range(num_dims):
+            valid_y = seq[valid_frames, lm_idx, dim_idx]
+            seq[:, lm_idx, dim_idx] = np.interp(frame_idx, valid_x, valid_y)
+
+    return seq
 
 
 if __name__ == "__main__":
