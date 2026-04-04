@@ -6,6 +6,7 @@ import os
 import cv2
 import mediapipe as mp
 import numpy as np
+from scipy.signal import savgol_filter
 
 # Set up logging
 logging.basicConfig(
@@ -26,7 +27,6 @@ pose  = None
 
 # Number of parallel workers
 NUM_WORKERS = 12
-
 
 FACE_LANDMARKS = [
     # ===== EYEBROWS =====
@@ -250,6 +250,40 @@ def normalize_keypoints(keypoints, avg_left_shoulder=None, avg_right_shoulder=No
     return normalized_keypoints
 
 
+def apply_temporal_savgol_smoothing(sequence, window_length=9, polyorder=2):
+    """Apply temporal Savitzky-Golay smoothing over frames.
+
+    sequence shape: (num_frames, num_landmarks, 3)
+    Smoothing is applied along the frame axis to reduce MediaPipe jitter
+    while preserving movement dynamics better than a simple moving average.
+    """
+    seq = np.array(sequence, dtype=float)
+    num_frames = seq.shape[0]
+
+    # Need at least polyorder + 2 points; keep an odd window for SavGol.
+    if num_frames < (polyorder + 2):
+        return seq
+
+    max_odd_window = num_frames if num_frames % 2 == 1 else num_frames - 1
+    if max_odd_window < (polyorder + 2):
+        return seq
+
+    window = min(window_length, max_odd_window)
+    if window % 2 == 0:
+        window -= 1
+
+    if window <= polyorder:
+        window = polyorder + 1
+        if window % 2 == 0:
+            window += 1
+    if window > max_odd_window:
+        return seq
+
+    # Apply filter for all landmarks and xyz channels over time.
+    smoothed = savgol_filter(seq, window_length=window, polyorder=polyorder, axis=0, mode="interp")
+    return smoothed
+
+
 def save_in_csv(
     pose_keypoints,
     hand_keypoints,
@@ -281,6 +315,9 @@ def save_in_csv(
         n_hand = 21
         n_face = len(FACE_LANDMARKS)
 
+        frame_ids = []
+        all_frames_keypoints = []
+
         for i in range(len(pose_keypoints)):
             frame_idx = pose_keypoints[i][0]
 
@@ -301,11 +338,20 @@ def save_in_csv(
                 all_kp = center_keypoints(all_kp, avg_left_shoulder, avg_right_shoulder)
                 all_kp = normalize_keypoints(all_kp, avg_left_shoulder, avg_right_shoulder)
 
+            frame_ids.append(frame_idx)
+            all_frames_keypoints.append(all_kp)
+
+        # Temporal smoothing over the complete sequence reduces frame-to-frame jitter.
+        smoothed_sequence = apply_temporal_savgol_smoothing(all_frames_keypoints, window_length=9, polyorder=2)
+
+        for i, frame_idx in enumerate(frame_ids):
+            all_kp = smoothed_sequence[i]
+
             # Split back and flatten
-            flat_pose  = all_kp[:n_pose].flatten().tolist()
-            flat_left  = all_kp[n_pose:n_pose + n_hand].flatten().tolist()
+            flat_pose = all_kp[:n_pose].flatten().tolist()
+            flat_left = all_kp[n_pose:n_pose + n_hand].flatten().tolist()
             flat_right = all_kp[n_pose + n_hand:n_pose + 2 * n_hand].flatten().tolist()
-            flat_face  = all_kp[n_pose + 2 * n_hand:].flatten().tolist()
+            flat_face = all_kp[n_pose + 2 * n_hand:].flatten().tolist()
 
             writer.writerow([subfolder_name, gloss, frame_idx]
                             + flat_pose + flat_left + flat_right + flat_face)
@@ -340,6 +386,7 @@ def average_shoulder_kp(video_file):
     avg_right_shoulder = np.mean(right_shoulders, axis=0)
 
     return avg_left_shoulder, avg_right_shoulder
+
 
 
 if __name__ == "__main__":
