@@ -112,8 +112,17 @@ def process_subfolder(subfolder_path):
     pose_keypoints = extract_pose_keypoints(frames)
     hand_keypoints = extract_hand_keypoints(frames)
     face_keypoints = extract_face_keypoints(frames)
+    avg_left_shoulder, avg_right_shoulder = average_shoulder_kp(video_file)
 
-    save_in_csv(pose_keypoints, hand_keypoints, face_keypoints, gloss, subfolder_name)
+    save_in_csv(
+        pose_keypoints,
+        hand_keypoints,
+        face_keypoints,
+        gloss,
+        subfolder_name,
+        avg_left_shoulder,
+        avg_right_shoulder,
+    )
 
 
 def extract_gloss(folder_path):
@@ -211,27 +220,29 @@ def extract_face_keypoints(frames):
     return all_face_keypoints
 
 
-def center_keypoints(keypoints):
+def center_keypoints(keypoints, avg_left_shoulder=None, avg_right_shoulder=None):
     """Center all keypoints around the midpoint between the shoulders in all 3 dimensions (x, y, z).
     Expects keypoints as a numpy array of shape (N, 3) with pose landmarks first,
     where index 1 = left shoulder and index 2 = right shoulder (per POSE_LANDMARKS).
+    If average shoulder positions are provided, use them (video-wise centering).
     """
     kp = np.array(keypoints, dtype=float)
-    left_shoulder  = kp[1]
-    right_shoulder = kp[2]
+    left_shoulder = np.array(avg_left_shoulder, dtype=float) if avg_left_shoulder is not None else kp[1]
+    right_shoulder = np.array(avg_right_shoulder, dtype=float) if avg_right_shoulder is not None else kp[2]
     center = (left_shoulder + right_shoulder) / 2.0
     centered_keypoints = kp - center
     return centered_keypoints
 
 
-def normalize_keypoints(keypoints):
+def normalize_keypoints(keypoints, avg_left_shoulder=None, avg_right_shoulder=None):
     """Normalize keypoints so that the distance between the shoulders equals 1.
     Expects keypoints as a numpy array of shape (N, 3) with pose landmarks first,
     where index 1 = left shoulder and index 2 = right shoulder (per POSE_LANDMARKS).
+    If average shoulder positions are provided, use them (video-wise normalization scale).
     """
     kp = np.array(keypoints, dtype=float)
-    left_shoulder  = kp[1]
-    right_shoulder = kp[2]
+    left_shoulder = np.array(avg_left_shoulder, dtype=float) if avg_left_shoulder is not None else kp[1]
+    right_shoulder = np.array(avg_right_shoulder, dtype=float) if avg_right_shoulder is not None else kp[2]
     dist = np.linalg.norm(right_shoulder - left_shoulder)
     if dist == 0:
         return kp
@@ -239,7 +250,15 @@ def normalize_keypoints(keypoints):
     return normalized_keypoints
 
 
-def save_in_csv(pose_keypoints, hand_keypoints, face_keypoints, gloss, subfolder_name):
+def save_in_csv(
+    pose_keypoints,
+    hand_keypoints,
+    face_keypoints,
+    gloss,
+    subfolder_name,
+    avg_left_shoulder=None,
+    avg_right_shoulder=None,
+):
     """Save the extracted keypoints into a CSV file.
     Format: name, GLOSS, Frame, pose keypoints, left hand keypoints, right hand keypoints, face keypoints
     """
@@ -279,8 +298,8 @@ def save_in_csv(pose_keypoints, hand_keypoints, face_keypoints, gloss, subfolder
             # Combine all landmarks, then center and normalize (only when pose is detected)
             all_kp = np.concatenate([pose_arr, left_arr, right_arr, face_arr], axis=0)
             if pose_kp:
-                all_kp = center_keypoints(all_kp)
-                all_kp = normalize_keypoints(all_kp)
+                all_kp = center_keypoints(all_kp, avg_left_shoulder, avg_right_shoulder)
+                all_kp = normalize_keypoints(all_kp, avg_left_shoulder, avg_right_shoulder)
 
             # Split back and flatten
             flat_pose  = all_kp[:n_pose].flatten().tolist()
@@ -292,6 +311,36 @@ def save_in_csv(pose_keypoints, hand_keypoints, face_keypoints, gloss, subfolder
                             + flat_pose + flat_left + flat_right + flat_face)
 
     logging.info(f"  -> Saved keypoints to {csv_file_path}")
+
+def average_shoulder_kp(video_file):
+    """Calculate the average shoulder keypoint position from each video.
+    This is used for centering and normalizing the keypoints videowise NOT framewise.
+    """
+
+    # get all frames from the video
+    extracted_frames = extract_frames(video_file)
+    if not extracted_frames:
+        return None, None
+
+    extracted_pose_kp = extract_pose_keypoints(extracted_frames)
+
+    left_shoulders = []
+    right_shoulders = []
+
+    for _, pose_kp in extracted_pose_kp:
+        if not pose_kp:
+            continue
+        left_shoulders.append(np.array(pose_kp[1], dtype=float))   # index 1 in POSE_LANDMARKS
+        right_shoulders.append(np.array(pose_kp[2], dtype=float))  # index 2 in POSE_LANDMARKS
+
+    if not left_shoulders or not right_shoulders:
+        return None, None
+
+    avg_left_shoulder = np.mean(left_shoulders, axis=0)
+    avg_right_shoulder = np.mean(right_shoulders, axis=0)
+
+    return avg_left_shoulder, avg_right_shoulder
+
 
 if __name__ == "__main__":
     logging.info("this script is made for the preprocessing of datasets (Phoenix 2014 T)")
