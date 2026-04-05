@@ -28,7 +28,6 @@ from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, Masking, Bidire
 import concurrent.futures
 import warnings
 import pickle
-import random
 import jiwer
 from sacrebleu.metrics import BLEU
 
@@ -1022,8 +1021,6 @@ def train_main(
         hidden_dim=1024,
         dropout_rate=0.3,
         l1_reg=0.001,
-        augment=False,
-        augment_factor=1,  # number of augmented samples to create per original (1 or 2)
     architecture="multi_attention",  # "baseline", "multi_attention", or "transformer"
     metrics_sample_size=256,
 ):
@@ -1209,9 +1206,9 @@ def train_main(
         callbacks = [
             tf.keras.callbacks.EarlyStopping(
                 monitor='val_loss',
-                patience=10,
+                patience=20,
                 restore_best_weights=True,
-                min_delta=0.001
+                min_delta=0.0005
             ),
             # NOTE: ReduceLROnPlateau removed - conflicts with CosineDecayRestarts schedule
             # The lr_schedule already handles learning rate adjustments
@@ -1280,8 +1277,8 @@ if __name__ == "__main__":
 
         config = {
             "train_data_folder": "data/train_data",
-            "version_model": 36,
-            "epochs": 100,
+            "version_model": 37,
+            "epochs": 150,
             "batch_size": 8,
             "validation_split": 0.1,
             "input_sequence_length": 300,
@@ -1289,8 +1286,6 @@ if __name__ == "__main__":
             "hidden_dim": 512,  
             "dropout_rate": 0.4,
             "l1_reg": 0.0001,
-            "augment": False, # NOTE: Currently, this does not respect the validation split properly and leads the model to overfit by seeing augmented versions of validation samples during training
-            "augment_factor": 2,
             "architecture": "multi_attention", # Either baseline or multi_attention or transformer
             "metrics_sample_size": 64,
         }

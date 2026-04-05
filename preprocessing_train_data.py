@@ -419,8 +419,37 @@ def interpolate_missing_keypoints(sequence):
     return seq
 
 
+def maybe_clean_output_folder():
+    """Optionally delete old output CSV files."""
+    output_folder = os.path.join("data", "train_data")
+    os.makedirs(output_folder, exist_ok=True)
+
+    try:
+        answer = input("Delete old output CSVs? (y/n): ").strip().lower()
+    except EOFError:
+        # Non-interactive run: keep existing files by default.
+        logging.info("No interactive input available; keeping existing output files.")
+        return
+
+    if answer not in {"y", "yes"}:
+        logging.info("Keeping existing output files.")
+        return
+
+    removed = 0
+    
+    for file_name in os.listdir(output_folder):
+        if file_name.lower().endswith(".csv"):
+            file_path = os.path.join(output_folder, file_name)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+                removed += 1
+
+    logging.info(f"Removed {removed} existing CSV file(s) from {output_folder}.")
+
+
 if __name__ == "__main__":
     logging.info("this script is made for the preprocessing of datasets (Phoenix 2014 T)")
+    maybe_clean_output_folder()
 
     raw_vid = os.path.join("data", "raw_data", "train")
 
