@@ -30,6 +30,7 @@ import warnings
 import pickle
 import jiwer
 from sacrebleu.metrics import BLEU
+from augemantations import Augmentation
 
 # NOTE: Set random seeds for reproducibility
 import keras
@@ -793,15 +794,28 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
             batch_size: int,
             shuffle: bool = True,
             seed: Optional[int] = 42,
+            augmenter: Optional[Augmentation] = None,
+            augment_each_epoch: bool = False,
+            augment_factor: int = 1,
     ):
-        self.encoder_data = encoder_data
-        self.decoder_data = decoder_data
-        self.target_data = target_data
         self.base_indices = np.asarray(indices, dtype=np.int64)
+
+        # Keep an immutable snapshot of the ORIGINAL train split as augmentation base.
+        # This guarantees each epoch starts from normal data, not previous augmented data.
+        self.base_encoder = np.asarray(encoder_data[self.base_indices]).copy()
+        self.base_decoder = np.asarray(decoder_data[self.base_indices]).copy()
+        self.base_target = np.asarray(target_data[self.base_indices]).copy()
+
         self.batch_size = max(1, int(batch_size))
         self.shuffle = bool(shuffle)
         self.rng = np.random.default_rng(seed)
-        self.indices = self.base_indices.copy()
+        self.augmenter = augmenter
+        self.augment_each_epoch = bool(augment_each_epoch)
+        self.augment_factor = max(0, int(augment_factor))
+        self.epoch_encoder = None
+        self.epoch_decoder = None
+        self.epoch_target = None
+        self.indices = np.array([], dtype=np.int64)
         self.on_epoch_end()
 
     def __len__(self):
@@ -811,13 +825,34 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
         start = idx * self.batch_size
         end = min(start + self.batch_size, len(self.indices))
         batch_idx = self.indices[start:end]
-        x_enc = self.encoder_data[batch_idx]
-        x_dec = self.decoder_data[batch_idx]
-        y = self.target_data[batch_idx]
+        x_enc = self.epoch_encoder[batch_idx]
+        x_dec = self.epoch_decoder[batch_idx]
+        y = self.epoch_target[batch_idx]
         return (x_enc, x_dec), y
 
+    def _rebuild_epoch_data(self):
+        base_enc = self.base_encoder
+        base_dec = self.base_decoder
+        base_tgt = self.base_target
+
+        if self.augment_each_epoch and self.augmenter is not None and self.augment_factor > 0:
+            epoch_enc, epoch_dec, epoch_tgt = self.augmenter.augment_training_split(
+                base_enc,
+                base_dec,
+                base_tgt,
+                augment_factor=self.augment_factor,
+                keep_original=True,
+            )
+        else:
+            epoch_enc, epoch_dec, epoch_tgt = base_enc, base_dec, base_tgt
+
+        self.epoch_encoder = epoch_enc
+        self.epoch_decoder = epoch_dec
+        self.epoch_target = epoch_tgt
+        self.indices = np.arange(self.epoch_encoder.shape[0], dtype=np.int64)
+
     def on_epoch_end(self):
-        self.indices = self.base_indices.copy()
+        self._rebuild_epoch_data()
         if self.shuffle:
             self.rng.shuffle(self.indices)
 
@@ -1021,6 +1056,8 @@ def train_main(
         hidden_dim=1024,
         dropout_rate=0.3,
         l1_reg=0.001,
+        augment_train_each_epoch=True,
+        augment_factor=1,
     architecture="multi_attention",  # "baseline", "multi_attention", or "transformer"
     metrics_sample_size=256,
 ):
@@ -1107,6 +1144,9 @@ def train_main(
             batch_size=batch_size,
             shuffle=True,
             seed=42,
+            augmenter=Augmentation(seed=42),
+            augment_each_epoch=augment_train_each_epoch,
+            augment_factor=augment_factor,
         )
         val_sequence = Seq2SeqBatchSequence(
             encoder_data=encoder_input_data,
@@ -1116,6 +1156,14 @@ def train_main(
             batch_size=min(batch_size, 8),
             shuffle=False,
             seed=42,
+            augmenter=None,
+            augment_each_epoch=False,
+            augment_factor=0,
+        )
+        logging.info(
+            "Epoch-wise augmentation: train_only=%s, factor=%d",
+            bool(augment_train_each_epoch),
+            int(augment_factor),
         )
 
         # 5. create model
@@ -1286,6 +1334,8 @@ if __name__ == "__main__":
             "hidden_dim": 512,  
             "dropout_rate": 0.4,
             "l1_reg": 0.0001,
+            "augment_train_each_epoch": True,
+            "augment_factor": 1,
             "architecture": "multi_attention", # Either baseline or multi_attention or transformer
             "metrics_sample_size": 64,
         }
