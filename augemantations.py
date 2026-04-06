@@ -29,17 +29,92 @@ class Augmentation:
     """
 
     def __init__(
+        # General settings
         self,
         seed: int = 42,
-        stretch_min: float = 0.9,
-        stretch_max: float = 1.1,
-    ) -> None:
-        # Use a config list in the training file for augmentation choices and parameters.
-        self.rng = np.random.default_rng(seed)
-        self.stretch_min = float(stretch_min)
-        self.stretch_max = float(stretch_max)
+        augment_factor: int = 3,
 
-    # --- Temporal augmentations (placeholders) ---
+        # Temporal: linear time stretch
+        linear_stretch_min: float = 0.8,
+        linear_stretch_max: float = 1.2,
+        linear_stretch_probability: float = 0.5,
+
+        # Temporal: dynamic time warping
+        dynamic_warp_min: float = 0.8,
+        dynamic_warp_max: float = 1.2,
+        dynamic_warp_probability: float = 0.4,
+
+        # Temporal: frame freeze
+        frame_freeze_min: float = 1.0,
+        frame_freeze_max: float = 3.0,
+        frame_freeze_probability: float = 0.25,
+
+        # Temporal: dropout
+        temporal_dropout_min: float = 0.01,
+        temporal_dropout_max: float = 0.08,
+        temporal_dropout_probability: float = 0.35,
+
+        # Spatial: random shift
+        random_shift_min: float = -0.03,
+        random_shift_max: float = 0.03,
+        random_shift_probability: float = 0.3,
+
+        # Spatial: random scaling
+        random_scaling_min: float = 0.95,
+        random_scaling_max: float = 1.05,
+        random_scaling_probability: float = 0.3,
+
+        # Spatial: z-axis rotation
+        z_rotation_min: float = -5.0,
+        z_rotation_max: float = 5.0,
+        z_rotation_probability: float = 0.3,
+
+        # Spatial: point noise
+        point_noise_min: float = 0.0005,
+        point_noise_max: float = 0.003,
+        point_noise_probability: float = 0.3,
+
+    ) -> None:
+        # General config
+        self.rng = np.random.default_rng(seed)
+        self.seed = int(seed)
+        self.augment_factor = max(0, int(augment_factor))
+
+        # Temporal augmentation params
+        self.linear_stretch_min = float(linear_stretch_min)
+        self.linear_stretch_max = float(linear_stretch_max)
+        self.linear_stretch_probability = float(linear_stretch_probability)
+
+        self.dynamic_warp_min = float(dynamic_warp_min)
+        self.dynamic_warp_max = float(dynamic_warp_max)
+        self.dynamic_warp_probability = float(dynamic_warp_probability)
+
+        self.frame_freeze_min = float(frame_freeze_min)
+        self.frame_freeze_max = float(frame_freeze_max)
+        self.frame_freeze_probability = float(frame_freeze_probability)
+
+        self.temporal_dropout_min = float(temporal_dropout_min)
+        self.temporal_dropout_max = float(temporal_dropout_max)
+        self.temporal_dropout_probability = float(temporal_dropout_probability)
+
+        # Spatial augmentation params
+        self.random_shift_min = float(random_shift_min)
+        self.random_shift_max = float(random_shift_max)
+        self.random_shift_probability = float(random_shift_probability)
+
+        self.random_scaling_min = float(random_scaling_min)
+        self.random_scaling_max = float(random_scaling_max)
+        self.random_scaling_probability = float(random_scaling_probability)
+
+        self.z_rotation_min = float(z_rotation_min)
+        self.z_rotation_max = float(z_rotation_max)
+        self.z_rotation_probability = float(z_rotation_probability)
+
+        self.point_noise_min = float(point_noise_min)
+        self.point_noise_max = float(point_noise_max)
+        self.point_noise_probability = float(point_noise_probability)
+
+    # --- Temporal augmentations ---
     def linear_time_stretch(self, sequence: np.ndarray, factor: float = None) -> np.ndarray:
         """Placeholder for uniform temporal stretching."""
         pass
