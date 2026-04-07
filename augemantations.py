@@ -48,6 +48,7 @@ class Augmentation:
         # Temporal: frame freeze
         frame_freeze_min: float = 1.0,
         frame_freeze_max: float = 3.0,
+        frame_freeze_frequency_max: float = 1, # max number of freezes per sequence
         frame_freeze_probability: float = 0.25,
 
         # Temporal: dropout
@@ -93,6 +94,7 @@ class Augmentation:
 
         self.frame_freeze_min = float(frame_freeze_min)
         self.frame_freeze_max = float(frame_freeze_max)
+        self.frame_freeze_frequency_max = float(frame_freeze_frequency_max)
         self.frame_freeze_probability = float(frame_freeze_probability)
 
         self.temporal_dropout_min = float(temporal_dropout_min)
@@ -159,7 +161,22 @@ class Augmentation:
 
     def dynamic_time_warping(self, sequence: np.ndarray) -> np.ndarray:
         """
+        In this function, we apply a dynamic time warping to the input sequence by creating a smooth nonlinear time map, so that different parts of the sequence can be stretched or compressed with different local speeds.
 
+        This is the step-by-step process:
+            1. Get the number of frames and create the reference time grid (target_indices) as a linear grid from 0 to 1 across the original sequence length.
+
+            2. Create four control points (start, two middle points, end) that define the base time map.
+
+            3. Create random noise for the two middle control points by using self.dynamic_warp_min and self.dynamic_warp_max, then add this noise to the control points.
+
+            4. Clamp and sort the warped control points to keep them valid in the range [0, 1], and force the first and last point to exactly 0 and 1.
+
+            5. Build a smooth quadratic interpolation curve (warp_fn) from the original control points to the warped control points, and use it to generate warped indices for every frame.
+
+            6. Clip the warped indices to [0, 1], then use scipy interp1d (linear in the time dimension) to resample the original sequence at these warped indices.
+
+            7. At last, we return the warped sequence in float32 format to ensure it matches the data type of the original input sequence.
         """
 
         num_frames = sequence.shape[0]
@@ -201,10 +218,62 @@ class Augmentation:
         # Return in float32 format to match the input type
         return warped_sequence.astype(np.float32)
 
-
     def frame_freeze(self, sequence: np.ndarray) -> np.ndarray:
-        """Placeholder for short frame repeat/stutter augmentation."""
-        pass
+        """
+        In this function, we apply a frame freeze augmentation to the input sequence by repeating one or more randomly selected frames for a short random duration, which simulates brief stutters in temporal motion.
+
+        This is the step-by-step process:
+            1. First, we draw a random number and compare it to self.frame_freeze_probability to decide whether the augmentation is applied.
+
+            2. If the augmentation is enabled, we create a copy of the input sequence so the original sequence is not modified in-place.
+
+            3. We determine how many freeze events should be applied (num_freezes), and for each event we recompute the current sequence length because the sequence becomes longer after each insertion.
+
+            4. For each freeze event, we sample a random freeze duration between self.frame_freeze_min and self.frame_freeze_max, and select a random frame index to freeze.
+
+            5. We extract the selected frame, repeat it for the sampled duration, and insert the repeated frames back into the sequence at the chosen position.
+
+            6. This process increases the total number of frames and introduces local temporal pauses that mimic short capture lags or motion stalls.
+
+            7. At last, we return the augmented sequence in float32 format to ensure it matches the data type of the original input sequence.
+        """
+        # check if we should apply the freeze augmentation
+        if self.rng.random() > self.frame_freeze_probability:
+            return sequence
+
+        # work on a copy to avoid modifying the original data
+        sequence = sequence.copy()
+        
+        # get the number of freezes to apply (frequency)
+        num_freezes = int(self.frame_freeze_frequency_max)
+
+        for _ in range(num_freezes):
+            # get current number of frames (important because sequence grows each loop)
+            num_frames = sequence.shape[0]
+
+            # get freeze duration in frames (random between min and max)
+            freeze_duration = self.rng.integers(self.frame_freeze_min, self.frame_freeze_max + 1)
+
+            # find random frame index to freeze
+            freeze_index = self.rng.integers(0, num_frames)
+
+            # create the frozen sequence by inserting the frozen frame
+            # we take one frame as a slice to keep the (1, features) shape
+            frozen_frame = sequence[freeze_index : freeze_index + 1]
+            
+            # split the sequence and insert the repeated frame
+            before = sequence[:freeze_index]
+            after = sequence[freeze_index:]
+            
+            # concatenate everything back together (sequence length increases here)
+            sequence = np.concatenate([
+                before, 
+                np.repeat(frozen_frame, freeze_duration, axis=0), 
+                after
+            ], axis=0)
+
+        # return the longer sequence in float32 format
+        return sequence.astype(np.float32)
 
     def temporal_dropout(self, sequence: np.ndarray) -> np.ndarray:
         """Placeholder for dropping random time steps."""
