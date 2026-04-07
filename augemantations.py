@@ -218,7 +218,7 @@ class Augmentation:
         # Return in float32 format to match the input type
         return warped_sequence.astype(np.float32)
 
-    def frame_freeze(self, sequence: np.ndarray) -> np.ndarray:
+    def frame_freeze(self, sequence: np.ndarray) -> np.ndarray:  
         """
         In this function, we apply a frame freeze augmentation to the input sequence by repeating one or more randomly selected frames for a short random duration, which simulates brief stutters in temporal motion.
 
@@ -276,8 +276,30 @@ class Augmentation:
         return sequence.astype(np.float32)
 
     def temporal_dropout(self, sequence: np.ndarray) -> np.ndarray:
-        """Placeholder for dropping random time steps."""
-        pass
+        num_frames = sequence.shape[0]
+        
+        # determine how many frames to drop (randomly between min and max)
+        # for example: drop 1 to 5 frames
+        num_to_drop = self.rng.integers(self.temporal_dropout_min, self.temporal_dropout_max + 1)
+        
+        # safety check: we need at least a few frames left to have a valid sequence
+        if num_to_drop >= num_frames - 2:
+            return sequence
+
+        # get random indices to drop
+        # we pick unique indices so we don't try to drop the same frame twice
+        drop_indices = self.rng.choice(np.arange(num_frames), size=num_to_drop, replace=False)
+
+        # create a mask to keep all frames EXCEPT the ones in drop_indices
+        keep_mask = np.ones(num_frames, dtype=bool)
+        keep_mask[drop_indices] = False
+
+        # apply the mask to the sequence (sequence length decreases here)
+        dropped_sequence = sequence[keep_mask]
+
+        # return the shorter sequence in float32 format
+        return dropped_sequence.astype(np.float32)
+
 
     # --- Spatial augmentations ---
     def random_shift(self, sequence: np.ndarray) -> np.ndarray:
