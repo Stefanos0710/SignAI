@@ -158,8 +158,49 @@ class Augmentation:
         return stretched_sequence.astype(np.float32)
 
     def dynamic_time_warping(self, sequence: np.ndarray) -> np.ndarray:
-        """Placeholder for non-uniform temporal warping."""
-        pass
+        """
+
+        """
+
+        num_frames = sequence.shape[0]
+        
+        # 1. Create the reference grid (0 to 1)
+        # This represents our target frame indices
+        target_indices = np.linspace(0, 1, num_frames)
+
+        # 2. Create 4 control points (Start, 2x Middle, End)
+        control_points = np.linspace(0, 1, 4)
+
+        # 3. Create and apply noise only to the 2 middle control points
+        # Use self.dynamic_warp_max to control the intensity
+        noise = np.zeros(4)
+        noise[1:3] = self.rng.uniform(self.dynamic_warp_min, self.dynamic_warp_max, size=2)
+
+        # Apply noise and ensure the time stays valid (0 to 1 and strictly increasing)
+        warped_control_points = control_points + noise
+        warped_control_points = np.clip(warped_control_points, 0, 1)
+        warped_control_points = np.sort(warped_control_points)
+        warped_control_points[0] = 0.0  # Force start at 0
+        warped_control_points[-1] = 1.0 # Force end at 1
+
+        # 4. Create the Warping Curve (The "Bent Ruler")
+        # We use 'quadratic' to ensure smooth acceleration/deceleration
+        warp_fn = interp1d(control_points, warped_control_points, kind='quadratic')
+        
+        # This calculates where each target frame should "look" in the original sequence
+        warped_indices = warp_fn(target_indices)
+        warped_indices = np.clip(warped_indices, 0, 1) # Safety clip
+
+        # 5. Interpolate the actual sequence data
+        # We use 'linear' for the keypoints to avoid overshoot artifacts
+        interpolation_func = interp1d(target_indices, sequence, axis=0, kind='linear', fill_value='extrapolate')
+        
+        # Apply the warped time-map to the original data
+        warped_sequence = interpolation_func(warped_indices)
+
+        # Return in float32 format to match the input type
+        return warped_sequence.astype(np.float32)
+
 
     def frame_freeze(self, sequence: np.ndarray) -> np.ndarray:
         """Placeholder for short frame repeat/stutter augmentation."""
