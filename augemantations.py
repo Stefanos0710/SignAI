@@ -118,6 +118,50 @@ class Augmentation:
         self.point_noise_max = float(point_noise_max)
         self.point_noise_probability = float(point_noise_probability)
 
+    def _normalize_sequence_shape(
+        self,
+        sequence: np.ndarray,
+        target_timesteps: int,
+        target_features: int,
+    ) -> np.ndarray:
+        """Normalize a sequence to fixed [T, F] with strict right-padding (zeros at the end only)."""
+        seq = np.asarray(sequence, dtype=np.float32)
+        if seq.ndim != 2:
+            raise ValueError(f"Expected 2D sequence [T, F], got shape={seq.shape}")
+
+        seq = np.nan_to_num(seq, nan=0.0, posinf=0.0, neginf=0.0)
+
+        if seq.shape[1] != target_features:
+            if seq.shape[1] > target_features:
+                seq = seq[:, :target_features]
+            else:
+                pad_w = target_features - seq.shape[1]
+                seq = np.pad(seq, ((0, 0), (0, pad_w)), mode='constant', constant_values=0.0)
+
+        if seq.shape[0] == 0:
+            seq = np.zeros((1, target_features), dtype=np.float32)
+
+        if seq.shape[0] > target_timesteps:
+            seq = seq[:target_timesteps]
+        elif seq.shape[0] < target_timesteps:
+            pad_t = target_timesteps - seq.shape[0]
+            seq = np.pad(seq, ((0, pad_t), (0, 0)), mode='constant', constant_values=0.0)
+
+        return seq.astype(np.float32, copy=False)
+
+    def _strip_right_padding(self, sequence: np.ndarray) -> np.ndarray:
+        """Remove trailing all-zero frames so temporal augmentation only touches valid frames."""
+        seq = np.asarray(sequence, dtype=np.float32)
+        if seq.ndim != 2:
+            raise ValueError(f"Expected 2D sequence [T, F], got shape={seq.shape}")
+
+        non_zero_rows = np.any(np.abs(seq) > 1e-6, axis=1)
+        if not np.any(non_zero_rows):
+            return seq[:1].copy()
+
+        last_valid = int(np.where(non_zero_rows)[0][-1]) + 1
+        return seq[:last_valid].copy()
+
     # --- Temporal augmentations ---
     def linear_time_stretch(self, sequence: np.ndarray) -> np.ndarray:
         """
@@ -420,18 +464,37 @@ class Augmentation:
     def pipeline_augment(self, sequence: np.ndarray) -> np.ndarray:
         """Apply a random combination of augmentations to the input sequence based on the configured probabilities."""
 
+        sequence = np.asarray(sequence, dtype=np.float32)
+        if sequence.ndim != 2:
+            raise ValueError(f"Expected 2D sequence [T, F], got shape={sequence.shape}")
+
+        target_timesteps = int(sequence.shape[0])
+        target_features = int(sequence.shape[1])
+
+        # Start from guaranteed right-padded shape and only augment the valid prefix.
+        sequence = self._normalize_sequence_shape(sequence, target_timesteps, target_features)
+        sequence = self._strip_right_padding(sequence)
+
         # --- Temporal ---
         if self.rng.random() < self.linear_stretch_probability:
             sequence = self.linear_time_stretch(sequence)
+            sequence = self._normalize_sequence_shape(sequence, target_timesteps, target_features)
+            sequence = self._strip_right_padding(sequence)
 
         if self.rng.random() < self.dynamic_warp_probability:
             sequence = self.dynamic_time_warping(sequence)
+            sequence = self._normalize_sequence_shape(sequence, target_timesteps, target_features)
+            sequence = self._strip_right_padding(sequence)
 
         if self.rng.random() < self.frame_freeze_probability:
             sequence = self.frame_freeze(sequence)
+            sequence = self._normalize_sequence_shape(sequence, target_timesteps, target_features)
+            sequence = self._strip_right_padding(sequence)
 
         if self.rng.random() < self.temporal_dropout_probability:
             sequence = self.temporal_dropout(sequence)
+            sequence = self._normalize_sequence_shape(sequence, target_timesteps, target_features)
+            sequence = self._strip_right_padding(sequence)
 
         # --- Spatial ---
         if self.rng.random() < self.random_shift_probability:
@@ -446,7 +509,7 @@ class Augmentation:
         if self.rng.random() < self.point_noise_probability:
             sequence = self.point_noise(sequence)
 
-        return sequence.astype(np.float32)
+        return self._normalize_sequence_shape(sequence, target_timesteps, target_features)
 
     def augment_training_split(
         self,
@@ -455,7 +518,7 @@ class Augmentation:
         target_data: np.ndarray,
         augment_factor: Optional[int] = None, # makes it possible to override the number of augmentations per sample for this specific call, otherwise it uses the default from __init__
         keep_original: Optional[bool] = None  # makes it possible to override the keep_original setting for this specific call, otherwise it uses the default from __init__
-    ) -> Tuple[list, np.ndarray, np.ndarray]:
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Return old + newly augmented training samples."""
         
         # 1. set up augmentation parameters for this call (use defaults if not provided)
@@ -469,6 +532,8 @@ class Augmentation:
         aug_enc = []
         aug_dec = []
         aug_y = []
+        target_timesteps = int(x_enc.shape[1])
+        target_features = int(x_enc.shape[2])
 
         # 2. add the augmentation samples
         for i in range(x_enc.shape[0]):
@@ -476,7 +541,7 @@ class Augmentation:
             
             # if keep_original is True, we add the original sample to the augmented dataset before creating new versions
             if keep:
-                aug_enc.append(base_seq)
+                aug_enc.append(self._normalize_sequence_shape(base_seq, target_timesteps, target_features))
                 aug_dec.append(x_dec[i])
                 aug_y.append(y[i])
 
@@ -485,10 +550,8 @@ class Augmentation:
                 # HIER: Deine Pipeline aufrufen statt nur .copy()
                 augmented = self.pipeline_augment(base_seq.copy())
                 
-                aug_enc.append(augmented)
+                aug_enc.append(self._normalize_sequence_shape(augmented, target_timesteps, target_features))
                 aug_dec.append(x_dec[i])
                 aug_y.append(y[i])
 
-        # IMPORTATNT: aug_dec and aug_y remain Numpy Arrays, because they have fixed lengths!
-        # aug_enc is a list of arrays because each augmented sequence can have a different length due to temporal augmentations, so we keep it as a list of variable-length sequences.
-        return aug_enc, np.array(aug_dec), np.array(aug_y)
+        return np.asarray(aug_enc, dtype=np.float32), np.asarray(aug_dec), np.asarray(aug_y)

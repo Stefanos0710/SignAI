@@ -860,9 +860,16 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
         else:
             epoch_enc, epoch_dec, epoch_tgt = base_enc, base_dec, base_tgt
 
-        self.epoch_encoder = epoch_enc
-        self.epoch_decoder = epoch_dec
-        self.epoch_target = epoch_tgt
+        self.epoch_encoder = np.asarray(epoch_enc, dtype=np.float32)
+        self.epoch_decoder = np.asarray(epoch_dec)
+        self.epoch_target = np.asarray(epoch_tgt)
+        if self.epoch_encoder.shape[0] != self.epoch_decoder.shape[0] or self.epoch_encoder.shape[0] != self.epoch_target.shape[0]:
+            raise ValueError(
+                "Augmented split size mismatch: "
+                f"enc={self.epoch_encoder.shape[0]}, "
+                f"dec={self.epoch_decoder.shape[0]}, "
+                f"tgt={self.epoch_target.shape[0]}"
+            )
         self.indices = np.arange(self.epoch_encoder.shape[0], dtype=np.int64)
 
     def on_epoch_end(self):
@@ -893,17 +900,21 @@ def build_seq2seq_model_multi_attention(
     4. Deeper feedforward network after attention
     5. Dropout after feedforward layers
     """
+    # Keep argument for backwards compatibility while forcing cuDNN-safe recurrent dropout.
+    recurrent_dropout_rate = 0.0
+
     # ===== ENCODER =====
     encoder_inputs = Input(shape=(None, num_features), name="encoder_inputs")
+    encoder_masked_inputs = Masking(mask_value=0.0, name="encoder_masking")(encoder_inputs)
 
     # define masking
     lstm_mask = Lambda(
         lambda t: tf.reduce_sum(tf.abs(t), axis=-1) > 1e-6,
         name="encoder_mask"
-    )(encoder_inputs)
+    )(encoder_masked_inputs)
 
     # Spatial projection: helps model focus on important keypoint relationships
-    x = Dense(encoder_units * 2, activation="relu", name="encoder_projection")(encoder_inputs)
+    x = Dense(encoder_units * 2, activation="relu", name="encoder_projection")(encoder_masked_inputs)
     if use_layer_norm:
         x = LayerNormalization(name="encoder_norm1")(x)
     x = Dropout(dropout_rate, name="encoder_dropout1")(x)
@@ -919,8 +930,10 @@ def build_seq2seq_model_multi_attention(
             encoder_units,
             return_sequences=True,
             return_state=True,
+            activation="tanh",
+            recurrent_activation="sigmoid",
             dropout=dropout_rate,
-            recurrent_dropout=recurrent_dropout_rate,
+            recurrent_dropout=0.0,
         ),
         name="encoder_bidirectional"
     )
@@ -957,8 +970,10 @@ def build_seq2seq_model_multi_attention(
         decoder_units,
         return_sequences=True,
         return_state=True,
+        activation="tanh",
+        recurrent_activation="sigmoid",
         dropout=dropout_rate,
-        recurrent_dropout=recurrent_dropout_rate,
+        recurrent_dropout=0.0,
         name="decoder_lstm"
     )
 
@@ -1340,7 +1355,7 @@ if __name__ == "__main__":
 
         config = {
             "train_data_folder": "data/train_data",
-            "version_model": 38,
+            "version_model": 38_1,
             "epochs": 200,
             "batch_size": 64,
             "validation_split": 0.1,
