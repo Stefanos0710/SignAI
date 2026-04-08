@@ -276,21 +276,35 @@ class Augmentation:
         return sequence.astype(np.float32)
 
     def temporal_dropout(self, sequence: np.ndarray) -> np.ndarray:
+        """
+        In this function, we apply temporal dropout to the input sequence by removing a random set of frames, which simulates small temporal discontinuities like skipped capture moments.
+
+        This is the step-by-step process:
+            1. First, we get the total number of frames in the sequence.
+
+            2. We sample how many frames should be dropped (num_to_drop) between self.temporal_dropout_min and self.temporal_dropout_max.
+
+            3. We run a safety check so we do not remove too many frames, because we still need a minimum sequence length for valid processing.
+
+            4. We sample unique frame indices to drop, so the same frame index is not selected multiple times.
+
+            5. We build a boolean keep mask, mark selected indices as False, and keep all other frames.
+
+            6. At last, we return the shortened sequence in float32 format to keep dtype consistency for the pipeline.
+        """
         num_frames = sequence.shape[0]
         
-        # determine how many frames to drop (randomly between min and max)
-        # for example: drop 1 to 5 frames
+        # determine how many frames to drop (random between min and max)
         num_to_drop = self.rng.integers(self.temporal_dropout_min, self.temporal_dropout_max + 1)
         
-        # safety check: we need at least a few frames left to have a valid sequence
+        # safety check: we still need at least a few frames to keep the sequence valid
         if num_to_drop >= num_frames - 2:
             return sequence
 
-        # get random indices to drop
-        # we pick unique indices so we don't try to drop the same frame twice
+        # get random indices to drop (unique so we do not drop the same index twice)
         drop_indices = self.rng.choice(np.arange(num_frames), size=num_to_drop, replace=False)
 
-        # create a mask to keep all frames EXCEPT the ones in drop_indices
+        # create a keep mask for all frames except the selected drop indices
         keep_mask = np.ones(num_frames, dtype=bool)
         keep_mask[drop_indices] = False
 
@@ -303,20 +317,107 @@ class Augmentation:
 
     # --- Spatial augmentations ---
     def random_shift(self, sequence: np.ndarray) -> np.ndarray:
-        """Placeholder for global xy shift augmentation."""
-        pass
+        """
+        In this function, we apply a random spatial shift to the full person by moving all keypoints in x and y direction, which simulates camera framing changes like slight left/right/up/down offsets.
+
+        This is the step-by-step process:
+            1. First, we create a copy of the input sequence so the original data is not modified in-place.
+
+            2. We sample two random shift values (shift_x and shift_y) between self.random_shift_min and self.random_shift_max.
+
+            3. Since the input features are arranged as (x, y, z), we add shift_x to all x coordinates and shift_y to all y coordinates.
+
+            4. At last, we return the shifted sequence in float32 format to ensure it matches the expected input/output type.
+        """
+        sequence = sequence.copy()
+        
+        # sample random values for the x and y shift
+        shift_x = self.rng.uniform(self.random_shift_min, self.random_shift_max)
+        shift_y = self.rng.uniform(self.random_shift_min, self.random_shift_max)
+
+        # since your data layout is (x, y, z):
+        sequence[:, 0::3] += shift_x  # all x coordinates
+        sequence[:, 1::3] += shift_y  # all y coordinates
+
+        return sequence.astype(np.float32)
 
     def random_scaling(self, sequence: np.ndarray) -> np.ndarray:
-        """Placeholder for global scale augmentation."""
-        pass
+        """
+        In this function, we apply a random spatial scaling to simulate a zoom effect, so the full person appears slightly larger or smaller while staying centered in the frame.
+
+        This is the step-by-step process:
+            1. First, we create a copy of the input sequence to avoid changing the original sequence in-place.
+
+            2. We sample a random scale factor between self.random_scaling_min and self.random_scaling_max.
+
+            3. We define the frame center as 0.5 and scale all x and y coordinates around this center point.
+
+            4. At last, we return the scaled sequence in float32 format so it stays consistent with the expected model input type.
+        """
+
+        sequence = sequence.copy()
+        scale = self.rng.uniform(self.random_scaling_min, self.random_scaling_max)
+
+        # we scale around the center point of the frame (0.5)
+        center = 0.5
+        
+        sequence[:, 0::3] = (sequence[:, 0::3] - center) * scale + center
+        sequence[:, 1::3] = (sequence[:, 1::3] - center) * scale + center
+
+        return sequence.astype(np.float32)
 
     def z_axis_rotation(self, sequence: np.ndarray) -> np.ndarray:
-        """Placeholder for small z-axis body tilt augmentation."""
-        pass
+        """
+        In this function, we apply a small rotation around the z-axis by rotating all (x, y) keypoint pairs around the frame center, which simulates slight sideways upper-body tilt.
+
+        This is the step-by-step process:
+            1. First, we copy the sequence so the original sequence is kept unchanged.
+
+            2. We sample a random rotation angle in degrees between self.z_rotation_min and self.z_rotation_max, then convert it to radians.
+
+            3. We compute cosine and sine of the angle once, and define 0.5 as the center of rotation.
+
+            4. We iterate through the feature vector in (x, y, z) layout, take each (x, y) pair, shift it to center-based coordinates, apply the 2D rotation matrix, and shift it back.
+
+            5. At last, we return the rotated sequence in float32 format to keep a stable numeric dtype for the pipeline.
+        """
+
+        sequence = sequence.copy()
+        
+        # convert random angle from degree to radian
+        angle_rad = np.radians(self.rng.uniform(self.z_rotation_min, self.z_rotation_max))
+        cos_a, sin_a = np.cos(angle_rad), np.sin(angle_rad)
+        center = 0.5
+        
+        # apply rotation to each (x, y) pair
+        for i in range(0, sequence.shape[1], 3):
+            x = sequence[:, i] - center
+            y = sequence[:, i+1] - center
+            
+            sequence[:, i] = (x * cos_a - y * sin_a) + center
+            sequence[:, i+1] = (x * sin_a + y * cos_a) + center
+
+        return sequence.astype(np.float32)
 
     def point_noise(self, sequence: np.ndarray) -> np.ndarray:
-        """Placeholder for Gaussian keypoint noise."""
-        pass
+        """
+        In this function, we add small Gaussian point noise to the full sequence so each keypoint gets a minimal jitter, which simulates measurement/tracking inaccuracy.
+
+        This is the step-by-step process:
+            1. We sample a random noise standard deviation (noise_sigma) between self.point_noise_min and self.point_noise_max.
+
+            2. We generate Gaussian noise with mean 0 and the sampled sigma for the full sequence shape (frames, features).
+
+            3. We add this noise to the original sequence values.
+
+            4. At last, we return the noisy sequence in float32 format to keep dtype compatibility with the rest of the training pipeline.
+        """
+
+        # generate noise for the full array (frames, features)
+        noise_sigma = self.rng.uniform(self.point_noise_min, self.point_noise_max)
+        noise = self.rng.normal(0, noise_sigma, size=sequence.shape)
+
+        return (sequence + noise).astype(np.float32)
 
     def augment_training_split(
         self,
