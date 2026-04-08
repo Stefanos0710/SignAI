@@ -36,6 +36,10 @@ from augemantations import Augmentation
 import keras
 keras.utils.set_random_seed(42)
 
+# enable mixed precision for faster training on compatible GPUs
+from tensorflow.keras import mixed_precision
+mixed_precision.set_global_policy('mixed_float16')
+
 # logging configuration
 logging.basicConfig(
     level=logging.INFO,
@@ -796,7 +800,8 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
             seed: Optional[int] = 42,
             augmenter: Optional[Augmentation] = None,
             augment_each_epoch: bool = False,
-            augment_factor: int = 1,
+                augment_factor: Optional[int] = None,
+                keep_original: Optional[bool] = None,
     ):
         self.base_indices = np.asarray(indices, dtype=np.int64)
 
@@ -811,7 +816,8 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
         self.rng = np.random.default_rng(seed)
         self.augmenter = augmenter
         self.augment_each_epoch = bool(augment_each_epoch)
-        self.augment_factor = max(0, int(augment_factor))
+        self.augment_factor = None if augment_factor is None else max(0, int(augment_factor))
+        self.keep_original = None if keep_original is None else bool(keep_original)
         self.epoch_encoder = None
         self.epoch_decoder = None
         self.epoch_target = None
@@ -835,14 +841,22 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
         base_dec = self.base_decoder
         base_tgt = self.base_target
 
-        if self.augment_each_epoch and self.augmenter is not None and self.augment_factor > 0:
-            epoch_enc, epoch_dec, epoch_tgt = self.augmenter.augment_training_split(
-                base_enc,
-                base_dec,
-                base_tgt,
-                augment_factor=self.augment_factor,
-                keep_original=True,
+        if self.augment_each_epoch and self.augmenter is not None:
+            effective_factor = (
+                self.augment_factor
+                if self.augment_factor is not None
+                else max(0, int(getattr(self.augmenter, "augment_factor", 0)))
             )
+            if effective_factor > 0:
+                epoch_enc, epoch_dec, epoch_tgt = self.augmenter.augment_training_split(
+                    base_enc,
+                    base_dec,
+                    base_tgt,
+                    augment_factor=self.augment_factor,
+                    keep_original=self.keep_original,
+                )
+            else:
+                epoch_enc, epoch_dec, epoch_tgt = base_enc, base_dec, base_tgt
         else:
             epoch_enc, epoch_dec, epoch_tgt = base_enc, base_dec, base_tgt
 
@@ -863,8 +877,8 @@ def build_seq2seq_model_multi_attention(
         embedding_dim=512,
         encoder_units=512,
         decoder_units=1024,
-        dropout_rate=0.3,
-        recurrent_dropout_rate=0.1,
+    dropout_rate=0.4,
+    recurrent_dropout_rate=0.0,
         use_layer_norm=True,
         num_attention_heads=8,
         use_cnn=True
@@ -951,7 +965,7 @@ def build_seq2seq_model_multi_attention(
     decoder_outputs, _, _ = decoder_lstm(
         decoder_embedding,
         initial_state=[state_h, state_c],
-        mask=decoder_mask  # Pass mask to LSTM
+        mask=decoder_mask,  # Pass mask to LSTM
     )
     
     if use_layer_norm:
@@ -1003,7 +1017,7 @@ def build_seq2seq_model_multi_attention(
         decoder_combined = LayerNormalization(name="decoder_ff_norm")(decoder_combined)
 
     # Numerical stability
-    decoder_dense = Dense(vocab_size, activation="softmax", name="decoder_dense")
+    decoder_dense = Dense(vocab_size, activation="softmax", dtype="float32", name="decoder_dense")
     final_outputs = decoder_dense(decoder_combined)
 
     model = tf.keras.Model([encoder_inputs, decoder_inputs], final_outputs, name="seq2seq_improved")
@@ -1016,8 +1030,8 @@ def build_seq2seq_model(
         embedding_dim=128,
         encoder_units=256,
         decoder_units=512,
-        dropout_rate=0.5,
-        recurrent_dropout_rate=0.1,
+    dropout_rate=0.4,
+    recurrent_dropout_rate=0.0,
         architecture="multi_attention",
         use_layer_norm=True,
         use_multi_head_attention=True,
@@ -1049,17 +1063,17 @@ def train_main(
         train_data_folder,
         version_model=31,
         epochs=10,
-        batch_size=16,
+        batch_size=64,
         validation_split=0.1,
         input_sequence_length=None,
         embedding_dim=512,
         hidden_dim=1024,
-        dropout_rate=0.3,
+        dropout_rate=0.4,
         l1_reg=0.001,
         augment_train_each_epoch=True,
         augment_factor=1,
-    architecture="multi_attention",  # "baseline", "multi_attention", or "transformer"
-    metrics_sample_size=256,
+        architecture="multi_attention",  # "baseline", "multi_attention", or "transformer"
+        metrics_sample_size=256,
 ):
     try:
 
@@ -1144,9 +1158,10 @@ def train_main(
             batch_size=batch_size,
             shuffle=True,
             seed=42,
-            augmenter=Augmentation(seed=42),
+            augmenter=Augmentation(seed=42, augment_factor=augment_factor, keep_original=True),
             augment_each_epoch=augment_train_each_epoch,
-            augment_factor=augment_factor,
+            augment_factor=None,
+            keep_original=None,
         )
         val_sequence = Seq2SeqBatchSequence(
             encoder_data=encoder_input_data,
@@ -1177,7 +1192,7 @@ def train_main(
             encoder_units=embedding_dim,
             decoder_units=hidden_dim,
             dropout_rate=dropout_rate,
-            recurrent_dropout_rate=0.1,
+            recurrent_dropout_rate=0.0,
             architecture=architecture,
             use_layer_norm=True,
             use_multi_head_attention=True,
@@ -1254,7 +1269,7 @@ def train_main(
         callbacks = [
             tf.keras.callbacks.EarlyStopping(
                 monitor='val_loss',
-                patience=20,
+                patience=30,  # Increased patience for more stable training
                 restore_best_weights=True,
                 min_delta=0.0005
             ),
@@ -1325,9 +1340,9 @@ if __name__ == "__main__":
 
         config = {
             "train_data_folder": "data/train_data",
-            "version_model": 37,
-            "epochs": 150,
-            "batch_size": 8,
+            "version_model": 38,
+            "epochs": 200,
+            "batch_size": 64,
             "validation_split": 0.1,
             "input_sequence_length": 300,
             "embedding_dim": 256,
@@ -1335,9 +1350,9 @@ if __name__ == "__main__":
             "dropout_rate": 0.4,
             "l1_reg": 0.0001,
             "augment_train_each_epoch": True,
-            "augment_factor": 1,
+            "augment_factor": 2,
             "architecture": "multi_attention", # Either baseline or multi_attention or transformer
-            "metrics_sample_size": 64,
+            "metrics_sample_size": 128,
         }
 
          # starting training
