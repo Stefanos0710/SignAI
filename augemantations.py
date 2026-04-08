@@ -419,6 +419,38 @@ class Augmentation:
 
         return (sequence + noise).astype(np.float32)
 
+    # add the pipline and the probability logic to the main augmentation function
+    def pipeline_augment(self, sequence: np.ndarray) -> np.ndarray:
+        """Apply a random combination of augmentations to the input sequence based on the configured probabilities."""
+
+        # --- Temporal ---
+        if self.rng.random() < self.linear_stretch_probability:
+            sequence = self.linear_time_stretch(sequence)
+
+        if self.rng.random() < self.dynamic_warp_probability:
+            sequence = self.dynamic_time_warping(sequence)
+
+        if self.rng.random() < self.frame_freeze_probability:
+            sequence = self.frame_freeze(sequence)
+
+        if self.rng.random() < self.temporal_dropout_probability:
+            sequence = self.temporal_dropout(sequence)
+
+        # --- Spatial ---
+        if self.rng.random() < self.random_shift_probability:
+            sequence = self.random_shift(sequence)
+
+        if self.rng.random() < self.random_scaling_probability:
+            sequence = self.random_scaling(sequence)
+
+        if self.rng.random() < self.z_rotation_probability:
+            sequence = self.z_axis_rotation(sequence)
+            
+        if self.rng.random() < self.point_noise_probability:
+            sequence = self.point_noise(sequence)
+
+        return sequence.astype(np.float32)
+
     def augment_training_split(
         self,
         encoder_data: np.ndarray,
