@@ -32,49 +32,49 @@ class Augmentation:
         # General settings
         self,
         seed: int = 42,
-        augment_factor: int = 3, # Number of augmented samples to create per original sample (0 = no augmentation, 1 = 1 new aug sample set, etc.)
+        augment_factor: int = 2, # Number of augmented samples to create per original sample (0 = no augmentation, 1 = 1 new aug sample set, etc.)
         keep_original: bool = True,
 
         # Temporal: linear time stretch
-        linear_stretch_min: float = 0.8,
-        linear_stretch_max: float = 1.2,
+        linear_stretch_min: float = 0.85,
+        linear_stretch_max: float = 1.15,
         linear_stretch_probability: float = 0.5,
 
         # Temporal: dynamic time warping
-        dynamic_warp_min: float = 0.8,
-        dynamic_warp_max: float = 1.2,
-        dynamic_warp_probability: float = 0.4,
+        dynamic_warp_min: float = 0.9,
+        dynamic_warp_max: float = 1.1,
+        dynamic_warp_probability: float = 0.3,
 
         # Temporal: frame freeze
         frame_freeze_min: float = 1.0,
-        frame_freeze_max: float = 3.0,
+        frame_freeze_max: float = 2.0,
         frame_freeze_frequency_max: float = 1, # max number of freezes per sequence
-        frame_freeze_probability: float = 0.25,
+        frame_freeze_probability: float = 0.15,
 
         # Temporal: dropout
-        temporal_dropout_min: float = 0.01,
-        temporal_dropout_max: float = 0.08,
-        temporal_dropout_probability: float = 0.35,
+        temporal_dropout_min: float = 1,
+        temporal_dropout_max: float = 3,
+        temporal_dropout_probability: float = 0.2,
 
         # Spatial: random shift
         random_shift_min: float = -0.03,
         random_shift_max: float = 0.03,
-        random_shift_probability: float = 0.3,
+        random_shift_probability: float = 0.4,
 
         # Spatial: random scaling
-        random_scaling_min: float = 0.95,
-        random_scaling_max: float = 1.05,
-        random_scaling_probability: float = 0.3,
+        random_scaling_min: float = 0.92,
+        random_scaling_max: float = 1.08,
+        random_scaling_probability: float = 0.4,
 
         # Spatial: z-axis rotation
-        z_rotation_min: float = -5.0,
-        z_rotation_max: float = 5.0,
+        z_rotation_min: float = -4.0,
+        z_rotation_max: float = 4.0,
         z_rotation_probability: float = 0.3,
 
         # Spatial: point noise
         point_noise_min: float = 0.0005,
-        point_noise_max: float = 0.003,
-        point_noise_probability: float = 0.3,
+        point_noise_max: float = 0.002,
+        point_noise_probability: float = 0.5,
 
     ) -> None:
         # General config
@@ -237,9 +237,6 @@ class Augmentation:
 
             7. At last, we return the augmented sequence in float32 format to ensure it matches the data type of the original input sequence.
         """
-        # check if we should apply the freeze augmentation
-        if self.rng.random() > self.frame_freeze_probability:
-            return sequence
 
         # work on a copy to avoid modifying the original data
         sequence = sequence.copy()
@@ -455,53 +452,43 @@ class Augmentation:
         self,
         encoder_data: np.ndarray,
         decoder_data: np.ndarray,
-        target_data: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Return old + newly augmented training samples.
+        target_data: np.ndarray,
+        augment_factor: Optional[int] = None, # makes it possible to override the number of augmentations per sample for this specific call, otherwise it uses the default from __init__
+        keep_original: Optional[bool] = None  # makes it possible to override the keep_original setting for this specific call, otherwise it uses the default from __init__
+    ) -> Tuple[list, np.ndarray, np.ndarray]:
+        """Return old + newly augmented training samples."""
+        
+        # 1. set up augmentation parameters for this call (use defaults if not provided)
+        factor = self.augment_factor if augment_factor is None else max(0, int(augment_factor))
+        keep = self.keep_original if keep_original is None else bool(keep_original)
 
-        Augmentation is applied only to encoder sequences; decoder/target labels are copied.
-        By default, uses values from __init__ (self.augment_factor, self.keep_original).
-        """
         x_enc = np.asarray(encoder_data, dtype=np.float32)
         x_dec = np.asarray(decoder_data)
         y = np.asarray(target_data)
-
-        if x_enc.ndim != 3:
-            raise ValueError("encoder_data must be a 3D array: (samples, frames, features)")
-        if x_enc.shape[0] != x_dec.shape[0] or x_enc.shape[0] != y.shape[0]:
-            raise ValueError("encoder/decoder/target sample counts do not match")
-
-        factor = self.augment_factor if augment_factor is None else max(0, int(augment_factor))
-        keep = self.keep_original if keep_original is None else bool(keep_original)
-        if factor == 0:
-            if keep:
-                return x_enc, x_dec, y
-            return (
-                np.empty((0, x_enc.shape[1], x_enc.shape[2]), dtype=np.float32),
-                np.empty((0, x_dec.shape[1]), dtype=x_dec.dtype),
-                np.empty((0, y.shape[1]), dtype=y.dtype),
-            )
 
         aug_enc = []
         aug_dec = []
         aug_y = []
 
+        # 2. add the augmentation samples
         for i in range(x_enc.shape[0]):
             base_seq = x_enc[i]
-            for _ in range(factor):
-                # Placeholder behavior until augmentation methods are implemented.
-                aug_enc.append(base_seq.copy())
+            
+            # if keep_original is True, we add the original sample to the augmented dataset before creating new versions
+            if keep:
+                aug_enc.append(base_seq)
                 aug_dec.append(x_dec[i])
                 aug_y.append(y[i])
 
-        aug_enc_arr = np.asarray(aug_enc, dtype=np.float32)
-        aug_dec_arr = np.asarray(aug_dec, dtype=x_dec.dtype)
-        aug_y_arr = np.asarray(aug_y, dtype=y.dtype)
+            # generate 'factor' augmented versions of the current sample and add them to the augmented dataset
+            for _ in range(factor):
+                # HIER: Deine Pipeline aufrufen statt nur .copy()
+                augmented = self.pipeline_augment(base_seq.copy())
+                
+                aug_enc.append(augmented)
+                aug_dec.append(x_dec[i])
+                aug_y.append(y[i])
 
-        if keep:
-            return (
-                np.concatenate([x_enc, aug_enc_arr], axis=0),
-                np.concatenate([x_dec, aug_dec_arr], axis=0),
-                np.concatenate([y, aug_y_arr], axis=0),
-            )
-        return aug_enc_arr, aug_dec_arr, aug_y_arr
+        # IMPORTATNT: aug_dec and aug_y remain Numpy Arrays, because they have fixed lengths!
+        # aug_enc is a list of arrays because each augmented sequence can have a different length due to temporal augmentations, so we keep it as a list of variable-length sequences.
+        return aug_enc, np.array(aug_dec), np.array(aug_y)
