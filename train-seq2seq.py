@@ -14,6 +14,7 @@ import csv
 import json
 import logging
 import inspect
+from datetime import datetime
 import numpy as np
 import tensorflow as tf
 import pandas as pd
@@ -885,7 +886,8 @@ def build_seq2seq_model_multi_attention(
         encoder_units=512,
         decoder_units=1024,
     dropout_rate=0.4,
-    recurrent_dropout_rate=0.0,
+    recurrent_dropout_rate=0.25,
+    l2_reg=1e-4,
         use_layer_norm=True,
         num_attention_heads=8,
         use_cnn=True
@@ -900,8 +902,7 @@ def build_seq2seq_model_multi_attention(
     4. Deeper feedforward network after attention
     5. Dropout after feedforward layers
     """
-    # Keep argument for backwards compatibility while forcing cuDNN-safe recurrent dropout.
-    recurrent_dropout_rate = 0.0
+    dense_kernel_regularizer = tf.keras.regularizers.l2(l2_reg) if l2_reg and l2_reg > 0 else None
 
     # ===== ENCODER =====
     encoder_inputs = Input(shape=(None, num_features), name="encoder_inputs")
@@ -914,7 +915,12 @@ def build_seq2seq_model_multi_attention(
     )(encoder_masked_inputs)
 
     # Spatial projection: helps model focus on important keypoint relationships
-    x = Dense(encoder_units * 2, activation="relu", name="encoder_projection")(encoder_masked_inputs)
+    x = Dense(
+        encoder_units * 2,
+        activation="relu",
+        kernel_regularizer=dense_kernel_regularizer,
+        name="encoder_projection",
+    )(encoder_masked_inputs)
     if use_layer_norm:
         x = LayerNormalization(name="encoder_norm1")(x)
     x = Dropout(dropout_rate, name="encoder_dropout1")(x)
@@ -933,7 +939,7 @@ def build_seq2seq_model_multi_attention(
             activation="tanh",
             recurrent_activation="sigmoid",
             dropout=dropout_rate,
-            recurrent_dropout=0.0,
+            recurrent_dropout=recurrent_dropout_rate,
         ),
         name="encoder_bidirectional"
     )
@@ -973,7 +979,7 @@ def build_seq2seq_model_multi_attention(
         activation="tanh",
         recurrent_activation="sigmoid",
         dropout=dropout_rate,
-        recurrent_dropout=0.0,
+        recurrent_dropout=recurrent_dropout_rate,
         name="decoder_lstm"
     )
 
@@ -1026,13 +1032,24 @@ def build_seq2seq_model_multi_attention(
     decoder_combined = Concatenate(axis=-1, name="decoder_concat")([attention, decoder_outputs])
     
     # Deeper feedforward network for better expressiveness
-    decoder_combined = Dense(decoder_units, activation="relu", name="decoder_ff1")(decoder_combined)
+    decoder_combined = Dense(
+        decoder_units,
+        activation="relu",
+        kernel_regularizer=dense_kernel_regularizer,
+        name="decoder_ff1",
+    )(decoder_combined)
     decoder_combined = Dropout(dropout_rate, name="decoder_dropout")(decoder_combined)
     if use_layer_norm:
         decoder_combined = LayerNormalization(name="decoder_ff_norm")(decoder_combined)
 
     # Numerical stability
-    decoder_dense = Dense(vocab_size, activation="softmax", dtype="float32", name="decoder_dense")
+    decoder_dense = Dense(
+        vocab_size,
+        activation="softmax",
+        dtype="float32",
+        kernel_regularizer=dense_kernel_regularizer,
+        name="decoder_dense",
+    )
     final_outputs = decoder_dense(decoder_combined)
 
     model = tf.keras.Model([encoder_inputs, decoder_inputs], final_outputs, name="seq2seq_improved")
@@ -1045,8 +1062,9 @@ def build_seq2seq_model(
         embedding_dim=128,
         encoder_units=256,
         decoder_units=512,
-    dropout_rate=0.4,
-    recurrent_dropout_rate=0.0,
+        dropout_rate=0.4,
+    recurrent_dropout_rate=0.25,
+    l2_reg=1e-4,
         architecture="multi_attention",
         use_layer_norm=True,
         use_multi_head_attention=True,
@@ -1069,6 +1087,7 @@ def build_seq2seq_model(
         decoder_units=decoder_units,
         dropout_rate=dropout_rate,
         recurrent_dropout_rate=recurrent_dropout_rate,
+        l2_reg=l2_reg,
         use_layer_norm=use_layer_norm,
         num_attention_heads=num_attention_heads,
     )
@@ -1085,8 +1104,9 @@ def train_main(
         hidden_dim=1024,
         dropout_rate=0.4,
         l1_reg=0.001,
+        l2_reg=1e-4,
         augment_train_each_epoch=True,
-        augment_factor=1,
+        augment_factor=3,
         architecture="multi_attention",  # "baseline", "multi_attention", or "transformer"
         metrics_sample_size=256,
 ):
@@ -1207,7 +1227,8 @@ def train_main(
             encoder_units=embedding_dim,
             decoder_units=hidden_dim,
             dropout_rate=dropout_rate,
-            recurrent_dropout_rate=0.0,
+            recurrent_dropout_rate=0.25,
+            l2_reg=l2_reg,
             architecture=architecture,
             use_layer_norm=True,
             use_multi_head_attention=True,
@@ -1221,25 +1242,13 @@ def train_main(
             raise ValueError(f"Model output vocab size ({model_output_vocab_dim}) does not match tokenizer size ({target_vocab_size}).\n" \
                              f"This often indicates an issue in tokenizer building or the 'vocab_size' passed to model builder.")
 
-        initial_learning_rate = 0.0001 # adjusted learning rate for more stable training; old was 0.001
-        lr_schedule = tf.keras.optimizers.schedules.CosineDecayRestarts(
-            initial_learning_rate,
-            first_decay_steps=1000,
-            t_mul=2.0,
-            m_mul=0.9,
-            alpha=0.0001
-        )
-        logging.info("Using CosineDecayRestarts LR schedule")
-
         # Optimizer
-        optimizer = tf.keras.optimizers.AdamW(
-            learning_rate=lr_schedule,
-            weight_decay=0.001,
+        optimizer = tf.keras.optimizers.Adam(
+            learning_rate=5e-4,
             clipnorm=1.0,
             epsilon=1e-7,
-            beta_1=0.9,
-            beta_2=0.98  # Higher beta2 for more stable updates
         )
+        logging.info("Using Adam optimizer with initial learning rate 5e-4")
 
         # compile model
         logging.info(f"Target vocabulary size (including padding/oov/special): {target_vocab_size}")
@@ -1280,16 +1289,28 @@ def train_main(
         # show model summary
         model.summary()
 
+        # Create per-run log directory structure based on datetime.
+        run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_log_dir = os.path.join("logs", f"model_v{version_model}", run_timestamp)
+        tensorboard_log_dir = os.path.join(run_log_dir, "tensorboard")
+        metrics_log_dir = os.path.join(run_log_dir, "metrics")
+        os.makedirs(tensorboard_log_dir, exist_ok=True)
+        os.makedirs(metrics_log_dir, exist_ok=True)
+
         # callbacks
         callbacks = [
             tf.keras.callbacks.EarlyStopping(
                 monitor='val_loss',
-                patience=30,  # Increased patience for more stable training
+                patience=15,
                 restore_best_weights=True,
-                min_delta=0.0005
             ),
-            # NOTE: ReduceLROnPlateau removed - conflicts with CosineDecayRestarts schedule
-            # The lr_schedule already handles learning rate adjustments
+            tf.keras.callbacks.ReduceLROnPlateau(
+                monitor='val_loss',
+                factor=0.5,
+                patience=5,
+                min_lr=1e-6,
+                verbose=1,
+            ),
             tf.keras.callbacks.ModelCheckpoint(
                 filepath=f'models/checkpoint_v{version_model}_' + 'epoch_{epoch:02d}.keras',
                 save_best_only=True,
@@ -1298,7 +1319,7 @@ def train_main(
                 verbose=1
             ),
             tf.keras.callbacks.TensorBoard(
-                log_dir=f'./logs/model_v{version_model}',
+                log_dir=tensorboard_log_dir,
                 histogram_freq=1,
                 write_graph=True,
                 update_freq='epoch'
@@ -1310,7 +1331,7 @@ def train_main(
                 max_len=decoder_target_data.shape[1],
                 sample_size=metrics_sample_size,
                 seed=42,
-                log_file_path=f'./logs/model_v{version_model}/training_logs.txt'
+                log_file_path=os.path.join(metrics_log_dir, 'training_logs.txt')
             ),
         ]
         # training
@@ -1355,7 +1376,7 @@ if __name__ == "__main__":
 
         config = {
             "train_data_folder": "data/train_data",
-            "version_model": 38_1,
+            "version_model": 38_4,
             "epochs": 200,
             "batch_size": 64,
             "validation_split": 0.1,
@@ -1364,8 +1385,9 @@ if __name__ == "__main__":
             "hidden_dim": 512,  
             "dropout_rate": 0.4,
             "l1_reg": 0.0001,
+            "l2_reg": 1e-4,
             "augment_train_each_epoch": True,
-            "augment_factor": 2,
+            "augment_factor": 0,
             "architecture": "multi_attention", # Either baseline or multi_attention or transformer
             "metrics_sample_size": 128,
         }

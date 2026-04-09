@@ -32,12 +32,12 @@ class Augmentation:
         # General settings
         self,
         seed: int = 42,
-        augment_factor: int = 2, # Number of augmented samples to create per original sample (0 = no augmentation, 1 = 1 new aug sample set, etc.)
+        augment_factor: int = 3, # Number of augmented samples to create per original sample (0 = no augmentation, 1 = 1 new aug sample set, etc.)
         keep_original: bool = True,
 
         # Temporal: linear time stretch
-        linear_stretch_min: float = 0.85,
-        linear_stretch_max: float = 1.15,
+        linear_stretch_min: float = 0.8,
+        linear_stretch_max: float = 1.2,
         linear_stretch_probability: float = 0.5,
 
         # Temporal: dynamic time warping
@@ -52,8 +52,8 @@ class Augmentation:
         frame_freeze_probability: float = 0.15,
 
         # Temporal: dropout
-        temporal_dropout_min: float = 1,
-        temporal_dropout_max: float = 3,
+        temporal_dropout_min: float = 0.05,
+        temporal_dropout_max: float = 0.10,
         temporal_dropout_probability: float = 0.2,
 
         # Spatial: random shift
@@ -335,8 +335,18 @@ class Augmentation:
         """
         num_frames = sequence.shape[0]
         
-        # determine how many frames to drop (random between min and max)
-        num_to_drop = self.rng.integers(self.temporal_dropout_min, self.temporal_dropout_max + 1)
+        # determine how many frames to drop.
+        # If values are <= 1.0, interpret as percentage range; otherwise as absolute frame counts.
+        if self.temporal_dropout_max <= 1.0:
+            drop_ratio = float(self.rng.uniform(self.temporal_dropout_min, self.temporal_dropout_max))
+            num_to_drop = int(round(num_frames * drop_ratio))
+            num_to_drop = max(1, num_to_drop)
+        else:
+            min_drop = int(round(self.temporal_dropout_min))
+            max_drop = int(round(self.temporal_dropout_max))
+            if max_drop < min_drop:
+                min_drop, max_drop = max_drop, min_drop
+            num_to_drop = int(self.rng.integers(min_drop, max_drop + 1))
         
         # safety check: we still need at least a few frames to keep the sequence valid
         if num_to_drop >= num_frames - 2:
