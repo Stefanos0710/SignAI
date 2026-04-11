@@ -31,7 +31,6 @@ class Augmentation:
     def __init__(
         # General settings
         self,
-        seed: int = 42,
         augment_factor: int = 2, # Number of augmented samples to create per original sample (0 = no augmentation, 1 = 1 new aug sample set, etc.)
         keep_original: bool = True,
 
@@ -78,8 +77,7 @@ class Augmentation:
 
     ) -> None:
         # General config
-        self.rng = np.random.default_rng(seed)
-        self.seed = int(seed)
+        self.rng = np.random.default_rng()
         self.augment_factor = max(0, int(augment_factor))
         self.keep_original = bool(keep_original)
 

@@ -818,6 +818,34 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
         self.indices = np.array([], dtype=np.int64)
         self.on_epoch_end()
 
+    def _coerce_encoder_tensor(self, encoder_batch) -> np.ndarray:
+        """Convert augmented encoder samples to a dense [N, T, F] float32 tensor."""
+        target_frames = int(self.base_encoder.shape[1])
+        target_features = int(self.base_encoder.shape[2])
+
+        if isinstance(encoder_batch, np.ndarray) and encoder_batch.ndim == 3:
+            if encoder_batch.shape[1] == target_frames and encoder_batch.shape[2] == target_features:
+                return encoder_batch.astype(np.float32, copy=False)
+            samples = [encoder_batch[i] for i in range(encoder_batch.shape[0])]
+        else:
+            samples = list(encoder_batch)
+
+        dense = np.zeros((len(samples), target_frames, target_features), dtype=np.float32)
+        for i, seq in enumerate(samples):
+            arr = np.asarray(seq, dtype=np.float32)
+            if arr.ndim != 2:
+                raise ValueError(
+                    f"Encoder sample {i} must be 2D [T, F], got shape {arr.shape}."
+                )
+            if arr.shape[1] != target_features:
+                raise ValueError(
+                    f"Encoder sample {i} feature dim mismatch: expected {target_features}, got {arr.shape[1]}."
+                )
+            length = min(arr.shape[0], target_frames)
+            dense[i, :length, :] = arr[:length, :]
+
+        return dense
+
     def __len__(self):
         return int(np.ceil(len(self.indices) / self.batch_size))
 
@@ -846,9 +874,22 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
         else:
             epoch_enc, epoch_dec, epoch_tgt = base_enc, base_dec, base_tgt
 
-        self.epoch_encoder = epoch_enc
-        self.epoch_decoder = epoch_dec
-        self.epoch_target = epoch_tgt
+        self.epoch_encoder = self._coerce_encoder_tensor(epoch_enc)
+        self.epoch_decoder = np.asarray(epoch_dec)
+        self.epoch_target = np.asarray(epoch_tgt)
+
+        if not (
+            self.epoch_encoder.shape[0]
+            == self.epoch_decoder.shape[0]
+            == self.epoch_target.shape[0]
+        ):
+            raise ValueError(
+                "Epoch sample count mismatch after augmentation: "
+                f"enc={self.epoch_encoder.shape[0]}, "
+                f"dec={self.epoch_decoder.shape[0]}, "
+                f"tgt={self.epoch_target.shape[0]}"
+            )
+
         self.indices = np.arange(self.epoch_encoder.shape[0], dtype=np.int64)
 
     def on_epoch_end(self):
@@ -1060,6 +1101,8 @@ def train_main(
         augment_factor=1,
     architecture="multi_attention",  # "baseline", "multi_attention", or "transformer"
     metrics_sample_size=256,
+    resume_from_checkpoint: Optional[str] = None,
+    resume_from_epoch: int = 0,
 ):
     try:
 
@@ -1144,7 +1187,7 @@ def train_main(
             batch_size=batch_size,
             shuffle=True,
             seed=42,
-            augmenter=Augmentation(seed=42),
+            augmenter=Augmentation(),
             augment_each_epoch=augment_train_each_epoch,
             augment_factor=augment_factor,
         )
@@ -1168,8 +1211,7 @@ def train_main(
 
         # 5. create model
         target_vocab_size = len(tokenizer.word_index) + 1
-        logging.info(f"Building model with architecture: {architecture}")
-        model = build_seq2seq_model(
+        model_kwargs = dict(
             max_frames=used_max_frames,
             num_features=input_feature_dim,
             vocab_size=target_vocab_size,
@@ -1184,6 +1226,46 @@ def train_main(
             num_attention_heads=8
         )
 
+        resume_checkpoint = (resume_from_checkpoint or "").strip()
+        initial_epoch = max(0, int(resume_from_epoch))
+
+        if resume_checkpoint:
+            if not os.path.exists(resume_checkpoint):
+                raise FileNotFoundError(f"Resume checkpoint not found: {resume_checkpoint}")
+
+            logging.info(
+                "Resuming training from checkpoint: %s (initial_epoch=%d)",
+                resume_checkpoint,
+                initial_epoch,
+            )
+
+            model = None
+
+            # Try full-model loading first, but continue safely to weight fallback on any failure.
+            for kwargs in (
+                {"compile": False, "safe_mode": False},
+                {"compile": False},
+            ):
+                try:
+                    model = tf.keras.models.load_model(resume_checkpoint, **kwargs)
+                    logging.info("Loaded full model from checkpoint successfully.")
+                    break
+                except Exception as e:
+                    logging.warning(
+                        "Full-model checkpoint load failed with args %s: %s",
+                        kwargs,
+                        str(e),
+                    )
+
+            if model is None:
+                logging.info("Falling back to rebuilding model and loading weights only.")
+                model = build_seq2seq_model(**model_kwargs)
+                model.load_weights(resume_checkpoint)
+                logging.info("Loaded checkpoint weights into rebuilt model.")
+        else:
+            logging.info(f"Building model with architecture: {architecture}")
+            model = build_seq2seq_model(**model_kwargs)
+
         # Sanity-check: model-output-dimension equals target vocab size
         model_output_vocab_dim = int(model.output_shape[-1]) if model.output_shape and model.output_shape[-1] is not None else None
         logging.info(f"Model final output vocab dim: {model_output_vocab_dim}, expected: {target_vocab_size}")
@@ -1191,7 +1273,7 @@ def train_main(
             raise ValueError(f"Model output vocab size ({model_output_vocab_dim}) does not match tokenizer size ({target_vocab_size}).\n" \
                              f"This often indicates an issue in tokenizer building or the 'vocab_size' passed to model builder.")
 
-        initial_learning_rate = 0.0001 # adjusted learning rate for more stable training; old was 0.001
+        initial_learning_rate = 0.00001 # adjusted learning rate for more stable training; old was 0.001
         lr_schedule = tf.keras.optimizers.schedules.CosineDecayRestarts(
             initial_learning_rate,
             first_decay_steps=1000,
@@ -1203,8 +1285,8 @@ def train_main(
 
         # Optimizer
         optimizer = tf.keras.optimizers.AdamW(
-            learning_rate=lr_schedule,
-            weight_decay=0.001,
+            learning_rate=initial_learning_rate,
+            weight_decay=0.005,
             clipnorm=1.0,
             epsilon=1e-7,
             beta_1=0.9,
@@ -1254,7 +1336,7 @@ def train_main(
         callbacks = [
             tf.keras.callbacks.EarlyStopping(
                 monitor='val_loss',
-                patience=20,
+                patience=15,
                 restore_best_weights=True,
                 min_delta=0.0005
             ),
@@ -1286,6 +1368,7 @@ def train_main(
         # training
         history = model.fit(
             train_sequence,
+            initial_epoch=initial_epoch,
             epochs=epochs,
             validation_data=val_sequence,
             callbacks=callbacks,
@@ -1325,9 +1408,9 @@ if __name__ == "__main__":
 
         config = {
             "train_data_folder": "data/train_data",
-            "version_model": 37,
-            "epochs": 150,
-            "batch_size": 8,
+            "version_model": 38_8,
+            "epochs": 300,
+            "batch_size": 64,
             "validation_split": 0.1,
             "input_sequence_length": 300,
             "embedding_dim": 256,
@@ -1335,9 +1418,11 @@ if __name__ == "__main__":
             "dropout_rate": 0.4,
             "l1_reg": 0.0001,
             "augment_train_each_epoch": True,
-            "augment_factor": 1,
+            "augment_factor": 2,
             "architecture": "multi_attention", # Either baseline or multi_attention or transformer
             "metrics_sample_size": 64,
+            "resume_from_checkpoint": "models/checkpoint_v387_epoch_44.keras",
+            "resume_from_epoch": 44,
         }
 
          # starting training
