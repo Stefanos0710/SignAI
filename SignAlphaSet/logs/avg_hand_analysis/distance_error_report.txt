@@ -1,0 +1,10 @@
+Distance vs Error Analysis
+==============================
+pearson_correlation_off_diagonal=-0.088412
+
+Top 5 confusion pairs (true -> predicted):
+- V -> U: error_rate=0.009709, distance_norm=0.022798
+- A -> B: error_rate=0.000000, distance_norm=0.644046
+- A -> C: error_rate=0.000000, distance_norm=0.699290
+- A -> D: error_rate=0.000000, distance_norm=0.374698
+- A -> E: error_rate=0.000000, distance_norm=0.319764

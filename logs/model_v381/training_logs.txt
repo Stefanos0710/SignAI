@@ -1,0 +1,1497 @@
+=== Training Logs and Progress ===
+
+
+================ EPOCH 1 ================
+Train Metrics: loss=4.9136 | sparse_categorical_accuracy=0.0421 | top_5_accuracy=0.0786
+Eval  Metrics: WER=0.9777 BLEU=0.36 B1=7.41 B2=2.19 B3=0.69 B4=0.36
+ROUGE Metrics: R1-F=0.1015 R2-F=0.0092 RL-F=0.0986
+
+--- Epoch 1: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : heute nacht region region regen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : heute nacht region regen region
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : heute nacht region regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen ix kommen region regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : heute nacht sued region regen
+  ----------------------------------------
+
+
+================ EPOCH 2 ================
+Train Metrics: loss=4.1790 | sparse_categorical_accuracy=0.0604 | top_5_accuracy=0.1059
+Eval  Metrics: WER=0.9467 BLEU=0.44 B1=10.46 B2=3.53 B3=0.95 B4=0.44
+ROUGE Metrics: R1-F=0.1254 R2-F=0.0147 RL-F=0.1198
+
+--- Epoch 2: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : heute nacht minus minus zwei grad
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : heute nacht region klar himmel
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : heute nacht region klar himmel wolke regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen nord region wolke kommen regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : heute nacht nord region regen region wolke kommen regen
+  ----------------------------------------
+
+
+================ EPOCH 3 ================
+Train Metrics: loss=4.0250 | sparse_categorical_accuracy=0.0638 | top_5_accuracy=0.1120
+Eval  Metrics: WER=0.9670 BLEU=0.53 B1=12.76 B2=5.19 B3=1.22 B4=0.53
+ROUGE Metrics: R1-F=0.1403 R2-F=0.0241 RL-F=0.1322
+
+--- Epoch 3: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : morgen wetter wie aussehen morgen sonntag zwanzig zwanzig grad
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : heute nacht region klar himmel
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : heute nacht region regen kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen wetter wie aussehen morgen mittwoch mittwoch zwanzig zwanzig grad
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : heute nacht nord region wolke ix region regen kommen
+  ----------------------------------------
+
+
+================ EPOCH 4 ================
+Train Metrics: loss=3.9668 | sparse_categorical_accuracy=0.0651 | top_5_accuracy=0.1148
+Eval  Metrics: WER=0.9389 BLEU=0.83 B1=13.98 B2=6.34 B3=1.76 B4=0.83
+ROUGE Metrics: R1-F=0.1646 R2-F=0.0354 RL-F=0.1546
+
+--- Epoch 4: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : heute nacht region regen kommen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : nacht wolke kommen regen
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : heute nacht nord regen kommen region
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen wetter wie aussehen morgen sonntag samstag sonne
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : nacht region regen region kommen ix regen kommen
+  ----------------------------------------
+
+
+================ EPOCH 5 ================
+Train Metrics: loss=3.7998 | sparse_categorical_accuracy=0.0694 | top_5_accuracy=0.1220
+Eval  Metrics: WER=0.9825 BLEU=0.73 B1=12.67 B2=5.04 B3=1.50 B4=0.73
+ROUGE Metrics: R1-F=0.1349 R2-F=0.0266 RL-F=0.1297
+
+--- Epoch 5: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : heute nacht region klar himmel stern koennen sehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : heute nacht minus acht grad
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : heute nacht wolke kommen regen kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen ix nord region regen region sonne region
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : heute nacht region regen region klar stern koennen sehen sehen
+  ----------------------------------------
+
+
+================ EPOCH 6 ================
+Train Metrics: loss=3.6632 | sparse_categorical_accuracy=0.0735 | top_5_accuracy=0.1304
+Eval  Metrics: WER=0.9476 BLEU=0.89 B1=15.60 B2=7.33 B3=1.94 B4=0.89
+ROUGE Metrics: R1-F=0.1692 R2-F=0.0364 RL-F=0.1587
+
+--- Epoch 6: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : wind schwach maessig wehen frisch wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : wind schwach maessig wehen
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : heute nacht region klar himmel stern koennen sehen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen nord region wolke kommen regen koennen gewitter koennen regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen frueh ix region auch sonne wolke ix bisschen regen
+  ----------------------------------------
+
+
+================ EPOCH 7 ================
+Train Metrics: loss=3.5702 | sparse_categorical_accuracy=0.0764 | top_5_accuracy=0.1368
+Eval  Metrics: WER=0.9321 BLEU=1.25 B1=15.69 B2=7.23 B3=3.05 B4=1.25
+ROUGE Metrics: R1-F=0.1805 R2-F=0.0419 RL-F=0.1715
+
+--- Epoch 7: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : heute nacht region regen kommen region
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : wind schwach maessig wehen
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : heute nacht wolke kommen regen kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen nord region wolke kommen regen region regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen frueh fluss bis drei zwanzig grad region bis fuenf zwanzig grad region
+  ----------------------------------------
+
+
+================ EPOCH 8 ================
+Train Metrics: loss=3.5095 | sparse_categorical_accuracy=0.0794 | top_5_accuracy=0.1436
+Eval  Metrics: WER=0.9360 BLEU=0.84 B1=15.77 B2=6.48 B3=1.79 B4=0.84
+ROUGE Metrics: R1-F=0.1865 R2-F=0.0329 RL-F=0.1705
+
+--- Epoch 8: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : wind schwach maessig wehen ix wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : wind schwach maessig wehen
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : heute nacht klar himmel stern koennen sehen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen nord region wolke kommen regen region bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig wehen ix wehen nord frisch wehen nord frisch wehen sturm
+  ----------------------------------------
+
+
+================ EPOCH 9 ================
+Train Metrics: loss=3.4749 | sparse_categorical_accuracy=0.0816 | top_5_accuracy=0.1491
+Eval  Metrics: WER=0.9340 BLEU=1.08 B1=16.67 B2=7.57 B3=2.50 B4=1.08
+ROUGE Metrics: R1-F=0.1843 R2-F=0.0383 RL-F=0.1680
+
+--- Epoch 9: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : wind schwach maessig wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : wind schwach maessig wehen
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : heute nacht klar himmel stern koennen sehen ix nebel
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen nord region mehr sonne wolke kommen regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen frueh kommen ost region regen region auch gewitter
+  ----------------------------------------
+
+
+================ EPOCH 10 ================
+Train Metrics: loss=3.4607 | sparse_categorical_accuracy=0.0825 | top_5_accuracy=0.1521
+Eval  Metrics: WER=0.9282 BLEU=1.17 B1=16.63 B2=7.32 B3=2.79 B4=1.17
+ROUGE Metrics: R1-F=0.1862 R2-F=0.0378 RL-F=0.1730
+
+--- Epoch 10: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : heute nacht region regen region regen region
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : sued schwach maessig wehen
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : heute nacht nord region klar himmel stern koennen sehen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen nord region sonne wolke kommen regen koennen gewitter
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : tag nord region mehr sonne wolke aber nord bisschen regen
+  ----------------------------------------
+
+
+================ EPOCH 11 ================
+Train Metrics: loss=3.4519 | sparse_categorical_accuracy=0.0808 | top_5_accuracy=0.1465
+Eval  Metrics: WER=0.9282 BLEU=1.16 B1=15.84 B2=7.14 B3=2.75 B4=1.16
+ROUGE Metrics: R1-F=0.1835 R2-F=0.0398 RL-F=0.1789
+
+--- Epoch 11: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : heute nacht region kommen regen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wetter wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region kommen regen kommen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen nord region drei zwanzig grad region mehr kuehl
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen frueh frueh fluss ix region ix region sonne region bisschen regen
+  ----------------------------------------
+
+
+================ EPOCH 12 ================
+Train Metrics: loss=3.3672 | sparse_categorical_accuracy=0.0824 | top_5_accuracy=0.1478
+Eval  Metrics: WER=0.9079 BLEU=1.26 B1=16.25 B2=7.20 B3=3.05 B4=1.26
+ROUGE Metrics: R1-F=0.1949 R2-F=0.0394 RL-F=0.1776
+
+--- Epoch 12: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : wind schwach maessig wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : wind schwach maessig wehen
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr kuehl kommen aber kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen nord region sonne wolke wechselhaft sued region sonne
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen frueh warm region bis eins zwanzig grad region bis fuenf zwanzig grad
+  ----------------------------------------
+
+
+================ EPOCH 13 ================
+Train Metrics: loss=3.2900 | sparse_categorical_accuracy=0.0848 | top_5_accuracy=0.1512
+Eval  Metrics: WER=0.8962 BLEU=1.25 B1=17.35 B2=8.18 B3=3.02 B4=1.25
+ROUGE Metrics: R1-F=0.2132 R2-F=0.0563 RL-F=0.2025
+
+--- Epoch 13: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : wind schwach maessig wehen ix wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr warm
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region bisschen wolke kommen regen region
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen temperatur steigen nord region bis acht zwanzig grad region
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 14 ================
+Train Metrics: loss=3.2210 | sparse_categorical_accuracy=0.0872 | top_5_accuracy=0.1534
+Eval  Metrics: WER=0.9098 BLEU=1.51 B1=18.19 B2=8.64 B3=3.93 B4=1.51
+ROUGE Metrics: R1-F=0.2151 R2-F=0.0529 RL-F=0.2019
+
+--- Epoch 14: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : morgen kommen hoch kommen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr mild luft kommen
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke kommen regen kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen viel sonne wolke teil regen sued region regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig wehen ix wehen ix wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 15 ================
+Train Metrics: loss=3.1617 | sparse_categorical_accuracy=0.0890 | top_5_accuracy=0.1568
+Eval  Metrics: WER=0.9108 BLEU=1.50 B1=18.67 B2=8.65 B3=3.92 B4=1.50
+ROUGE Metrics: R1-F=0.2091 R2-F=0.0485 RL-F=0.1984
+
+--- Epoch 15: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : morgen kommen regen gewitter koennen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke himmel kommen bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen morgen frueh sonne wolke ix koennen regen koennen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig wehen ix wehen ix wehen ix wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 16 ================
+Train Metrics: loss=3.1102 | sparse_categorical_accuracy=0.0913 | top_5_accuracy=0.1605
+Eval  Metrics: WER=0.8972 BLEU=1.43 B1=18.29 B2=8.43 B3=3.64 B4=1.43
+ROUGE Metrics: R1-F=0.2158 R2-F=0.0483 RL-F=0.2076
+
+--- Epoch 16: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : morgen schwach maessig wehen ix wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke bisschen regen region klar himmel
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen auch freundlich sonne wolke wechselhaft sued region sonne
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 17 ================
+Train Metrics: loss=3.0610 | sparse_categorical_accuracy=0.0933 | top_5_accuracy=0.1632
+Eval  Metrics: WER=0.9321 BLEU=1.51 B1=19.18 B2=8.89 B3=3.98 B4=1.51
+ROUGE Metrics: R1-F=0.2100 R2-F=0.0521 RL-F=0.1967
+
+--- Epoch 17: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nacht ix kommen regen gewitter koennen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord see tief kommen tief kommen morgen kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen viel sonne region wolke kommen regen sued region freundlich sonne
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig wehen ix wehen ix wehen ix wehen sonst region schwach wehen
+  ----------------------------------------
+
+
+================ EPOCH 18 ================
+Train Metrics: loss=3.0268 | sparse_categorical_accuracy=0.0942 | top_5_accuracy=0.1652
+Eval  Metrics: WER=0.8720 BLEU=2.07 B1=20.62 B2=10.04 B3=4.77 B4=2.07
+ROUGE Metrics: R1-F=0.2413 R2-F=0.0649 RL-F=0.2285
+
+--- Epoch 18: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : morgen schwach wehen ix wehen ix wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord see tief kommen morgen kommen nord kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen viel sonne region wolke kommen nach mittag gewitter koennen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig wehen nord frisch wehen ix wehen sonst region schwach maessig wehen
+  ----------------------------------------
+
+
+================ EPOCH 19 ================
+Train Metrics: loss=2.9948 | sparse_categorical_accuracy=0.0952 | top_5_accuracy=0.1675
+Eval  Metrics: WER=0.9166 BLEU=1.45 B1=19.10 B2=8.87 B3=3.75 B4=1.45
+ROUGE Metrics: R1-F=0.2152 R2-F=0.0531 RL-F=0.2016
+
+--- Epoch 19: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : region schwach maessig wehen ix wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord see tief kommen wolke kommen regen kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen tag nord region regen kommen sued region sonne
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen frueh wind schwach maessig nord frisch wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 20 ================
+Train Metrics: loss=2.9736 | sparse_categorical_accuracy=0.0960 | top_5_accuracy=0.1685
+Eval  Metrics: WER=0.8855 BLEU=1.47 B1=19.06 B2=8.97 B3=3.79 B4=1.47
+ROUGE Metrics: R1-F=0.2211 R2-F=0.0600 RL-F=0.2065
+
+--- Epoch 20: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : wind schwach maessig wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region bisschen wolke kommen bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen viel sonne wolke west region regen gewitter koennen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig ix wehen ix wehen ix wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 21 ================
+Train Metrics: loss=2.9582 | sparse_categorical_accuracy=0.0970 | top_5_accuracy=0.1700
+Eval  Metrics: WER=0.8865 BLEU=2.17 B1=21.06 B2=10.38 B3=5.08 B4=2.17
+ROUGE Metrics: R1-F=0.2457 R2-F=0.0688 RL-F=0.2266
+
+--- Epoch 21: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nord tief kommen deshalb regen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke bisschen regen region bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen vor mittag region regen region west kommen regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig ix wehen ix wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 22 ================
+Train Metrics: loss=2.9478 | sparse_categorical_accuracy=0.0977 | top_5_accuracy=0.1703
+Eval  Metrics: WER=0.8952 BLEU=1.52 B1=19.43 B2=9.52 B3=3.95 B4=1.52
+ROUGE Metrics: R1-F=0.2310 R2-F=0.0645 RL-F=0.2181
+
+--- Epoch 22: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : region hoch kommen regen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr warm luft kommen
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region mehr wolke kommen region bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen viel sonne region wolke regen sued region regen region
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 23 ================
+Train Metrics: loss=2.9416 | sparse_categorical_accuracy=0.0977 | top_5_accuracy=0.1707
+Eval  Metrics: WER=0.8758 BLEU=1.66 B1=20.13 B2=9.69 B3=4.46 B4=1.66
+ROUGE Metrics: R1-F=0.2332 R2-F=0.0594 RL-F=0.2186
+
+--- Epoch 23: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nacht morgen minus drei berg minus drei
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke aber region bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen wetter wie aussehen dienstag achte dezember
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 24 ================
+Train Metrics: loss=2.9564 | sparse_categorical_accuracy=0.0969 | top_5_accuracy=0.1696
+Eval  Metrics: WER=0.9079 BLEU=1.89 B1=20.34 B2=9.75 B3=4.24 B4=1.89
+ROUGE Metrics: R1-F=0.2339 R2-F=0.0596 RL-F=0.2214
+
+--- Epoch 24: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : morgen schwach maessig wehen ix wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region mehr wolke kommen region bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen frueh dann region regen kommen ost region regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : dann wochenende mehr warm als heute nacht temperatur sinken besonders minus eins bis minus eins grad
+  ----------------------------------------
+
+
+================ EPOCH 25 ================
+Train Metrics: loss=2.9325 | sparse_categorical_accuracy=0.0973 | top_5_accuracy=0.1683
+Eval  Metrics: WER=0.8865 BLEU=2.10 B1=21.45 B2=10.36 B3=4.87 B4=2.10
+ROUGE Metrics: R1-F=0.2495 R2-F=0.0714 RL-F=0.2344
+
+--- Epoch 25: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : morgen schwach maessig wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend in kommend mehr kalt bleiben
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke kommen aber region regen kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen auch viel sonne wolke west regen koennen gewitter koennen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : tag mehr warm als heute nacht minus eins bis minus zwei grad minus fuenf grad
+  ----------------------------------------
+
+
+================ EPOCH 26 ================
+Train Metrics: loss=2.8781 | sparse_categorical_accuracy=0.0983 | top_5_accuracy=0.1692
+Eval  Metrics: WER=0.8923 BLEU=1.48 B1=19.03 B2=9.08 B3=3.82 B4=1.48
+ROUGE Metrics: R1-F=0.2300 R2-F=0.0626 RL-F=0.2154
+
+--- Epoch 26: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : wind schwach maessig ix wehen ix wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region mehr wolke kommen aber regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen frueh tag west regen koennen regen gewitter koennen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen ix wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 27 ================
+Train Metrics: loss=2.8271 | sparse_categorical_accuracy=0.1009 | top_5_accuracy=0.1737
+Eval  Metrics: WER=0.8914 BLEU=1.48 B1=19.92 B2=9.30 B3=3.87 B4=1.48
+ROUGE Metrics: R1-F=0.2319 R2-F=0.0549 RL-F=0.2155
+
+--- Epoch 27: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch kommen kommen regen gewitter koennen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft mehr kuehl
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord see kommen tief kommen region kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen temperatur achtzehn grad region bis zwanzig grad region bis fuenf zwanzig grad region
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig ix wehen ix wehen ix wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 28 ================
+Train Metrics: loss=2.7759 | sparse_categorical_accuracy=0.1029 | top_5_accuracy=0.1749
+Eval  Metrics: WER=0.9049 BLEU=1.49 B1=20.59 B2=9.45 B3=3.91 B4=1.49
+ROUGE Metrics: R1-F=0.2248 R2-F=0.0527 RL-F=0.2097
+
+--- Epoch 28: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nacht kalt region minus zehn bis minus eins
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region wolke kommen regen kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen tag nord region regen region mehr freundlich region
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch ix wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 29 ================
+Train Metrics: loss=2.7274 | sparse_categorical_accuracy=0.1046 | top_5_accuracy=0.1783
+Eval  Metrics: WER=0.8807 BLEU=1.83 B1=22.74 B2=11.25 B3=5.14 B4=1.83
+ROUGE Metrics: R1-F=0.2583 R2-F=0.0789 RL-F=0.2431
+
+--- Epoch 29: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nacht ix kommen regen gewitter koennen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region heute nacht kommen regen region klar
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen vor mittag region regen kommen regen region ix kommen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch ix wehen ix wehen sonst region schwach maessig wehen
+  ----------------------------------------
+
+
+================ EPOCH 30 ================
+Train Metrics: loss=2.6828 | sparse_categorical_accuracy=0.1066 | top_5_accuracy=0.1815
+Eval  Metrics: WER=0.9040 BLEU=2.58 B1=22.72 B2=10.78 B3=5.17 B4=2.58
+ROUGE Metrics: R1-F=0.2430 R2-F=0.0657 RL-F=0.2269
+
+--- Epoch 30: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nacht ost regen berg schnee schneien
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken mehr kuehl
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord wolke bisschen regen kommen region auch sonne
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen vor mittag nord region regen region koennen sonne west wolke
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen ix wehen sonst region schwach maessig wehen
+  ----------------------------------------
+
+
+================ EPOCH 31 ================
+Train Metrics: loss=2.6371 | sparse_categorical_accuracy=0.1086 | top_5_accuracy=0.1832
+Eval  Metrics: WER=0.8778 BLEU=2.38 B1=24.27 B2=11.62 B3=5.82 B4=2.38
+ROUGE Metrics: R1-F=0.2665 R2-F=0.0702 RL-F=0.2497
+
+--- Epoch 31: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nacht sieben bis minus sechs alpen ix minus sechs
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr warm bleiben trocken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region bisschen wolke aber region bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen frueh ix fluss region regen region zehn bis fuenfzehn grad region
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen nord frisch stark wehen nord sturm koennen
+  ----------------------------------------
+
+
+================ EPOCH 32 ================
+Train Metrics: loss=2.5917 | sparse_categorical_accuracy=0.1103 | top_5_accuracy=0.1852
+Eval  Metrics: WER=0.8836 BLEU=1.79 B1=22.39 B2=10.82 B3=5.00 B4=1.79
+ROUGE Metrics: R1-F=0.2501 R2-F=0.0666 RL-F=0.2342
+
+--- Epoch 32: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : morgen schwach maessig wehen ix wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke himmel kommen aber region regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : mittwoch donnerstag nord region regen sued koennen sonne west suedwest mehr regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : naechste woche kuehl ungefaehr zwanzig grad mitte europa bis fuenfzehn grad sued mehr kuehl temperatur sinken
+  ----------------------------------------
+
+
+================ EPOCH 33 ================
+Train Metrics: loss=2.5525 | sparse_categorical_accuracy=0.1120 | top_5_accuracy=0.1876
+Eval  Metrics: WER=0.8982 BLEU=2.07 B1=21.65 B2=10.29 B3=4.82 B4=2.07
+ROUGE Metrics: R1-F=0.2357 R2-F=0.0673 RL-F=0.2198
+
+--- Epoch 33: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : morgen schwach maessig wehen ix wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft wetter wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region heute nacht wolke kommen region bisschen regen region
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen tag sonne wolke wechselhaft sued region sonne wolke wechselhaft
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig ix wehen ix wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 34 ================
+Train Metrics: loss=2.5143 | sparse_categorical_accuracy=0.1136 | top_5_accuracy=0.1892
+Eval  Metrics: WER=0.8807 BLEU=2.37 B1=24.63 B2=12.16 B3=5.80 B4=2.37
+ROUGE Metrics: R1-F=0.2639 R2-F=0.0724 RL-F=0.2484
+
+--- Epoch 34: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch druck kommen morgen regen wind wechselhaft
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke aber region bisschen regen region
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen tag region wolke koennen regen oder gewitter koennen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen trocken ix nord region zehn bis maximal siebzehn grad region nur zwei zwanzig grad
+  ----------------------------------------
+
+
+================ EPOCH 35 ================
+Train Metrics: loss=2.4763 | sparse_categorical_accuracy=0.1156 | top_5_accuracy=0.1906
+Eval  Metrics: WER=0.8826 BLEU=2.31 B1=23.78 B2=11.61 B3=5.62 B4=2.31
+ROUGE Metrics: R1-F=0.2542 R2-F=0.0672 RL-F=0.2375
+
+--- Epoch 35: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nacht sieben bis siebzehn grad sued noch frost
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend in kommend wechselhaft mehr kuehl
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland bisschen wolke kommen region kommen regen region
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen tag sonne wolke wechselhaft wolke nach mittag sued suedwest sonne
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig ix wehen ix wehen ix wehen ix wehen bis morgen abend sturm ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 36 ================
+Train Metrics: loss=2.4436 | sparse_categorical_accuracy=0.1170 | top_5_accuracy=0.1930
+Eval  Metrics: WER=0.8904 BLEU=2.17 B1=23.93 B2=10.70 B3=5.15 B4=2.17
+ROUGE Metrics: R1-F=0.2638 R2-F=0.0606 RL-F=0.2515
+
+--- Epoch 36: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nord wind schwach maessig region frisch wehen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr mild temperatur sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland kommen morgen kommen tief kommen nord region kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen tag nord region regen koennen region sued region sonne region
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig ix wehen ix wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 37 ================
+Train Metrics: loss=2.4100 | sparse_categorical_accuracy=0.1182 | top_5_accuracy=0.1943
+Eval  Metrics: WER=0.8817 BLEU=2.32 B1=25.28 B2=12.42 B3=5.67 B4=2.32
+ROUGE Metrics: R1-F=0.2783 R2-F=0.0828 RL-F=0.2646
+
+--- Epoch 37: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : ost europa tief kommen regen gewitter koennen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr mild aber kalt luft kommen
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland kommen morgen kommen wolke kommen deutsch land region
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen vor mittag region regen kommen nach mittag west regen gewitter
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : aber bleiben kuehl ungefaehr null grad nord bis acht grad nord region dreizehn grad
+  ----------------------------------------
+
+
+================ EPOCH 38 ================
+Train Metrics: loss=2.3808 | sparse_categorical_accuracy=0.1200 | top_5_accuracy=0.1959
+Eval  Metrics: WER=0.9117 BLEU=2.19 B1=22.58 B2=10.50 B3=5.25 B4=2.19
+ROUGE Metrics: R1-F=0.2409 R2-F=0.0610 RL-F=0.2248
+
+--- Epoch 38: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch druck kommen regen schnee koennen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend in kommend wechselhaft mehr kuehl
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland kommen wolke kommen deutsch land kommen ost kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : dienstag sonne wolke wechselhaft regen und gewitter koennen regen gewitter koennen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : dann morgen tag neun bis drei zwanzig grad fluss bis fuenf zwanzig grad fluss
+  ----------------------------------------
+
+
+================ EPOCH 39 ================
+Train Metrics: loss=2.3519 | sparse_categorical_accuracy=0.1215 | top_5_accuracy=0.1977
+Eval  Metrics: WER=0.8749 BLEU=3.70 B1=26.12 B2=13.62 B3=7.31 B4=3.70
+ROUGE Metrics: R1-F=0.2789 R2-F=0.0905 RL-F=0.2614
+
+--- Epoch 39: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nord schwach maessig kommen sued wind
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr mild
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland mehr wolke kommen regen region
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen viel sonne region wolke bis zwei zwanzig grad west suedwest bis acht zwanzig grad
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen ix wehen bis sturm koennen sturm wirbel
+  ----------------------------------------
+
+
+================ EPOCH 40 ================
+Train Metrics: loss=2.3325 | sparse_categorical_accuracy=0.1220 | top_5_accuracy=0.1988
+Eval  Metrics: WER=0.8846 BLEU=2.21 B1=24.76 B2=11.84 B3=5.29 B4=2.21
+ROUGE Metrics: R1-F=0.2641 R2-F=0.0686 RL-F=0.2487
+
+--- Epoch 40: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nacht sieben bis siebzehn grad koennen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region bisschen mehr wolke region bisschen regen bisschen schnee
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen tag suedost regen region bisschen gewitter dabei sonne
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen ix wehen sonst region schwach maessig wehen
+  ----------------------------------------
+
+
+================ EPOCH 41 ================
+Train Metrics: loss=2.3107 | sparse_categorical_accuracy=0.1229 | top_5_accuracy=0.1999
+Eval  Metrics: WER=0.8817 BLEU=1.77 B1=24.35 B2=11.51 B3=4.97 B4=1.77
+ROUGE Metrics: R1-F=0.2602 R2-F=0.0660 RL-F=0.2410
+
+--- Epoch 41: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : morgen frueh ix region regen gewitter koennen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft wetter wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland tief kommen tief kommen morgen region kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen tag ost region zehn grad fluss sued region drei zwanzig grad fluss region
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen bisschen kuehl ix nord region zehn bis siebzehn grad region nur zwei zwanzig grad
+  ----------------------------------------
+
+
+================ EPOCH 42 ================
+Train Metrics: loss=2.2937 | sparse_categorical_accuracy=0.1240 | top_5_accuracy=0.2009
+Eval  Metrics: WER=0.8991 BLEU=3.07 B1=22.74 B2=10.42 B3=5.71 B4=3.07
+ROUGE Metrics: R1-F=0.2528 R2-F=0.0650 RL-F=0.2394
+
+--- Epoch 42: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch druck kommen regen gewitter koennen sturm
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord region bisschen wolke aber region bisschen regen bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : mittwoch donnerstag viel wolke sonne west koennen regen gewitter koennen sued region regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig ix wehen ix wehen ix wehen ix auch sturm wirbel
+  ----------------------------------------
+
+
+================ EPOCH 43 ================
+Train Metrics: loss=2.2806 | sparse_categorical_accuracy=0.1245 | top_5_accuracy=0.2021
+Eval  Metrics: WER=0.8885 BLEU=3.10 B1=25.37 B2=12.22 B3=5.80 B4=3.10
+ROUGE Metrics: R1-F=0.2828 R2-F=0.0768 RL-F=0.2630
+
+--- Epoch 43: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : ost europa tief kommen regen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr mild temperatur sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke aber west region bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : mittwoch donnerstag nord wolke kommen regen koennen sued sonne dabei dann sonne
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch ix wehen ix wehen sonst region schwach maessig wehen
+  ----------------------------------------
+
+
+================ EPOCH 44 ================
+Train Metrics: loss=2.2641 | sparse_categorical_accuracy=0.1255 | top_5_accuracy=0.2029
+Eval  Metrics: WER=0.8846 BLEU=2.90 B1=24.94 B2=12.34 B3=6.05 B4=2.90
+ROUGE Metrics: R1-F=0.2688 R2-F=0.0765 RL-F=0.2526
+
+--- Epoch 44: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : region wechselhaft sonne wolke schauer gewitter
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr mild luft mild
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland schoen wetter kommen morgen kommen deutsch land kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen vor mittag region sonne wolke wechselhaft nach mittag suedwest gewitter
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig wehen nord frisch wehen dann sturm wehen
+  ----------------------------------------
+
+
+================ EPOCH 45 ================
+Train Metrics: loss=2.2583 | sparse_categorical_accuracy=0.1256 | top_5_accuracy=0.2029
+Eval  Metrics: WER=0.8982 BLEU=2.80 B1=23.30 B2=11.49 B3=5.76 B4=2.80
+ROUGE Metrics: R1-F=0.2559 R2-F=0.0736 RL-F=0.2414
+
+--- Epoch 45: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch kommen morgen kommen regen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr mild wind schwach maessig
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland tief kommen morgen kommen deutsch land kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen vor mittag west region regen koennen gewitter koennen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 46 ================
+Train Metrics: loss=2.2428 | sparse_categorical_accuracy=0.1266 | top_5_accuracy=0.2041
+Eval  Metrics: WER=0.8720 BLEU=3.25 B1=23.42 B2=11.97 B3=6.11 B4=3.25
+ROUGE Metrics: R1-F=0.2593 R2-F=0.0747 RL-F=0.2485
+
+--- Epoch 46: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch kommen ost kommen regen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland kommen wolke kommen morgen kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : mittwoch donnerstag nord region wolke kommen regen sued sonne dabei dann sued regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen ix wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 47 ================
+Train Metrics: loss=2.2455 | sparse_categorical_accuracy=0.1267 | top_5_accuracy=0.2041
+Eval  Metrics: WER=0.8836 BLEU=2.41 B1=24.99 B2=12.68 B3=5.95 B4=2.41
+ROUGE Metrics: R1-F=0.2747 R2-F=0.0881 RL-F=0.2594
+
+--- Epoch 47: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nacht kuehl kommen regen gewitter koennen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr mild aber kalt negalp kein negalp kein
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke sonne kommen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen tag sonne wolke region bis vier zwanzig grad fluss bis vier zwanzig grad
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen kueste stark sturm wehen moeglich
+  ----------------------------------------
+
+
+================ EPOCH 48 ================
+Train Metrics: loss=2.2418 | sparse_categorical_accuracy=0.1264 | top_5_accuracy=0.2043
+Eval  Metrics: WER=0.8826 BLEU=3.36 B1=23.72 B2=11.24 B3=5.84 B4=3.36
+ROUGE Metrics: R1-F=0.2580 R2-F=0.0689 RL-F=0.2423
+
+--- Epoch 48: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : ost europa tief kommen regen gewitter koennen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft wetter bleiben
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke mehr klar region bisschen wolke bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen mittwoch nord region sonne wolke wechselhaft nur sued suedwest schauer gewitter
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen ix wehen ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 49 ================
+Train Metrics: loss=2.2415 | sparse_categorical_accuracy=0.1268 | top_5_accuracy=0.2044
+Eval  Metrics: WER=0.8865 BLEU=3.13 B1=24.79 B2=11.85 B3=5.87 B4=3.13
+ROUGE Metrics: R1-F=0.2662 R2-F=0.0752 RL-F=0.2507
+
+--- Epoch 49: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch kommen ost europa tief kommen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland schon wolke kommen deutsch land kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : mittwoch sonne wolke wechselhaft wolke koennen sued west koennen regen gewitter
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen ix wehen bis abend sturm wirbel
+  ----------------------------------------
+
+
+================ EPOCH 50 ================
+Train Metrics: loss=2.2400 | sparse_categorical_accuracy=0.1267 | top_5_accuracy=0.2044
+Eval  Metrics: WER=0.8914 BLEU=3.44 B1=25.79 B2=13.20 B3=6.66 B4=3.44
+ROUGE Metrics: R1-F=0.2746 R2-F=0.0840 RL-F=0.2603
+
+--- Epoch 50: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : mitte europa tief kommen regen gewitter koennen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft sonne wolke wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : tag nord mehr wolke sonne kommen sued region bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen tag nordost wolke kommen suedwest nach mittag regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen sonst region schwach wehen nord auch frisch wehen
+  ----------------------------------------
+
+
+================ EPOCH 51 ================
+Train Metrics: loss=2.2843 | sparse_categorical_accuracy=0.1242 | top_5_accuracy=0.2006
+Eval  Metrics: WER=0.8788 BLEU=2.25 B1=23.28 B2=11.60 B3=5.43 B4=2.25
+ROUGE Metrics: R1-F=0.2544 R2-F=0.0700 RL-F=0.2420
+
+--- Epoch 51: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : morgen frueh ix region tief kommen regen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend schwach maessig nord frisch wehen
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord bisschen mehr wolke west bisschen regen bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen vor mittag west region regen koennen gewitter donner sued region freundlich
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : aber kalt luft kommen bis morgen tag temperatur steigen donnerstag bis zwanzig grad
+  ----------------------------------------
+
+
+================ EPOCH 52 ================
+Train Metrics: loss=2.2435 | sparse_categorical_accuracy=0.1258 | top_5_accuracy=0.2023
+Eval  Metrics: WER=0.9001 BLEU=1.88 B1=23.83 B2=11.50 B3=5.39 B4=1.88
+ROUGE Metrics: R1-F=0.2599 R2-F=0.0687 RL-F=0.2495
+
+--- Epoch 52: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch druck kommen ost kommen regen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend in kommend wechselhaft wetter wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord bisschen wolke aber region bisschen regen region auch bisschen sonne
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : mittwoch donnerstag sued region sonne wolke wechselhaft nur ix schauer gewitter koennen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : aber morgen kuehl zehn bis fuenfzehn grad ix bis sieben zwanzig grad fluss ix zwanzig grad
+  ----------------------------------------
+
+
+================ EPOCH 53 ================
+Train Metrics: loss=2.2103 | sparse_categorical_accuracy=0.1271 | top_5_accuracy=0.2041
+Eval  Metrics: WER=0.9001 BLEU=3.18 B1=22.84 B2=12.34 B3=6.84 B4=3.18
+ROUGE Metrics: R1-F=0.2544 R2-F=0.0858 RL-F=0.2406
+
+--- Epoch 53: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nord wind tief kommen sued auch sturm
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr warm aber kalt bleiben
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland region bisschen wolke kommen region bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : mittwoch donnerstag nord wolke regen koennen sued sonne west koennen regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig nord frisch wehen kueste sturm wehen koennen sturm wehen
+  ----------------------------------------
+
+
+================ EPOCH 54 ================
+Train Metrics: loss=2.1709 | sparse_categorical_accuracy=0.1292 | top_5_accuracy=0.2056
+Eval  Metrics: WER=0.8875 BLEU=2.33 B1=25.04 B2=11.79 B3=5.68 B4=2.33
+ROUGE Metrics: R1-F=0.2743 R2-F=0.0719 RL-F=0.2588
+
+--- Epoch 54: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch luft kommen kalt kommen regen gewitter
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr warm aber bleiben trocken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland kommen tief kommen morgen kommen ost kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : mittwoch donnerstag nord region regen sued sonne west regen gewitter
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : dann morgen kuehl ix region maximal zehn zwanzig grad fluss ix zwanzig grad
+  ----------------------------------------
+
+
+================ EPOCH 55 ================
+Train Metrics: loss=2.1289 | sparse_categorical_accuracy=0.1316 | top_5_accuracy=0.2083
+Eval  Metrics: WER=0.8885 BLEU=2.91 B1=26.65 B2=13.20 B3=6.11 B4=2.91
+ROUGE Metrics: R1-F=0.2810 R2-F=0.0784 RL-F=0.2628
+
+--- Epoch 55: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nord see tief kommen sued regen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland bisschen wolke kommen morgen abend kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen tag tagsueber sonne wolke wechselhaft west regen gewitter koennen sued regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen kuehl zehn bis fuenfzehn grad nord bis sieben zwanzig grad fluss bis fuenf zwanzig grad
+  ----------------------------------------
+
+
+================ EPOCH 56 ================
+Train Metrics: loss=2.0909 | sparse_categorical_accuracy=0.1328 | top_5_accuracy=0.2102
+Eval  Metrics: WER=0.9185 BLEU=3.15 B1=25.62 B2=12.71 B3=5.94 B4=3.15
+ROUGE Metrics: R1-F=0.2637 R2-F=0.0694 RL-F=0.2506
+
+--- Epoch 56: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : nord schwach maessig kommen wind stark wind
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft sonne wolke wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland mehr wolke tief kommen regen region bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen vor mittag sued region regen ost suedost koennen gewitter
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig ix wehen nord frisch ix wehen ix wehen ix auch sturm ix wehen
+  ----------------------------------------
+
+
+================ EPOCH 57 ================
+Train Metrics: loss=2.0473 | sparse_categorical_accuracy=0.1356 | top_5_accuracy=0.2128
+Eval  Metrics: WER=0.9011 BLEU=3.96 B1=23.96 B2=13.34 B3=7.34 B4=3.96
+ROUGE Metrics: R1-F=0.2521 R2-F=0.0850 RL-F=0.2426
+
+--- Epoch 57: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : ost europa tief kommen regen wind sturm
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr mild temperatur sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke himmel region moeglich regen region bisschen sonne
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen vor mittag noch region regen gewitter koennen nach mittag suedwest kommen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen schwach maessig ix wehen ix wehen ix wehen bis morgen abend ix zwischen minus eins
+  ----------------------------------------
+
+
+================ EPOCH 58 ================
+Train Metrics: loss=2.0134 | sparse_categorical_accuracy=0.1374 | top_5_accuracy=0.2145
+Eval  Metrics: WER=0.8720 BLEU=3.23 B1=25.52 B2=12.94 B3=6.93 B4=3.23
+ROUGE Metrics: R1-F=0.2853 R2-F=0.0845 RL-F=0.2682
+
+--- Epoch 58: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch kommen kalt kommen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr warm aber bisschen mild
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord mehr wolke west region moeglich bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen frueh ungefaehr null bis minus eins grad fluss minus fuenf grad
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : dann wochenende kuehl ost region zehn bis siebzehn grad sued noch mehr warm als heute auch
+  ----------------------------------------
+
+
+================ EPOCH 59 ================
+Train Metrics: loss=1.9748 | sparse_categorical_accuracy=0.1391 | top_5_accuracy=0.2165
+Eval  Metrics: WER=0.9020 BLEU=2.17 B1=25.58 B2=12.83 B3=6.54 B4=2.17
+ROUGE Metrics: R1-F=0.2674 R2-F=0.0775 RL-F=0.2532
+
+--- Epoch 59: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : ost kalt luft kommen regen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend dann wechselhaft wetter wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland bisschen wolke morgen kommen region
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen vor mittag ix region koennen regen gewitter koennen region bis zehn grad
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen kuehl bisschen mild zehn bis fuenfzehn grad fluss bis neun zwanzig grad
+  ----------------------------------------
+
+
+================ EPOCH 60 ================
+Train Metrics: loss=1.9387 | sparse_categorical_accuracy=0.1413 | top_5_accuracy=0.2180
+Eval  Metrics: WER=0.9205 BLEU=3.14 B1=25.83 B2=13.19 B3=6.80 B4=3.14
+ROUGE Metrics: R1-F=0.2761 R2-F=0.0903 RL-F=0.2633
+
+--- Epoch 60: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch luft druck kommen feucht kalt kommen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend dann mild kommen wetter wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland bisschen wolke kommen region morgen auch sonne region
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : mittwoch donnerstag nord wolke kommen regen koennen sued sonne kommen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen kuehl ix sieben zwanzig grad nord bis neun zwanzig grad fluss bis dreissig grad
+  ----------------------------------------
+
+
+================ EPOCH 61 ================
+Train Metrics: loss=1.8997 | sparse_categorical_accuracy=0.1435 | top_5_accuracy=0.2201
+Eval  Metrics: WER=0.8846 BLEU=2.45 B1=25.06 B2=12.48 B3=6.08 B4=2.45
+ROUGE Metrics: R1-F=0.2727 R2-F=0.0759 RL-F=0.2648
+
+--- Epoch 61: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch luft druck kommen regen gewitter
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft mehr kuehl sinken
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : tag nord bisschen wolke west bisschen regen bisschen regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen frueh sonne nord region wolke kommen aber nach mittag sued regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen kuehl meistens region zehn bis fuenfzehn grad fluss maximal zwanzig grad
+  ----------------------------------------
+
+
+================ EPOCH 62 ================
+Train Metrics: loss=1.8646 | sparse_categorical_accuracy=0.1450 | top_5_accuracy=0.2223
+Eval  Metrics: WER=0.8855 BLEU=3.39 B1=26.14 B2=12.74 B3=6.52 B4=3.39
+ROUGE Metrics: R1-F=0.2800 R2-F=0.0789 RL-F=0.2627
+
+--- Epoch 62: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch kommen jetzt kommen kalt kommen
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft sonne wolke wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland schoen wetter west kommen deutsch land kommen morgen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen temperatur achtzehn grad fluss bis fuenf zwanzig grad fluss
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen kuehl zehn bis fuenfzehn grad nord kuehl drei zwanzig grad sued mehr warm als heute
+  ----------------------------------------
+
+
+================ EPOCH 63 ================
+Train Metrics: loss=1.8319 | sparse_categorical_accuracy=0.1469 | top_5_accuracy=0.2239
+Eval  Metrics: WER=0.8652 BLEU=3.56 B1=27.07 B2=13.54 B3=6.96 B4=3.56
+ROUGE Metrics: R1-F=0.2857 R2-F=0.0805 RL-F=0.2687
+
+--- Epoch 63: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch luft druck kommen regen stark
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend wechselhaft wetter wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord see bisschen tief kommen morgen kommen nord region
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen viel sonne region nebel auftauchen koennen sehen west region koennen regen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen kuehl bisschen kuehl ungefaehr nord region maximal zehn grad
+  ----------------------------------------
+
+
+================ EPOCH 64 ================
+Train Metrics: loss=1.8001 | sparse_categorical_accuracy=0.1489 | top_5_accuracy=0.2243
+Eval  Metrics: WER=0.8952 BLEU=2.54 B1=25.70 B2=12.96 B3=6.41 B4=2.54
+ROUGE Metrics: R1-F=0.2644 R2-F=0.0744 RL-F=0.2509
+
+--- Epoch 64: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : hoch kommen kalt luft kommen kalt
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend in kommend dann wechselhaft wetter wechselhaft
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland vor mittag schon wolke kommen deutsch land regen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen mittwoch nord region koennen wolke und koennen sonne west regen koennen
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : morgen kuehl ix maximal fuenf zwanzig grad nord kuehl nur drei zwanzig grad
+  ----------------------------------------
+
+
+================ EPOCH 65 ================
+Train Metrics: loss=1.7660 | sparse_categorical_accuracy=0.1506 | top_5_accuracy=0.2264
+Eval  Metrics: WER=0.8962 BLEU=3.94 B1=26.39 B2=14.09 B3=8.03 B4=3.94
+ROUGE Metrics: R1-F=0.2807 R2-F=0.0877 RL-F=0.2662
+
+--- Epoch 65: 5 Test Translation Samples ---
+  True Translation : TAG SCHWARZ WALD BAYERN REGION REGEN STARK REGEN KOENNEN
+  Model Prediction : ost europa tief kommen regen sturm
+  ----------------------------------------
+  True Translation : IN-KOMMEND IN-KOMMEND RUHIG GUT WETTER
+  Model Prediction : in kommend mehr mild region zehn grad
+  ----------------------------------------
+  True Translation : NORD REGION DANN BISSCHEN WOLKE VON MEER TIEF KOMMEN BISSCHEN MERKEN SCHON ZWEITE WOCHENENDE SCHON MERKEN
+  Model Prediction : nord deutschland bisschen wolke mehr warm luft kommen
+  ----------------------------------------
+  True Translation : MORGEN MITTE EUROPA HOCH KOMMEN BLEIBEN BIS MINDESTENS SONNTAG SONNE TEMPERATUR STEIGEN
+  Model Prediction : morgen vor mittag nord region regen ost region bisschen sonne region
+  ----------------------------------------
+  True Translation : MORGEN KUEHL ZEHN GRAD NUR NORD SCHAFFEN MAXIMAL ZEHN GRAD MITTE BERG BESONDERS OST SUED neg-FUENF neg-GRAD neg-GRAD UNTER
+  Model Prediction : aber kuehl luft wehen nordost wehen kuehl mitte europa in kommend dann in kommend wochenende
+  ----------------------------------------
+

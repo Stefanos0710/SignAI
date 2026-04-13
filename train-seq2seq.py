@@ -1240,7 +1240,7 @@ def train_main(
         l1_reg=0.001,
         augment_train_each_epoch=True,
         augment_factor=1,
-        architecture="multi_attention",  # "baseline", "multi_attention", or "transformer"
+        architecture="multi_attention",  # currently only "multi_attention" is implemented
         metrics_sample_size=256,
         resume_enabled: bool = False,
         resume_from_checkpoint: Optional[str] = None,
@@ -1576,7 +1576,7 @@ if __name__ == "__main__":
             "l1_reg": 0.0001,
             "augment_train_each_epoch": True,
             "augment_factor": 3,
-            "architecture": "multi_attention", # Either baseline or multi_attention or transformer
+            "architecture": "multi_attention", # currently only "multi_attention" is supported
             "metrics_sample_size": 256,
             "resume_enabled": False,
             "resume_from_checkpoint": "models/checkpoint_v387_epoch_44.keras",

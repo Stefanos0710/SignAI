@@ -1,0 +1,25 @@
+=== Training Logs and Progress ===
+
+
+================ EPOCH 1 ================
+Train Metrics: loss=5.5539 | sparse_categorical_accuracy=0.0301 | top_5_accuracy=0.0578
+Eval  Metrics: WER=0.9669 BLEU=0.26 B1=2.50 B2=0.46 B3=0.26 B4=0.26
+ROUGE Metrics: R1-F=0.0638 R2-F=0.0000 RL-F=0.0638
+
+--- Epoch 1: 5 Test Translation Samples ---
+  True Translation : MORGEN OST SEE NEUN GRAD FLUSS SIEBZEHN GRAD
+  Model Prediction : morgen morgen region
+  ----------------------------------------
+  True Translation : TEMPERATUR WIE-AUSSEHEN SUED ZWANZIG BIS DREI ZWANZIG GRAD KUESTE NORD SIEBZEHN ACHTZEHN GRAD WEST NEUNZEHN BIS ZWEI ZWANZIG GRAD ANGENEHM
+  Model Prediction : morgen morgen region
+  ----------------------------------------
+  True Translation : SAMSTAG WECHSELHAFT MEHR KUEHL
+  Model Prediction : morgen morgen region
+  ----------------------------------------
+  True Translation : WEST MEHR KOMMEN KLAR ABER BISSCHEN NORDWEST BISSCHEN REGEN BISSCHEN DONNER BLITZ DONNER IX KOENNEN DABEI
+  Model Prediction : morgen morgen region
+  ----------------------------------------
+  True Translation : SUED WETTER BESSER NORD WOLKE
+  Model Prediction : morgen morgen region
+  ----------------------------------------
+

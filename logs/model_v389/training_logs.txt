@@ -1,0 +1,163 @@
+=== Training Logs and Progress ===
+
+
+================ EPOCH 1 ================
+Train Metrics: loss=4.0638 | sparse_categorical_accuracy=0.0628 | top_5_accuracy=0.1141
+Eval  Metrics: WER=0.9607 BLEU=2.33 B1=12.31 B2=6.88 B3=4.16 B4=2.33
+ROUGE Metrics: R1-F=0.1364 R2-F=0.0458 RL-F=0.1327
+
+--- Epoch 1: 5 Test Translation Samples ---
+  True Translation : MORGEN OST SEE NEUN GRAD FLUSS SIEBZEHN GRAD
+  Model Prediction : morgen nord region wolke himmel region sonne
+  ----------------------------------------
+  True Translation : TEMPERATUR WIE-AUSSEHEN SUED ZWANZIG BIS DREI ZWANZIG GRAD KUESTE NORD SIEBZEHN ACHTZEHN GRAD WEST NEUNZEHN BIS ZWEI ZWANZIG GRAD ANGENEHM
+  Model Prediction : heute nacht nord region klar himmel stern koennen sehen
+  ----------------------------------------
+  True Translation : SAMSTAG WECHSELHAFT MEHR KUEHL
+  Model Prediction : morgen ix region sonne
+  ----------------------------------------
+  True Translation : WEST MEHR KOMMEN KLAR ABER BISSCHEN NORDWEST BISSCHEN REGEN BISSCHEN DONNER BLITZ DONNER IX KOENNEN DABEI
+  Model Prediction : morgen frueh kommen region regen kommen
+  ----------------------------------------
+  True Translation : SUED WETTER BESSER NORD WOLKE
+  Model Prediction : morgen frueh region kommen
+  ----------------------------------------
+
+
+================ EPOCH 2 ================
+Train Metrics: loss=3.2344 | sparse_categorical_accuracy=0.0854 | top_5_accuracy=0.1502
+Eval  Metrics: WER=0.9483 BLEU=1.76 B1=13.39 B2=6.89 B3=3.53 B4=1.76
+ROUGE Metrics: R1-F=0.1564 R2-F=0.0447 RL-F=0.1473
+
+--- Epoch 2: 5 Test Translation Samples ---
+  True Translation : MORGEN OST SEE NEUN GRAD FLUSS SIEBZEHN GRAD
+  Model Prediction : samstag viel wolke sonne bisschen regen
+  ----------------------------------------
+  True Translation : TEMPERATUR WIE-AUSSEHEN SUED ZWANZIG BIS DREI ZWANZIG GRAD KUESTE NORD SIEBZEHN ACHTZEHN GRAD WEST NEUNZEHN BIS ZWEI ZWANZIG GRAD ANGENEHM
+  Model Prediction : heute nacht vierzehn grad region fuenf grad region fuenf grad
+  ----------------------------------------
+  True Translation : SAMSTAG WECHSELHAFT MEHR KUEHL
+  Model Prediction : freitag wechselhaft
+  ----------------------------------------
+  True Translation : WEST MEHR KOMMEN KLAR ABER BISSCHEN NORDWEST BISSCHEN REGEN BISSCHEN DONNER BLITZ DONNER IX KOENNEN DABEI
+  Model Prediction : west kommen regen gewitter kommen
+  ----------------------------------------
+  True Translation : SUED WETTER BESSER NORD WOLKE
+  Model Prediction : morgen frueh kommen
+  ----------------------------------------
+
+
+================ EPOCH 3 ================
+Train Metrics: loss=2.7768 | sparse_categorical_accuracy=0.1025 | top_5_accuracy=0.1738
+Eval  Metrics: WER=0.8595 BLEU=2.82 B1=22.08 B2=10.30 B3=5.44 B4=2.82
+ROUGE Metrics: R1-F=0.2572 R2-F=0.0631 RL-F=0.2440
+
+--- Epoch 3: 5 Test Translation Samples ---
+  True Translation : MORGEN OST SEE NEUN GRAD FLUSS SIEBZEHN GRAD
+  Model Prediction : morgen meistens wolke teil regen region
+  ----------------------------------------
+  True Translation : TEMPERATUR WIE-AUSSEHEN SUED ZWANZIG BIS DREI ZWANZIG GRAD KUESTE NORD SIEBZEHN ACHTZEHN GRAD WEST NEUNZEHN BIS ZWEI ZWANZIG GRAD ANGENEHM
+  Model Prediction : heute nacht minus drei grad minus vier grad minus vier grad
+  ----------------------------------------
+  True Translation : SAMSTAG WECHSELHAFT MEHR KUEHL
+  Model Prediction : freitag wechselhaft
+  ----------------------------------------
+  True Translation : WEST MEHR KOMMEN KLAR ABER BISSCHEN NORDWEST BISSCHEN REGEN BISSCHEN DONNER BLITZ DONNER IX KOENNEN DABEI
+  Model Prediction : west region kommen bisschen regen nordwest mehr freundlich trocken
+  ----------------------------------------
+  True Translation : SUED WETTER BESSER NORD WOLKE
+  Model Prediction : morgen sued region ruhig nebel
+  ----------------------------------------
+
+
+================ EPOCH 4 ================
+Train Metrics: loss=2.3800 | sparse_categorical_accuracy=0.1204 | top_5_accuracy=0.1955
+Eval  Metrics: WER=0.8388 BLEU=2.55 B1=24.78 B2=11.96 B3=6.00 B4=2.55
+ROUGE Metrics: R1-F=0.2787 R2-F=0.0678 RL-F=0.2578
+
+--- Epoch 4: 5 Test Translation Samples ---
+  True Translation : MORGEN OST SEE NEUN GRAD FLUSS SIEBZEHN GRAD
+  Model Prediction : morgen meistens wolke teil region auch sued region
+  ----------------------------------------
+  True Translation : TEMPERATUR WIE-AUSSEHEN SUED ZWANZIG BIS DREI ZWANZIG GRAD KUESTE NORD SIEBZEHN ACHTZEHN GRAD WEST NEUNZEHN BIS ZWEI ZWANZIG GRAD ANGENEHM
+  Model Prediction : heute nacht temperatur fuenf bis acht grad nord maximal dreizehn grad
+  ----------------------------------------
+  True Translation : SAMSTAG WECHSELHAFT MEHR KUEHL
+  Model Prediction : freitag wechselhaft mehr kuehl
+  ----------------------------------------
+  True Translation : WEST MEHR KOMMEN KLAR ABER BISSCHEN NORDWEST BISSCHEN REGEN BISSCHEN DONNER BLITZ DONNER IX KOENNEN DABEI
+  Model Prediction : west region kommen wolke himmel klar stern koennen sehen
+  ----------------------------------------
+  True Translation : SUED WETTER BESSER NORD WOLKE
+  Model Prediction : morgen sued freundlich region sonne wolke
+  ----------------------------------------
+
+
+================ EPOCH 5 ================
+Train Metrics: loss=1.9969 | sparse_categorical_accuracy=0.1408 | top_5_accuracy=0.2157
+Eval  Metrics: WER=0.8512 BLEU=2.34 B1=25.33 B2=11.59 B3=5.43 B4=2.34
+ROUGE Metrics: R1-F=0.3072 R2-F=0.0762 RL-F=0.2951
+
+--- Epoch 5: 5 Test Translation Samples ---
+  True Translation : MORGEN OST SEE NEUN GRAD FLUSS SIEBZEHN GRAD
+  Model Prediction : morgen zehn grad nord region fuenfzehn grad
+  ----------------------------------------
+  True Translation : TEMPERATUR WIE-AUSSEHEN SUED ZWANZIG BIS DREI ZWANZIG GRAD KUESTE NORD SIEBZEHN ACHTZEHN GRAD WEST NEUNZEHN BIS ZWEI ZWANZIG GRAD ANGENEHM
+  Model Prediction : heute nacht temperatur sinken neun bis null grad nord region minus eins grad
+  ----------------------------------------
+  True Translation : SAMSTAG WECHSELHAFT MEHR KUEHL
+  Model Prediction : samstag suedost freundlich trocken
+  ----------------------------------------
+  True Translation : WEST MEHR KOMMEN KLAR ABER BISSCHEN NORDWEST BISSCHEN REGEN BISSCHEN DONNER BLITZ DONNER IX KOENNEN DABEI
+  Model Prediction : west region kommen wolke himmel bisschen regen bisschen schnee
+  ----------------------------------------
+  True Translation : SUED WETTER BESSER NORD WOLKE
+  Model Prediction : morgen suedost trocken region wolke
+  ----------------------------------------
+
+
+================ EPOCH 6 ================
+Train Metrics: loss=1.6441 | sparse_categorical_accuracy=0.1618 | top_5_accuracy=0.2328
+Eval  Metrics: WER=0.8079 BLEU=4.92 B1=30.94 B2=16.61 B3=9.31 B4=4.92
+ROUGE Metrics: R1-F=0.3499 R2-F=0.1113 RL-F=0.3455
+
+--- Epoch 6: 5 Test Translation Samples ---
+  True Translation : MORGEN OST SEE NEUN GRAD FLUSS SIEBZEHN GRAD
+  Model Prediction : morgen meistens nord region fuenf grad region
+  ----------------------------------------
+  True Translation : TEMPERATUR WIE-AUSSEHEN SUED ZWANZIG BIS DREI ZWANZIG GRAD KUESTE NORD SIEBZEHN ACHTZEHN GRAD WEST NEUNZEHN BIS ZWEI ZWANZIG GRAD ANGENEHM
+  Model Prediction : temperatur wie aussehen in kommend sonntag acht zwanzig grad region sonst region nur vierzehn grad
+  ----------------------------------------
+  True Translation : SAMSTAG WECHSELHAFT MEHR KUEHL
+  Model Prediction : samstag wechselhaft mehr kuehl
+  ----------------------------------------
+  True Translation : WEST MEHR KOMMEN KLAR ABER BISSCHEN NORDWEST BISSCHEN REGEN BISSCHEN DONNER BLITZ DONNER IX KOENNEN DABEI
+  Model Prediction : west region kommen wolke himmel bisschen regen ix moeglich
+  ----------------------------------------
+  True Translation : SUED WETTER BESSER NORD WOLKE
+  Model Prediction : morgen sued freundlich nord wolke kommen
+  ----------------------------------------
+
+
+================ EPOCH 7 ================
+Train Metrics: loss=1.3209 | sparse_categorical_accuracy=0.1831 | top_5_accuracy=0.2463
+Eval  Metrics: WER=0.8326 BLEU=3.81 B1=28.99 B2=14.72 B3=8.31 B4=3.81
+ROUGE Metrics: R1-F=0.3309 R2-F=0.0965 RL-F=0.3190
+
+--- Epoch 7: 5 Test Translation Samples ---
+  True Translation : MORGEN OST SEE NEUN GRAD FLUSS SIEBZEHN GRAD
+  Model Prediction : morgen zehn grad nord region fuenfzehn grad
+  ----------------------------------------
+  True Translation : TEMPERATUR WIE-AUSSEHEN SUED ZWANZIG BIS DREI ZWANZIG GRAD KUESTE NORD SIEBZEHN ACHTZEHN GRAD WEST NEUNZEHN BIS ZWEI ZWANZIG GRAD ANGENEHM
+  Model Prediction : temperatur morgen minus fuenf region plus vier region minus sechs grad
+  ----------------------------------------
+  True Translation : SAMSTAG WECHSELHAFT MEHR KUEHL
+  Model Prediction : samstag wechselhaft mehr kuehl
+  ----------------------------------------
+  True Translation : WEST MEHR KOMMEN KLAR ABER BISSCHEN NORDWEST BISSCHEN REGEN BISSCHEN DONNER BLITZ DONNER IX KOENNEN DABEI
+  Model Prediction : west region bisschen wolke aber meistens sonne auch bisschen wolke bisschen schnee schneien
+  ----------------------------------------
+  True Translation : SUED WETTER BESSER NORD WOLKE
+  Model Prediction : in kommend in kommend dann langsam kommen ost region kommen
+  ----------------------------------------
+
