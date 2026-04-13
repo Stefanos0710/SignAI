@@ -553,6 +553,89 @@ def greedy_decode(model, encoder_input, tokenizer, max_len):
     return " ".join(words).strip()
 
 
+def beam_search_decode(
+        model,
+        encoder_input,
+        tokenizer,
+        max_len,
+        beam_width: int = 4,
+        length_penalty_alpha: float = 0.6,
+):
+    """Beam-search decoding with simple length penalty for better sequence-level outputs."""
+    start_id = tokenizer.word_index.get("<start>")
+    end_id = tokenizer.word_index.get("<end>")
+    if start_id is None or end_id is None:
+        raise ValueError("Tokenizer must contain <start> and <end> tokens.")
+
+    if encoder_input.ndim == 2:
+        encoder_input_batch = np.expand_dims(encoder_input, axis=0)
+    else:
+        encoder_input_batch = encoder_input
+
+    beam_width = max(1, int(beam_width))
+    length_penalty_alpha = max(0.0, float(length_penalty_alpha))
+
+    # (token_ids, cumulative_log_prob, ended)
+    beams = [([start_id], 0.0, False)]
+
+    for _ in range(max_len):
+        candidates = []
+        all_ended = True
+
+        for seq, score, ended in beams:
+            if ended:
+                candidates.append((seq, score, True))
+                continue
+
+            all_ended = False
+            decoder_input = np.array([seq], dtype=np.int32)
+            probs = model.predict([encoder_input_batch, decoder_input], verbose=0)[0, len(seq) - 1]
+            probs = np.asarray(probs, dtype=np.float64)
+            if probs.size == 0:
+                continue
+
+            top_k = min(beam_width, probs.shape[0])
+            top_ids = np.argpartition(probs, -top_k)[-top_k:]
+            top_ids = top_ids[np.argsort(probs[top_ids])[::-1]]
+
+            for token_id in top_ids:
+                token = int(token_id)
+                token_prob = max(float(probs[token]), 1e-12)
+                new_score = score + float(np.log(token_prob))
+                candidates.append((seq + [token], new_score, token == end_id))
+
+        if all_ended or not candidates:
+            break
+
+        def normalized_score(candidate):
+            seq, score, _ = candidate
+            out_len = max(1, len(seq) - 1)
+            return score / (out_len ** length_penalty_alpha)
+
+        candidates.sort(key=normalized_score, reverse=True)
+        beams = candidates[:beam_width]
+
+        if all(done for _, _, done in beams):
+            break
+
+    if not beams:
+        return ""
+
+    best_seq = max(
+        beams,
+        key=lambda c: c[1] / (max(1, len(c[0]) - 1) ** length_penalty_alpha),
+    )[0]
+
+    words = []
+    for token_id in best_seq[1:]:
+        if token_id == end_id:
+            break
+        if token_id == 0 or token_id == start_id:
+            continue
+        words.append(tokenizer.index_word.get(token_id, "<unk>"))
+    return " ".join(words).strip()
+
+
 def _safe_tokens(text: str) -> List[str]:
     return [t for t in str(text).strip().split() if t]
 
@@ -667,6 +750,9 @@ class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
             sample_size: Optional[int] = 256,
             seed: int = 42,
             log_file_path: Optional[str] = None,
+            decode_strategy: str = "beam",
+            beam_width: int = 4,
+            length_penalty_alpha: float = 0.6,
     ):
         super().__init__()
         self.val_encoder = val_encoder
@@ -674,6 +760,11 @@ class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
         self.tokenizer = tokenizer
         self.max_len = int(max_len)
         self.log_file_path = log_file_path
+        self.decode_strategy = str(decode_strategy).strip().lower()
+        if self.decode_strategy not in {"greedy", "beam"}:
+            raise ValueError("decode_strategy must be either 'greedy' or 'beam'.")
+        self.beam_width = max(1, int(beam_width))
+        self.length_penalty_alpha = max(0.0, float(length_penalty_alpha))
 
         n = len(self.val_references)
         if n == 0:
@@ -704,6 +795,18 @@ class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
         self.bleu3 = BLEU(max_ngram_order=3, effective_order=True)
         self.bleu4 = BLEU(max_ngram_order=4, effective_order=True)
 
+    def _decode(self, encoder_sample: np.ndarray) -> str:
+        if self.decode_strategy == "beam":
+            return beam_search_decode(
+                self.model,
+                encoder_sample,
+                self.tokenizer,
+                self.max_len,
+                beam_width=self.beam_width,
+                length_penalty_alpha=self.length_penalty_alpha,
+            )
+        return greedy_decode(self.model, encoder_sample, self.tokenizer, self.max_len)
+
     def on_epoch_end(self, epoch, logs=None):
         if logs is None:
             logs = {}
@@ -714,7 +817,7 @@ class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
         hyps = []
 
         for i in self.eval_indices:
-            pred = greedy_decode(self.model, self.val_encoder[i], self.tokenizer, self.max_len)
+            pred = self._decode(self.val_encoder[i])
             ref = self.val_references[i]
             refs.append(normalize_text(ref) if ref else "")
             hyps.append(normalize_text(pred) if pred else "")
@@ -757,7 +860,7 @@ class SignLanguageEvaluationCallback(tf.keras.callbacks.Callback):
         samples_out_lines = []
         samples_out_lines.append(f"\n--- Epoch {epoch + 1}: 5 Test Translation Samples ---")
         for idx_sample in self.fixed_5_indices:
-            fixed_pred = greedy_decode(self.model, self.val_encoder[idx_sample], self.tokenizer, self.max_len)
+            fixed_pred = self._decode(self.val_encoder[idx_sample])
             fixed_ref = self.val_references[idx_sample]
             samples_out_lines.append(f"  True Translation : {fixed_ref}")
             samples_out_lines.append(f"  Model Prediction : {fixed_pred}")
@@ -906,6 +1009,7 @@ def build_seq2seq_model_multi_attention(
         decoder_units=1024,
         dropout_rate=0.3,
         recurrent_dropout_rate=0.1,
+    l1_reg=0.0,
         use_layer_norm=True,
         num_attention_heads=8,
         use_cnn=True
@@ -929,8 +1033,16 @@ def build_seq2seq_model_multi_attention(
         name="encoder_mask"
     )(encoder_inputs)
 
+    l1_value = float(l1_reg)
+    kernel_regularizer = tf.keras.regularizers.l1(l1_value) if l1_value > 0.0 else None
+
     # Spatial projection: helps model focus on important keypoint relationships
-    x = Dense(encoder_units * 2, activation="relu", name="encoder_projection")(encoder_inputs)
+    x = Dense(
+        encoder_units * 2,
+        activation="relu",
+        kernel_regularizer=kernel_regularizer,
+        name="encoder_projection",
+    )(encoder_inputs)
     if use_layer_norm:
         x = LayerNormalization(name="encoder_norm1")(x)
     x = Dropout(dropout_rate, name="encoder_dropout1")(x)
@@ -948,6 +1060,8 @@ def build_seq2seq_model_multi_attention(
             return_state=True,
             dropout=dropout_rate,
             recurrent_dropout=recurrent_dropout_rate,
+            kernel_regularizer=kernel_regularizer,
+            recurrent_regularizer=kernel_regularizer,
         ),
         name="encoder_bidirectional"
     )
@@ -971,7 +1085,13 @@ def build_seq2seq_model_multi_attention(
 
     # ===== DECODER =====
     decoder_inputs = Input(shape=(None,), name="decoder_inputs")
-    decoder_embedding_layer = Embedding(vocab_size, embedding_dim, mask_zero=True, name="decoder_embedding")
+    decoder_embedding_layer = Embedding(
+        vocab_size,
+        embedding_dim,
+        mask_zero=True,
+        embeddings_regularizer=kernel_regularizer,
+        name="decoder_embedding",
+    )
     decoder_embedding = decoder_embedding_layer(decoder_inputs)
     
     # Extract padding mask from embedding layer
@@ -986,6 +1106,8 @@ def build_seq2seq_model_multi_attention(
         return_state=True,
         dropout=dropout_rate,
         recurrent_dropout=recurrent_dropout_rate,
+        kernel_regularizer=kernel_regularizer,
+        recurrent_regularizer=kernel_regularizer,
         name="decoder_lstm"
     )
 
@@ -1038,13 +1160,23 @@ def build_seq2seq_model_multi_attention(
     decoder_combined = Concatenate(axis=-1, name="decoder_concat")([attention, decoder_outputs])
     
     # Deeper feedforward network for better expressiveness
-    decoder_combined = Dense(decoder_units, activation="relu", name="decoder_ff1")(decoder_combined)
+    decoder_combined = Dense(
+        decoder_units,
+        activation="relu",
+        kernel_regularizer=kernel_regularizer,
+        name="decoder_ff1",
+    )(decoder_combined)
     decoder_combined = Dropout(dropout_rate, name="decoder_dropout")(decoder_combined)
     if use_layer_norm:
         decoder_combined = LayerNormalization(name="decoder_ff_norm")(decoder_combined)
 
     # Numerical stability
-    decoder_dense = Dense(vocab_size, activation="softmax", name="decoder_dense")
+    decoder_dense = Dense(
+        vocab_size,
+        activation="softmax",
+        kernel_regularizer=kernel_regularizer,
+        name="decoder_dense",
+    )
     final_outputs = decoder_dense(decoder_combined)
 
     model = tf.keras.Model([encoder_inputs, decoder_inputs], final_outputs, name="seq2seq_improved")
@@ -1059,6 +1191,7 @@ def build_seq2seq_model(
         decoder_units=512,
         dropout_rate=0.5,
         recurrent_dropout_rate=0.1,
+    l1_reg=0.0,
         architecture="multi_attention",
         use_layer_norm=True,
         use_multi_head_attention=True,
@@ -1070,8 +1203,15 @@ def build_seq2seq_model(
     Factory function for the slimmed-down model setup.
     
     Args:
-        architecture: kept for backward compatibility and ignored.
+        architecture: currently only "multi_attention" is supported.
     """
+    selected_architecture = str(architecture or "multi_attention").strip().lower()
+    if selected_architecture != "multi_attention":
+        raise ValueError(
+            f"Unsupported architecture '{architecture}'. "
+            "Only 'multi_attention' is currently implemented in this script."
+        )
+
     return build_seq2seq_model_multi_attention(
         max_frames=max_frames,
         num_features=num_features,
@@ -1081,6 +1221,7 @@ def build_seq2seq_model(
         decoder_units=decoder_units,
         dropout_rate=dropout_rate,
         recurrent_dropout_rate=recurrent_dropout_rate,
+        l1_reg=l1_reg,
         use_layer_norm=use_layer_norm,
         num_attention_heads=num_attention_heads,
     )
@@ -1099,10 +1240,11 @@ def train_main(
         l1_reg=0.001,
         augment_train_each_epoch=True,
         augment_factor=1,
-    architecture="multi_attention",  # "baseline", "multi_attention", or "transformer"
-    metrics_sample_size=256,
-    resume_from_checkpoint: Optional[str] = None,
-    resume_from_epoch: int = 0,
+        architecture="multi_attention",  # "baseline", "multi_attention", or "transformer"
+        metrics_sample_size=256,
+        resume_enabled: bool = False,
+        resume_from_checkpoint: Optional[str] = None,
+        resume_from_epoch: int = 0,
 ):
     try:
 
@@ -1157,7 +1299,9 @@ def train_main(
         if n_samples < 2:
             raise ValueError("Need at least 2 samples to create a train/validation split.")
 
-        val_fraction = 0.1
+        if not 0.0 < float(validation_split) < 1.0:
+            raise ValueError(f"validation_split must be in (0, 1), got {validation_split}.")
+        val_fraction = float(validation_split)
         val_size = max(1, int(round(n_samples * val_fraction)))
         val_size = min(val_size, n_samples - 1)
 
@@ -1171,7 +1315,8 @@ def train_main(
         val_gloss_refs = [gloss_refs[i] for i in val_idx]
 
         logging.info(
-            "Split data into train/val with fixed 10%% validation: train=%d, val=%d",
+            "Split data into train/val with validation_split=%.3f: train=%d, val=%d",
+            val_fraction,
             len(train_idx),
             len(val_idx),
         )
@@ -1220,14 +1365,20 @@ def train_main(
             decoder_units=hidden_dim,
             dropout_rate=dropout_rate,
             recurrent_dropout_rate=0.1,
+            l1_reg=l1_reg,
             architecture=architecture,
             use_layer_norm=True,
             use_multi_head_attention=True,
             num_attention_heads=8
         )
 
-        resume_checkpoint = (resume_from_checkpoint or "").strip()
-        initial_epoch = max(0, int(resume_from_epoch))
+        resume_checkpoint = ""
+        initial_epoch = 0
+        if resume_enabled:
+            resume_checkpoint = (resume_from_checkpoint or "").strip()
+            initial_epoch = max(0, int(resume_from_epoch))
+        else:
+            logging.info("Resume disabled: starting from scratch (ignoring resume checkpoint settings).")
 
         if resume_checkpoint:
             if not os.path.exists(resume_checkpoint):
@@ -1273,20 +1424,20 @@ def train_main(
             raise ValueError(f"Model output vocab size ({model_output_vocab_dim}) does not match tokenizer size ({target_vocab_size}).\n" \
                              f"This often indicates an issue in tokenizer building or the 'vocab_size' passed to model builder.")
 
-        initial_learning_rate = 0.00001 # adjusted learning rate for more stable training; old was 0.001
+        initial_learning_rate = 0.00012
         lr_schedule = tf.keras.optimizers.schedules.CosineDecayRestarts(
             initial_learning_rate,
-            first_decay_steps=1000,
+            first_decay_steps=20000,
             t_mul=2.0,
-            m_mul=0.9,
-            alpha=0.0001
+            m_mul=0.95,
+            alpha=0.000001
         )
         logging.info("Using CosineDecayRestarts LR schedule")
 
         # Optimizer
         optimizer = tf.keras.optimizers.AdamW(
-            learning_rate=initial_learning_rate,
-            weight_decay=0.005,
+            learning_rate=lr_schedule,
+            weight_decay=0.001,
             clipnorm=1.0,
             epsilon=1e-7,
             beta_1=0.9,
@@ -1304,8 +1455,8 @@ def train_main(
             "ignore_class": 0,  # Ignore padding token (0) in loss calculation
         }
         if "label_smoothing" in inspect.signature(tf.keras.losses.SparseCategoricalCrossentropy).parameters:
-            loss_kwargs["label_smoothing"] = 0.1
-            logging.info("Enabled label_smoothing=0.1 for SparseCategoricalCrossentropy")
+            loss_kwargs["label_smoothing"] = 0.05
+            logging.info("Enabled label_smoothing=0.05 for SparseCategoricalCrossentropy")
         else:
             logging.info("SparseCategoricalCrossentropy has no label_smoothing in this TensorFlow version; skipping it")
 
@@ -1333,19 +1484,34 @@ def train_main(
         model.summary()
 
         # callbacks
+        text_eval_callback = SignLanguageEvaluationCallback(
+            val_encoder=encoder_input_data[val_idx],
+            val_references=val_gloss_refs,
+            tokenizer=tokenizer,
+            max_len=decoder_target_data.shape[1],
+            sample_size=metrics_sample_size,
+            seed=42,
+            log_file_path=f'./logs/model_v{version_model}/training_logs.txt',
+            decode_strategy="beam",
+            beam_width=4,
+            length_penalty_alpha=0.6,
+        )
         callbacks = [
+            # Must run before ModelCheckpoint so logs contain val_wer/val_bleu keys.
+            text_eval_callback,
             tf.keras.callbacks.EarlyStopping(
-                monitor='val_loss',
-                patience=15,
+                monitor='val_wer',
+                mode='min',
+                patience=25,
                 restore_best_weights=True,
-                min_delta=0.0005
+                min_delta=0.001
             ),
             # NOTE: ReduceLROnPlateau removed - conflicts with CosineDecayRestarts schedule
             # The lr_schedule already handles learning rate adjustments
             tf.keras.callbacks.ModelCheckpoint(
                 filepath=f'models/checkpoint_v{version_model}_' + 'epoch_{epoch:02d}.keras',
                 save_best_only=True,
-                monitor='val_loss', #NOTE: You should use BLEU here also if possible to be comparable - it is also less strict
+                monitor='val_wer', #NOTE: You should use BLEU here also if possible to be comparable - it is also less strict
                 mode='min',
                 verbose=1
             ),
@@ -1354,15 +1520,6 @@ def train_main(
                 histogram_freq=1,
                 write_graph=True,
                 update_freq='epoch'
-            ),
-            SignLanguageEvaluationCallback(
-                val_encoder=encoder_input_data[val_idx],
-                val_references=val_gloss_refs,
-                tokenizer=tokenizer,
-                max_len=decoder_target_data.shape[1],
-                sample_size=metrics_sample_size,
-                seed=42,
-                log_file_path=f'./logs/model_v{version_model}/training_logs.txt'
             ),
         ]
         # training
@@ -1408,19 +1565,20 @@ if __name__ == "__main__":
 
         config = {
             "train_data_folder": "data/train_data",
-            "version_model": 38_8,
-            "epochs": 300,
+            "version_model": 38_9_2,
+            "epochs": 220,
             "batch_size": 64,
             "validation_split": 0.1,
             "input_sequence_length": 300,
-            "embedding_dim": 256,
-            "hidden_dim": 512,  
-            "dropout_rate": 0.4,
+            "embedding_dim": 512,
+            "hidden_dim": 1024,  
+            "dropout_rate": 0.25,
             "l1_reg": 0.0001,
             "augment_train_each_epoch": True,
-            "augment_factor": 2,
+            "augment_factor": 3,
             "architecture": "multi_attention", # Either baseline or multi_attention or transformer
-            "metrics_sample_size": 64,
+            "metrics_sample_size": 256,
+            "resume_enabled": False,
             "resume_from_checkpoint": "models/checkpoint_v387_epoch_44.keras",
             "resume_from_epoch": 44,
         }

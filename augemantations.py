@@ -40,15 +40,15 @@ class Augmentation:
         linear_stretch_probability: float = 0.5,
 
         # Temporal: dynamic time warping
-        dynamic_warp_min: float = 0.9,
-        dynamic_warp_max: float = 1.1,
+        dynamic_warp_min: float = -0.1,
+        dynamic_warp_max: float = 0.1,
         dynamic_warp_probability: float = 0.3,
 
         # Temporal: frame freeze
         frame_freeze_min: float = 1.0,
         frame_freeze_max: float = 2.0,
         frame_freeze_frequency_max: float = 1, # max number of freezes per sequence
-        frame_freeze_probability: float = 0.15,
+        frame_freeze_probability: float = 0.30,
 
         # Temporal: dropout
         temporal_dropout_min: float = 1,
@@ -56,8 +56,8 @@ class Augmentation:
         temporal_dropout_probability: float = 0.2,
 
         # Spatial: random shift
-        random_shift_min: float = -0.03,
-        random_shift_max: float = 0.03,
+        random_shift_min: float = -0.08,
+        random_shift_max: float = 0.08,
         random_shift_probability: float = 0.4,
 
         # Spatial: random scaling
@@ -66,13 +66,13 @@ class Augmentation:
         random_scaling_probability: float = 0.4,
 
         # Spatial: z-axis rotation
-        z_rotation_min: float = -4.0,
-        z_rotation_max: float = 4.0,
+        z_rotation_min: float = -6.0,
+        z_rotation_max: float = 6.0,
         z_rotation_probability: float = 0.3,
 
         # Spatial: point noise
         point_noise_min: float = 0.0005,
-        point_noise_max: float = 0.002,
+        point_noise_max: float = 0.005,
         point_noise_probability: float = 0.5,
 
     ) -> None:
@@ -166,7 +166,7 @@ class Augmentation:
 
             2. Create four control points (start, two middle points, end) that define the base time map.
 
-            3. Create random noise for the two middle control points by using self.dynamic_warp_min and self.dynamic_warp_max, then add this noise to the control points.
+            3. Create small random offsets for the two middle control points by using self.dynamic_warp_min and self.dynamic_warp_max, then add these offsets to the control points.
 
             4. Clamp and sort the warped control points to keep them valid in the range [0, 1], and force the first and last point to exactly 0 and 1.
 
@@ -186,10 +186,19 @@ class Augmentation:
         # 2. Create 4 control points (Start, 2x Middle, End)
         control_points = np.linspace(0, 1, 4)
 
-        # 3. Create and apply noise only to the 2 middle control points
-        # Use self.dynamic_warp_max to control the intensity
+        # 3. Create and apply offsets only to the 2 middle control points.
+        # Backward compatibility: legacy configs used 0.9..1.1 as multiplicative ratio;
+        # map that to additive shifts around zero (-0.1..0.1).
+        warp_min = float(self.dynamic_warp_min)
+        warp_max = float(self.dynamic_warp_max)
+        if warp_min >= 0.5 and warp_max > 0.5:
+            warp_min -= 1.0
+            warp_max -= 1.0
+        if warp_min > warp_max:
+            warp_min, warp_max = warp_max, warp_min
+
         noise = np.zeros(4)
-        noise[1:3] = self.rng.uniform(self.dynamic_warp_min, self.dynamic_warp_max, size=2)
+        noise[1:3] = self.rng.uniform(warp_min, warp_max, size=2)
 
         # Apply noise and ensure the time stays valid (0 to 1 and strictly increasing)
         warped_control_points = control_points + noise
@@ -197,6 +206,9 @@ class Augmentation:
         warped_control_points = np.sort(warped_control_points)
         warped_control_points[0] = 0.0  # Force start at 0
         warped_control_points[-1] = 1.0 # Force end at 1
+        eps = 1e-3
+        warped_control_points[1] = np.clip(warped_control_points[1], eps, 1.0 - 2 * eps)
+        warped_control_points[2] = np.clip(warped_control_points[2], warped_control_points[1] + eps, 1.0 - eps)
 
         # 4. Create the Warping Curve (The "Bent Ruler")
         # We use 'quadratic' to ensure smooth acceleration/deceleration
