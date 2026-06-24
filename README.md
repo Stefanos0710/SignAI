@@ -1,295 +1,206 @@
 <div align="center">
 
+<img src="app/icons/icon.png" alt="SignAI" width="120"/>
+
 # SignAI — Sign Language Translator
 
-<div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+<br>
 
-  <!-- Tech / Versions -->
-  <a href="https://www.python.org/downloads/">
-    <img src="https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white" alt="Python Version">
-  </a>
-  <a href="https://www.tensorflow.org/">
-    <img src="https://img.shields.io/badge/TensorFlow-2.12-orange?logo=tensorflow&logoColor=white" alt="TensorFlow">
-  </a>
-  <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-Non%20Commercial-red?logo=github&logoColor=white" alt="License: Non-Commercial">
-  </a>
+[![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![TensorFlow 2.16](https://img.shields.io/badge/TensorFlow-2.16-orange?logo=tensorflow&logoColor=white)](https://www.tensorflow.org/)
+[![MediaPipe](https://img.shields.io/badge/MediaPipe-0.10-brightgreen)](https://mediapipe.dev)
 
-  <!-- Hackatime Badge -->
-  <a href="https://hackatime-badge.hackclub.com/U090BP84F7F/SignAI">
-    <img src="https://hackatime-badge.hackclub.com/U090BP84F7F/SignAI" alt="Hackatime Badge">
-  </a>
-
-  <!-- Website -->
-  <a href="https://signai.dev">
-    <img src="https://img.shields.io/badge/Website-signai.dev-brightgreen?logo=google-chrome&logoColor=white" alt="Website">
-  </a>
-
-  <!-- Tools / Hosting -->
-<a href="https://vercel.com/">
-  <img src="https://img.shields.io/badge/Hosting-Vercel-black?logo=vercel&logoColor=white" alt="Vercel">
-</a>
-
+[![License](https://img.shields.io/badge/License-Non%20Commercial-red)](/LICENSE)
+[![Website](https://img.shields.io/badge/Website-signai.dev-brightgreen)](https://signai.dev)
+[![Hosting](https://img.shields.io/badge/Hosting-Vercel-black?logo=vercel)](https://vercel.com)
+[![Media](https://img.shields.io/badge/Media-SZ%20%7C%20BR%20%7C%20Jugend%20forscht-blue)](https://www.sueddeutsche.de/muenchen/landkreismuenchen/ismaning-gymnasium-jugend-forscht-ki-gebaerdensprache-li.3475266)
+[![Hackatime](https://hackatime-badge.hackclub.com/U090BP84F7F/SignAI)](https://hackatime-badge.hackclub.com/U090BP84F7F/SignAI)
 
 </div>
 
+SignAI is a real-time sign language recognition and translation system for German Sign Language (DGS). It uses a sequence-to-sequence model with multi-head attention, trained on MediaPipe Holistic keypoint features. The project won 1st place at the Jugend forscht state competition and received coverage in SZ, BR, and other media outlets.
 
-</div>
-
-SignAI is an sign language recognition and translation system that uses machine learning to interpret German Sign Language (DGS) in real time and produce gloss-style translations. This repository contains the recognition engine, frontend UI, the product webside, preprocessing & training pipelines, and inference tooling.
-
-Primary languages: Python (core, app), CSS/HTML/JavaScript (frontend for web).
-
-> Note: v1.1.0 is the first fully working release. The project is actively developed and some operational aspects (admin privileges, resource requirements) are still being refined. See Known Issues & Roadmap for details.
+Primary languages: Python (core, app), CSS/HTML/JavaScript (product website).
 
 ---
 
-## Table of Contents
+## Quick Links
 
-1. [Quick links](#quick-links)
-2. [Highlights (v1.0.0)](#highlights-v100)
-3. [Requirements](#requirements)
-4. [Installation (end user)](#installation-end-user)
-5. [Quick start (developer / local run)](#quick-start-developer--local-run)
-6. [Models & AI](#models--ai)
-- 6.1. [Model artifacts and training workflow](#model-artifacts-and-training-workflow)
- - 6.2. [Seq2Seq architecture (detailed)](#seq2seq-architecture-detailed)
-- 6.3. [Training visualizations](#training-visualizations)
-7. [Preprocessing](#preprocessing)
-8. [Usage & tips](#usage--tips)
-9. [Technical notes & baseline metrics](#technical-notes--baseline-metrics)
-10. [Known issues & workarounds](#known-issues--workarounds)
-11. [Roadmap](#roadmap)
-12. [Contributing](#contributing)
-13. [License](#license)
-14. [Media & acknowledgements](#media--acknowledgements)
-15. [Contact](#contact)
-
----
-
-## Quick links
-
-- Website / Downloads: https://www.signai.dev/download  
-- Issues & support: https://github.com/Stefanos0710/SignAI/issues  
-- Releases & changelog: https://github.com/Stefanos0710/SignAI/releases  
-- Full repository: https://github.com/Stefanos0710/SignAI
-
----
-
-## Highlights (v1.0.0)
-
-- New DGS model with a vocabulary of 800+ gloss tokens.  
-- Sentence-level gloss translation for sequences up to 15 tokens.  
-- Improved finetuning and a faster, more secure inference pipeline.  
-- Operational and UX improvements for camera handling and startup.  
-- Baseline training metrics (compressed dataset): training accuracy ≈ 30%, validation ≈ 25%.
+- **Website / Downloads:** https://www.signai.dev/download
+- **Issues:** https://github.com/Stefanos0710/SignAI/issues
+- **Releases:** https://github.com/Stefanos0710/SignAI/releases
 
 ---
 
 ## Requirements
 
-- Supported platforms: Windows (primary). macOS, Linux, Android and iOS builds planned.  
-- Webcam or compatible video input for live recognition.  
-- Disk space: minimum 5 GB free (models/caches may require more).  
-- Python 3.8+ (for development and source builds).  
-- Recommended: GPU for faster inference and training; CPU-only inference is supported but slower.
+- **OS:** Windows (primary). macOS/Linux support in development.
+- **Hardware:** Webcam for live recognition. GPU recommended; CPU-only supported but slower.
+- **Disk:** 5 GB minimum (models and caches require more).
+- **Python:** 3.8+
+- **Core stack:** TensorFlow 2.16.2 / Keras 3.7.0, MediaPipe 0.10.21, numpy 1.26.4, protobuf 4.25.8
+
+Install dependencies:
+
+```
+pip install -r requirements.txt
+```
 
 ---
 
-## Installation (end user)
+## Quick Start
 
-1. Visit https://www.signai.dev/download and download the appropriate installer for your OS.  
-2. Run the installer and follow the on-screen instructions.  
-3. Launch the SignAI application.
-
-Troubleshooting
-- If the camera feed does not appear on startup, click the “Switch Camera” button repeatedly until the correct feed appears (the OS or other apps might lock the camera).  
-- First run may take several seconds while libraries and model files load; please wait for the UI to become responsive.
-
-Security note
-- Some operations in this release may require administrator privileges (installation, camera access, certain model management tasks). Future releases will reduce these requirements or provide safer alternatives.
-- If a console apears, do *not* close it, because it would also close the main app, and it shows bugs or more translation details ect.
+| Component | Command |
+|---|---|
+| Desktop app | `cd app && python app.py` |
+| Web API (Flask + SocketIO, port 8000) | `python main.py` |
+| Flask API server (port 5000) | `python -m api.signai_api` |
+| API client (background server + upload) | `python -c "import request; request.start('video.mp4')"` |
+| Product website | `cd product_webside && python main.py` |
 
 ---
 
-## Quick start (developer / local run)
+## Models
 
-1. Clone the repository:
-   ```bash git clone https://github.com/Stefanos0710/SignAI.git```
-2. Create & activate a virtual environment:
-   python -m venv .venv
-   - Windows: ```bash .venv\Scripts\activate ```
-   - macOS / Linux: ```bash source .venv/bin/activate```
-3. Install dependencies:
-   ```bash pip install -r requirements.txt```
-4. Start the app (development mode):
-   ```bash cd app```
-   ```bash python app.py```
+### Sentence Seq2Seq
 
-For training:
-- Use ```bash python train.py``` for single-word classification or ```bash python train-seq2seq.py``` for sentence-level training (see Models & AI).
+Primary translation model. BiLSTM encoder + LSTM decoder with 8-head MultiHeadAttention.
 
----
+```
+python train-seq2seq.py
+```
 
-## Models & AI
+Configure at the bottom of `train-seq2seq.py` (defaults: version 38.4, 200 epochs, batch 64, `multi_attention`).
 
-### Model artifacts and training workflow
+Key features:
+- Mixed precision training (`mixed_float16` global policy)
+- Per-epoch WER, BLEU-1..4, ROUGE-1/2/L via `SignLanguageEvaluationCallback`
+- Epoch-wise augmentation (temporal: stretch/warp/freeze/dropout; spatial: shift/scale/rotate/noise) via `augemantations.py` and `Seq2SeqBatchSequence`
+- Transformer alternative in `utils_experimental_train.py`
 
-- Model artifacts are stored in `models/` (Keras checkpoints, final models, and training history JSON/CSV files).  
-- Training scripts:
-  - `train.py` — single-word classification training loop.  
-  - `train-seq2seq.py` — sequence-to-sequence training for sentence-level gloss translation.
-- Typical training flow:
-  1. Run preprocessing to produce feature files (keypoint embeddings or frame features).  
-  2. Create TF/PyTorch datasets and dataloaders.  
-  3. Build or load a model from `model.py`.  
-  4. Configure augmentation, optimizers, and losses.  
-  5. Train with callbacks (ModelCheckpoint, EarlyStopping, CSV/JSON history).  
-  6. Save final model and training history.
+Latest trained models:
 
-When changing model architecture, keep checkpoint compatibility in mind (naming conventions or conversion scripts help migration).
+| Version | Type | Notes |
+|---|---|---|
+| v30 | Seq2Seq checkpoints | Latest, Feb 2026 |
+| v29 | Seq2Seq (200+ epochs) | Full training history |
+| v28 | Seq2Seq (200+ epochs) | Full training history |
 
-### Seq2Seq architecture (detailed)
+- Vocabulary: 800+ gloss tokens
+- Sentence output: up to 15 tokens
+- Input features: 426 per frame (7 pose + 21 left hand + 21 right hand + 93 face landmarks, each x/y/z)
 
-This project’s sentence translation uses an encoder–decoder (seq2seq) architecture with additive attention. Summary of the implemented architecture:
+### Single-Word Classifier
 
-- Encoder
-  - Input: variable-length sequences of per-frame features (shape: batch × time_steps × num_features).  
-  - Masking to ignore padded frames.  
-  - Bidirectional LSTM (returning sequences and forward/backward final states).  
-  - Concatenate forward and backward states to initialize the decoder.
-- Decoder
-  - Token input sequence (previous tokens during training — teacher forcing).  
-  - Embedding layer (mask_zero=True).  
-  - LSTM initialized with concatenated encoder states.
-- Attention
-  - Additive (Bahdanau-style) attention between decoder outputs and encoder outputs to compute a time-dependent context vector.
-- Output
-  - Concatenate decoder output and attention context.  
-  - Dense softmax projection to produce token probabilities over the gloss vocabulary.
+BiLSTM classifier using 150 features (pose + hands only, no face).
 
-Design rationale and training notes are documented in MODEL_ARCHITECTURE.md and the code comments in `model.py`.
+```
+python train.py
+```
 
-### Training visualizations
+Supports `--rebuild-cache` to re-parse training CSVs.
 
-Below are example training history plots and diagnostics:
+| Metric | Value |
+|---|---|
+| Training accuracy | 50.8% |
+| Validation accuracy | 30.7% |
+| Architecture | BiLSTM(64) → BiLSTM(32) → Dense(64) → Softmax |
 
-- Training history (example run — mode 28) with dataset https://www.kaggle.com/datasets/mariusschmidtmengin/phoenixweather2014t-3rd-attempt:  
-<img width="1200" height="400" alt="training_history_v28" src="https://github.com/user-attachments/assets/801ccbc6-f84f-4d26-840a-45ad8466db8d" />
-
-- Training history (example run — model 29) with dataset https://www.kaggle.com/datasets/mariusschmidtmengin/phoenixweather2014t-3rd-attempt:  
-<img width="1200" height="400" alt="training_history_v29" src="https://github.com/user-attachments/assets/130e6ee7-dbac-455e-bbeb-dffee992ed28" />
-
-- Classification training snapshot:  
-<img width="1200" height="400" alt="training_20251122_103141" src="https://github.com/user-attachments/assets/3913ef63-bfa5-4cb6-a859-2445e2a7761d" />
+*Trained on a compressed subset of PHOENIX-Weather-2014T. Performance improves significantly with the full dataset.*
 
 ---
 
 ## Preprocessing
 
-- Key scripts:
-  - `preprocessing_train_data.py` — prepares training features from raw videos/frames (frame sampling, keypoint extraction, normalization, padding/truncation).  
-  - `preprecessing_livedata_web.py` / `api/preprocessing_live_data.py` — lightweight live preprocessing pipeline for camera / API inputs.  
-- Data format
-  - A sequence is a time-ordered array of per-frame feature vectors: (time_steps, num_features).  
-  - Coordinate normalization is recommended (relative to person or frame) to reduce variation.  
-  - Short sequences are zero-padded; long sequences are truncated or sampled to a fixed maximum length.
-- Recommended workflow
-  1. Collect raw videos under `data/`.  
-  2. Run `preprocessing_train_data.py` to generate feature files.  
-  3. Inspect features with `check_dataset.py`.  
-  4. Train with `train.py` or `train-seq2seq.py`.
+MediaPipe Holistic keypoint extraction pipeline:
 
-Example visualization (keypoint & pose preprocessing example using MediaPipe):  
-<img width="850" height="958" alt="MediaPipe-Holistic-API" src="https://github.com/user-attachments/assets/1f0fa089-ae88-4ec1-8423-557f37a89cd5" />
+| Script | Purpose | Features | Landmarks |
+|---|---|---|---|
+| `preprocessing_train_data.py` | Training data | 426 (×3 xyz) | 7 pose + 42 hand + 93 face |
+| `api/preprocessing_live_data.py` | Live inference | 151 (averaged) | 543 landmarks × 2 (xy) |
+
+Normalization pipeline:
+1. Video-wise shoulder midpoint centering
+2. Shoulder-distance scaling
+3. Savitzky–Golay temporal smoothing (window 9, polyorder 2)
+4. Linear interpolation for missing keypoints
 
 ---
 
-## Usage & tips
+## Architecture
 
-- Recording: Press “Record” and perform signs. The output is gloss-style German tokens — not fully grammatical sentences.  
-- Non-professional signers: Expect variable recognition quality. Casual or atypical signing can drop accuracy substantially.  
-- Camera feed missing: Press "Switch Camera" until the correct feed appears. Close other apps that may hold the webcam.  
-- Slow inference: Close other camera-using apps, free CPU/GPU resources, or use a device with a GPU.
+**Seq2Seq (multi_attention):**
 
----
+```
+Encoder: Input(426) → Dense(1024) → LayerNorm → Dropout → DepthwiseConv1D → BiLSTM(512) → LayerNorm
+Decoder: Embedding(256) → LayerNorm → LSTM(512) → LayerNorm → MultiHeadAttention(8 heads, residual) → Concat → Dense(512) → Dropout → LayerNorm → Dense(vocab) softmax
+```
 
-## Technical notes & baseline metrics
+**Classifier:**
 
-- Model: DGS recognition model v1.0.0 with >800 gloss tokens and sentence translation up to 15 tokens.  
-- Dataset (training baseline): compressed subsets of PHOENIX-Weather-2014T due to local compute limits — this explains lower initial accuracy.  
-- Baseline metrics:
-  - Training accuracy: ~30%  
-  - Validation accuracy: ~25%
-- These metrics are a starting point; retraining on full datasets, improved preprocessing and larger models are planned.
+```
+Input(150) → Masking → BiLSTM(64) → Dropout(0.2) → BiLSTM(32) → Dropout(0.2) → Dense(64, ReLU) → Dropout(0.2) → Dense(classes, softmax)
+```
 
 ---
 
-## Known issues & workarounds
+## Desktop App (PySide6)
 
-- Camera feed interference
-  - Symptom: No camera image or flicker.  
-  - Workaround: Press "Switch Camera" repeatedly; close other apps using the camera.
-- Admin privileges required
-  - Symptom: Installer or app requests elevated permissions.  
-  - Note: This release may need admin access for certain tasks. Reductions to this requirement are planned.
-- First-run delay
-  - Symptom: Blank UI or delayed stream on first launch.  
-  - Cause: Libraries and models are loading from disk.  
-  - Workaround: Wait a few seconds for the initial load.
-- Limited accuracy for casual signers
-  - Symptom: Low recognition quality for non-professional or out-of-distribution signers.  
-  - Note: Addressed in future training/augmentation plans.
+- **Camera workflow:** Press Record → perform signs → press again → upload to API → display result
+- **Result display:** `QPlainTextEdit`, hidden until prediction ready, shows translation with optional debug info
+- **Single-instance:** TCP port 52391 lock
+- **Logging:** stdout/stderr tee'd to `logs/desktop_app.log`
+- **Settings:** `app/settings/settings.json`
+- **Path handling:** `resource_path()` for bundled assets, `writable_path()` for per-user `%LOCALAPPDATA%\SignAI\` (prevents admin rights issues in frozen builds)
+- **Qt fix:** `fix_qt_plugin_path()` must run before any PySide6 import (essential for PyInstaller builds)
+- **User-site cleanup:** User site-packages stripped from `sys.path` to avoid protobuf version conflicts
+- **Build:** `app\SignAI - Desktop.spec`, artifact at `build\SignAI - Desktop\SignAI - Desktop.exe`
+
+---
+
+## Build & Deploy
+
+- **PyInstaller spec:** `app\SignAI - Desktop.spec` (pathex set to repo root, bundles models/tokenizers/UI/icons)
+- **Updater:** `app\start_updater.py`, spec at `app\SignAI - Updater.spec`
+- **API env overrides:** `SIGNAI_MODEL_PATH` / `SIGNAI_MODEL` for model selection, `SIGNAI_DISABLE_SITE_CLEANUP=1` to suppress user-site cleanup
+
+---
+
+## Known Issues
+
+- **Camera feed:** If no image appears, press "Switch Camera" repeatedly. Close other camera-using apps.
+- **Admin privileges:** Some operations may require elevation. Future releases will reduce this.
+- **First-run delay:** Models load from disk on first launch — wait a few seconds for UI to become responsive.
+- **Recognition quality:** Degrades for casual or atypical signing. Addressed by planned augmentation and larger datasets.
 
 ---
 
 ## Roadmap
 
-Planned next steps and goals:
-
-- Improve accuracy substantially (target: 3x improvement over v1.0.0) by:
-  - Training on full (non-compressed) datasets.  
-  - Moving training to larger compute (cloud / supercomputers).  
-  - Combining multiple datasets and adding synthetic augmentation.  
-  - Exploring transformer-based architectures and stronger preprocessing.
-- Expand vocabulary coverage (thousands of gloss tokens over time).  
-- Reduce admin-access requirements and harden camera handling.  
-- Add natural language rendering (convert glosses to grammatical sentences) and multilingual support (ASL planned).
+- Improve accuracy 3x by training on full datasets, larger compute, synthetic augmentation, and transformer architectures
+- Expand vocabulary to thousands of gloss tokens
+- Reduce admin access requirements
+- Natural language rendering (gloss → grammatical sentences)
+- Multilingual support (ASL planned)
 
 ---
 
 ## Contributing
 
-We welcome contributions:
-
-1. Star the repo.  
-2. Fork and create a branch: ```bash git checkout -b feat/my-change```
-3. Add tests and documentation for changes.  
-4. Run the test suite and linters.  
-5. Open a Pull Request with a clear description, test instructions and any migration notes.
-
-Please avoid committing large model binaries — use release assets or external model hosting.
+1. Fork and branch: `git checkout -b feat/my-change`
+2. Add tests and documentation
+3. Open a Pull Request with description and migration notes
+4. Do **not** commit large model binaries — use release assets
 
 ---
 
 ## License
 
-See the LICENSE file in the repository root. The project currently uses a non-commercial license; contact the maintainers if you require a different arrangement.
-
----
-
-## Media & acknowledgements
-
-- 🥈 2nd Place
-- Jugend forscht 2024/2025:  Featured coverage in [Süddeutsche Zeitung](https://www.sueddeutsche.de/muenchen/freising/flughafen-muenchen-jugend-forscht-li.3209469) and several local/regional outlets. 
-  
-
+Non-commercial license. See [LICENSE](/LICENSE). Contact maintainers for alternative arrangements.
 
 ---
 
 ## Contact
 
-- General / partnerships / press / collaborations: [hello@signai.dev](mailto:hello@signai.dev) — I'm open to collabs, creative projects, and partnerships.  
-- Support / troubleshooting: [support@signai.dev](mailto:support@signai.dev) — preferred: open an issue first at [GitHub Issues](https://github.com/Stefanos0710/SignAI/issues) with reproduction steps and logs.
-
----
+- **General / press:** hello@signai.dev
+- **Support:** open an issue at https://github.com/Stefanos0710/SignAI/issues
