@@ -34,25 +34,18 @@ Primary languages: Python (core, app), CSS/HTML/JavaScript (product website).
 
 ## Table of Contents
 
-- [SignAI — Sign Language Translator](#signai--sign-language-translator)
-  - [Table of Contents](#table-of-contents)
-  - [Quick Start](#quick-start)
-  - [Requirements](#requirements)
-  - [Models \& Training](#models--training)
-    - [Sentence Seq2Seq](#sentence-seq2seq)
-    - [Single-Word Classifier](#single-word-classifier)
-    - [Training Data](#training-data)
-  - [Preprocessing](#preprocessing)
-  - [Architecture](#architecture)
-    - [Seq2Seq (multi\_attention)](#seq2seq-multi_attention)
-    - [Classifier](#classifier)
-  - [Desktop App (PySide6)](#desktop-app-pyside6)
-  - [Build \& Deploy](#build--deploy)
-  - [Known Issues](#known-issues)
-  - [Roadmap](#roadmap)
-  - [Contributing](#contributing)
-  - [License](#license)
-  - [Contact](#contact)
+- [Quick Start](#quick-start)
+- [Requirements](#requirements)
+- [Models & Training](#models--training)
+- [Preprocessing](#preprocessing)
+- [Architecture](#architecture)
+- [Desktop App](#desktop-app-pyside6)
+- [Build & Deploy](#build--deploy)
+- [Known Issues](#known-issues)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+- [Contact](#contact)
 
 ---
 
