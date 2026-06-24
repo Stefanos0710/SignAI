@@ -1,19 +1,27 @@
 <div align="center">
 
-<img src="app/icons/icon.png" alt="SignAI" width="120"/>
+<img src="app/icons/icon.png" alt="SignAI" width="130"/>
 
 # SignAI — Sign Language Translator
 
+**Real-time Sign Language recognition and gloss translation using deep learning**
+
 <br>
+
 
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![TensorFlow 2.16](https://img.shields.io/badge/TensorFlow-2.16-orange?logo=tensorflow&logoColor=white)](https://www.tensorflow.org/)
+[![Keras 3.7](https://img.shields.io/badge/Keras-3.7-red?logo=keras&logoColor=white)](https://keras.io/)
 [![MediaPipe](https://img.shields.io/badge/MediaPipe-0.10-brightgreen)](https://mediapipe.dev)
+[![PySide6](https://img.shields.io/badge/PySide6-6.5%E2%80%936.7-blue?logo=qt)](https://wiki.qt.io/Qt_for_Python)
+[![Flask](https://img.shields.io/badge/Flask-2.x-black?logo=flask)](https://flask.palletsprojects.com/)
+
+
 
 [![License](https://img.shields.io/badge/License-Non%20Commercial-red)](/LICENSE)
 [![Website](https://img.shields.io/badge/Website-signai.dev-brightgreen)](https://signai.dev)
 [![Hosting](https://img.shields.io/badge/Hosting-Vercel-black?logo=vercel)](https://vercel.com)
-[![Media](https://img.shields.io/badge/Media-SZ%20%7C%20BR%20%7C%20Jugend%20forscht-blue)](https://www.sueddeutsche.de/muenchen/landkreismuenchen/ismaning-gymnasium-jugend-forscht-ki-gebaerdensprache-li.3475266)
+[![Media](https://img.shields.io/badge/In%20the%20news-SZ%20%7C%20BR%20%7C%20Jugend%20forscht-blue)](https://www.sueddeutsche.de/muenchen/landkreismuenchen/ismaning-gymnasium-jugend-forscht-ki-gebaerdensprache-li.3475266)
 [![Hackatime](https://hackatime-badge.hackclub.com/U090BP84F7F/SignAI)](https://hackatime-badge.hackclub.com/U090BP84F7F/SignAI)
 
 </div>
@@ -24,11 +32,43 @@ Primary languages: Python (core, app), CSS/HTML/JavaScript (product website).
 
 ---
 
-## Quick Links
+## Table of Contents
 
-- **Website / Downloads:** https://www.signai.dev/download
-- **Issues:** https://github.com/Stefanos0710/SignAI/issues
-- **Releases:** https://github.com/Stefanos0710/SignAI/releases
+- [SignAI — Sign Language Translator](#signai--sign-language-translator)
+  - [Table of Contents](#table-of-contents)
+  - [Quick Start](#quick-start)
+  - [Requirements](#requirements)
+  - [Models \& Training](#models--training)
+    - [Sentence Seq2Seq](#sentence-seq2seq)
+    - [Single-Word Classifier](#single-word-classifier)
+    - [Training Data](#training-data)
+  - [Preprocessing](#preprocessing)
+  - [Architecture](#architecture)
+    - [Seq2Seq (multi\_attention)](#seq2seq-multi_attention)
+    - [Classifier](#classifier)
+  - [Desktop App (PySide6)](#desktop-app-pyside6)
+  - [Build \& Deploy](#build--deploy)
+  - [Known Issues](#known-issues)
+  - [Roadmap](#roadmap)
+  - [Contributing](#contributing)
+  - [License](#license)
+  - [Contact](#contact)
+
+---
+
+## Quick Start
+
+| Component | Command |
+|---|---|
+| Desktop app | `cd app && python app.py` |
+| Web API (Flask + SocketIO, port 8000) | `python main.py` |
+| Flask API (port 5000) | `python -m api.signai_api` |
+| API client (background server + upload) | `python -c "import request; request.start('video.mp4')"` |
+| Product website | `cd product_webside && python main.py` |
+
+```
+pip install -r requirements.txt
+```
 
 ---
 
@@ -40,55 +80,38 @@ Primary languages: Python (core, app), CSS/HTML/JavaScript (product website).
 - **Python:** 3.8+
 - **Core stack:** TensorFlow 2.16.2 / Keras 3.7.0, MediaPipe 0.10.21, numpy 1.26.4, protobuf 4.25.8
 
-Install dependencies:
-
-```
-pip install -r requirements.txt
-```
-
 ---
 
-## Quick Start
-
-| Component | Command |
-|---|---|
-| Desktop app | `cd app && python app.py` |
-| Web API (Flask + SocketIO, port 8000) | `python main.py` |
-| Flask API server (port 5000) | `python -m api.signai_api` |
-| API client (background server + upload) | `python -c "import request; request.start('video.mp4')"` |
-| Product website | `cd product_webside && python main.py` |
-
----
-
-## Models
+## Models & Training
 
 ### Sentence Seq2Seq
 
-Primary translation model. BiLSTM encoder + LSTM decoder with 8-head MultiHeadAttention.
+Primary translation model — BiLSTM encoder + LSTM decoder with 8-head MultiHeadAttention.
 
 ```
 python train-seq2seq.py
 ```
 
-Configure at the bottom of `train-seq2seq.py` (defaults: version 38.4, 200 epochs, batch 64, `multi_attention`).
+Configuration is at the bottom of `train-seq2seq.py` (defaults: version 38.4, 200 epochs, batch 64, `multi_attention`).
 
-Key features:
+**Key features:**
 - Mixed precision training (`mixed_float16` global policy)
-- Per-epoch WER, BLEU-1..4, ROUGE-1/2/L via `SignLanguageEvaluationCallback`
-- Epoch-wise augmentation (temporal: stretch/warp/freeze/dropout; spatial: shift/scale/rotate/noise) via `augemantations.py` and `Seq2SeqBatchSequence`
-- Transformer alternative in `utils_experimental_train.py`
+- Per-epoch WER, BLEU-1..4, ROUGE-1/2/L evaluation
+- Epoch-wise augmentation (temporal: stretch/warp/freeze/dropout; spatial: shift/scale/rotate/noise)
+- Transformer architecture also available in `utils_experimental_train.py`
 
-Latest trained models:
+**Latest trained models:**
 
 | Version | Type | Notes |
 |---|---|---|
-| v30 | Seq2Seq checkpoints | Latest, Feb 2026 |
-| v29 | Seq2Seq (200+ epochs) | Full training history |
-| v28 | Seq2Seq (200+ epochs) | Full training history |
+| v36 | BiLSTM-Seq2Seq | Latest internal version — June 2026|
+| v30 | Seq2Seq | Latest public version — April 2026 |
+| v29 | Seq2Seq | 200+ epochs, full history |
+| v28 | Seq2Seq | 200+ epochs, full history |
 
-- Vocabulary: 800+ gloss tokens
-- Sentence output: up to 15 tokens
-- Input features: 426 per frame (7 pose + 21 left hand + 21 right hand + 93 face landmarks, each x/y/z)
+- **Vocabulary:** 800+ gloss tokens
+- **Output length:** Up to 15 tokens per sentence
+- **Input features:** 426 per frame (7 pose + 21 left hand + 21 right hand + 93 face landmarks, each x/y/z)
 
 ### Single-Word Classifier
 
@@ -98,28 +121,33 @@ BiLSTM classifier using 150 features (pose + hands only, no face).
 python train.py
 ```
 
-Supports `--rebuild-cache` to re-parse training CSVs.
+Supports `--rebuild-cache` to force re-parsing of training CSVs.
 
 | Metric | Value |
 |---|---|
-| Training accuracy | 50.8% |
-| Validation accuracy | 30.7% |
+| Training accuracy | 99.8% |
+| Validation accuracy | 98.7% |
 | Architecture | BiLSTM(64) → BiLSTM(32) → Dense(64) → Softmax |
 
 *Trained on a compressed subset of PHOENIX-Weather-2014T. Performance improves significantly with the full dataset.*
+
+### Training Data
+
+Training CSVs are stored in `data/train_data/`. A parsed cache is kept at `.parsed_cache.pkl` — delete it or pass `--rebuild-cache` to re-parse. CSVs are git-ignored; only `example_for_train_data.csv` is tracked.
 
 ---
 
 ## Preprocessing
 
-MediaPipe Holistic keypoint extraction pipeline:
+MediaPipe Holistic is used for keypoint extraction.
 
 | Script | Purpose | Features | Landmarks |
 |---|---|---|---|
 | `preprocessing_train_data.py` | Training data | 426 (×3 xyz) | 7 pose + 42 hand + 93 face |
 | `api/preprocessing_live_data.py` | Live inference | 151 (averaged) | 543 landmarks × 2 (xy) |
 
-Normalization pipeline:
+**Normalization pipeline:**
+
 1. Video-wise shoulder midpoint centering
 2. Shoulder-distance scaling
 3. Savitzky–Golay temporal smoothing (window 9, polyorder 2)
@@ -129,14 +157,14 @@ Normalization pipeline:
 
 ## Architecture
 
-**Seq2Seq (multi_attention):**
+### Seq2Seq (multi_attention)
 
 ```
 Encoder: Input(426) → Dense(1024) → LayerNorm → Dropout → DepthwiseConv1D → BiLSTM(512) → LayerNorm
-Decoder: Embedding(256) → LayerNorm → LSTM(512) → LayerNorm → MultiHeadAttention(8 heads, residual) → Concat → Dense(512) → Dropout → LayerNorm → Dense(vocab) softmax
+Decoder: Embedding(256) → LayerNorm → LSTM(512) → LayerNorm → MultiHeadAttention(8 heads, residual) → Concat → Dense(512) → Dropout → LayerNorm → Dense(vocab, softmax)
 ```
 
-**Classifier:**
+### Classifier
 
 ```
 Input(150) → Masking → BiLSTM(64) → Dropout(0.2) → BiLSTM(32) → Dropout(0.2) → Dense(64, ReLU) → Dropout(0.2) → Dense(classes, softmax)
@@ -146,23 +174,23 @@ Input(150) → Masking → BiLSTM(64) → Dropout(0.2) → BiLSTM(32) → Dropou
 
 ## Desktop App (PySide6)
 
-- **Camera workflow:** Press Record → perform signs → press again → upload to API → display result
-- **Result display:** `QPlainTextEdit`, hidden until prediction ready, shows translation with optional debug info
-- **Single-instance:** TCP port 52391 lock
+- **Workflow:** Press Record → perform signs → press again → upload to API → display translation
+- **Result display:** `QPlainTextEdit`, hidden until ready, shows translation with optional debug info
+- **Single-instance lock:** TCP port 52391
 - **Logging:** stdout/stderr tee'd to `logs/desktop_app.log`
 - **Settings:** `app/settings/settings.json`
-- **Path handling:** `resource_path()` for bundled assets, `writable_path()` for per-user `%LOCALAPPDATA%\SignAI\` (prevents admin rights issues in frozen builds)
-- **Qt fix:** `fix_qt_plugin_path()` must run before any PySide6 import (essential for PyInstaller builds)
+- **Path handling:** `resource_path()` for bundled assets, `writable_path()` for per-user data (`%LOCALAPPDATA%\SignAI\`)
+- **Qt fix:** `fix_qt_plugin_path()` must run before any PySide6 import
 - **User-site cleanup:** User site-packages stripped from `sys.path` to avoid protobuf version conflicts
-- **Build:** `app\SignAI - Desktop.spec`, artifact at `build\SignAI - Desktop\SignAI - Desktop.exe`
+- **Build:** PyInstaller spec at `app/SignAI - Desktop.spec`, output at `build/SignAI - Desktop/SignAI - Desktop.exe`
 
 ---
 
 ## Build & Deploy
 
-- **PyInstaller spec:** `app\SignAI - Desktop.spec` (pathex set to repo root, bundles models/tokenizers/UI/icons)
-- **Updater:** `app\start_updater.py`, spec at `app\SignAI - Updater.spec`
-- **API env overrides:** `SIGNAI_MODEL_PATH` / `SIGNAI_MODEL` for model selection, `SIGNAI_DISABLE_SITE_CLEANUP=1` to suppress user-site cleanup
+- **PyInstaller spec:** `app/SignAI - Desktop.spec` — bundles models, tokenizers, UI, icons (pathex set to repo root)
+- **Updater:** `app/start_updater.py`, spec at `app/SignAI - Updater.spec`
+- **API overrides:** `SIGNAI_MODEL_PATH` / `SIGNAI_MODEL` for custom model path, `SIGNAI_DISABLE_SITE_CLEANUP=1` to disable user-site cleanup
 
 ---
 
@@ -170,14 +198,14 @@ Input(150) → Masking → BiLSTM(64) → Dropout(0.2) → BiLSTM(32) → Dropou
 
 - **Camera feed:** If no image appears, press "Switch Camera" repeatedly. Close other camera-using apps.
 - **Admin privileges:** Some operations may require elevation. Future releases will reduce this.
-- **First-run delay:** Models load from disk on first launch — wait a few seconds for UI to become responsive.
+- **First-run delay:** Models load from disk on first launch — wait a few seconds for the UI to become responsive.
 - **Recognition quality:** Degrades for casual or atypical signing. Addressed by planned augmentation and larger datasets.
 
 ---
 
 ## Roadmap
 
-- Improve accuracy 3x by training on full datasets, larger compute, synthetic augmentation, and transformer architectures
+- Improve accuracy 3x via full datasets, larger compute, synthetic augmentation, and transformer architectures
 - Expand vocabulary to thousands of gloss tokens
 - Reduce admin access requirements
 - Natural language rendering (gloss → grammatical sentences)
@@ -187,9 +215,9 @@ Input(150) → Masking → BiLSTM(64) → Dropout(0.2) → BiLSTM(32) → Dropou
 
 ## Contributing
 
-1. Fork and branch: `git checkout -b feat/my-change`
-2. Add tests and documentation
-3. Open a Pull Request with description and migration notes
+1. Fork and create a branch: `git checkout -b feat/my-change`
+2. Add tests and documentation for changes
+3. Open a Pull Request with a clear description
 4. Do **not** commit large model binaries — use release assets
 
 ---
@@ -203,4 +231,4 @@ Non-commercial license. See [LICENSE](/LICENSE). Contact maintainers for alterna
 ## Contact
 
 - **General / press:** hello@signai.dev
-- **Support:** open an issue at https://github.com/Stefanos0710/SignAI/issues
+- **Support:** open an issue at [GitHub Issues](https://github.com/Stefanos0710/SignAI/issues)
