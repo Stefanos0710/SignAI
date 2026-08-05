@@ -10,7 +10,7 @@ import keras
 import jiwer
 
 
-DEFAULT_HISTORY_IMAGE = Path("/loctmp/zzm01651/SignAI/models/training_history_v36.png")
+DEFAULT_HISTORY_IMAGE = Path("/loctmp/zzm01651/SignAI/models/training_history_v388.png")
 DEFAULT_TOKENIZER_PATH = Path("/loctmp/zzm01651/SignAI/tokenizers/gloss_tokenizer.json")
 DEFAULT_DATA_FOLDER = Path("data/train_data")
 DEFAULT_MODELS_DIR = Path("models")
@@ -49,7 +49,7 @@ def resolve_path(repo_root: Path, path_like: str) -> Path:
 
 
 def parse_checkpoint_epoch(name: str) -> int:
-    # expected: checkpoint_v36_epoch_53.keras
+    # expected: checkpoint_v388_epoch_53.keras
     try:
         stem = Path(name).stem
         epoch_part = stem.split("_epoch_")[-1]
@@ -58,23 +58,23 @@ def parse_checkpoint_epoch(name: str) -> int:
         return -1
 
 
-def find_latest_v36_model(models_dir: Path) -> Path:
+def find_latest_v388_model(models_dir: Path) -> Path:
     if not models_dir.exists():
         raise FileNotFoundError(f"Models directory not found: {models_dir}")
 
     checkpoints = sorted(
-        models_dir.glob("checkpoint_v36_epoch_*.keras"),
+        models_dir.glob("checkpoint_v388_epoch_*.keras"),
         key=lambda p: parse_checkpoint_epoch(p.name),
     )
     if checkpoints:
         return checkpoints[-1]
 
-    trained = models_dir / "trained_model_v36.keras"
+    trained = models_dir / "trained_model_v388.keras"
     if trained.exists():
         return trained
 
     raise FileNotFoundError(
-        "No v36 model found. Expected one of: models/checkpoint_v36_epoch_*.keras or models/trained_model_v36.keras"
+        "No v388 model found. Expected one of: models/checkpoint_v388_epoch_*.keras or models/trained_model_v388.keras"
     )
 
 
@@ -155,7 +155,7 @@ def choose_middle(entries: List[Dict[str, Any]], n_show: int) -> List[Dict[str, 
 
 def print_header(model_path: Path, tokenizer_path: Path, data_path: Path, history_path: Path):
     print("=" * 88)
-    print("SignAI v36 Evaluation")
+    print("SignAI v388 Evaluation")
     print("=" * 88)
     print(f"Model            : {model_path}")
     print(f"Tokenizer        : {tokenizer_path}")
@@ -191,7 +191,7 @@ def print_block(title: str, rows: List[Dict[str, Any]], n: int):
         print("-" * 88)
 
 
-def load_v36_model_with_fallback(model_path: Path, train_module, encoder_input: np.ndarray, tokenizer):
+def load_v388_model_with_fallback(model_path: Path, train_module, encoder_input: np.ndarray, tokenizer):
     keras.config.enable_unsafe_deserialization()
     custom_objects = {
         "create_cross_mask": create_cross_mask,
@@ -233,12 +233,13 @@ def load_v36_model_with_fallback(model_path: Path, train_module, encoder_input: 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Evaluate v36 model on test data and print best/middle/worst translations."
+        description="Evaluate v388 model on test data and print best/middle/worst translations."
     )
     parser.add_argument("--data-folder", default=str(DEFAULT_DATA_FOLDER), help="Folder with CSV samples")
     parser.add_argument("--models-dir", default=str(DEFAULT_MODELS_DIR), help="Directory with model files")
     parser.add_argument("--tokenizer", default=str(DEFAULT_TOKENIZER_PATH), help="Tokenizer JSON path")
     parser.add_argument("--history-image", default=str(DEFAULT_HISTORY_IMAGE), help="Path to training history image")
+    parser.add_argument("--output-file", default="models/evaluation_all_translations_v388.txt", help="Path to save all translations")
     parser.add_argument(
         "--split-source",
         choices=["training", "custom"],
@@ -260,7 +261,7 @@ def main():
     tokenizer_path = resolve_path(repo_root, args.tokenizer)
     history_image = resolve_path(repo_root, args.history_image)
 
-    model_path = find_latest_v36_model(models_dir)
+    model_path = find_latest_v388_model(models_dir)
     tokenizer = load_tokenizer(tokenizer_path)
 
     print_header(model_path, tokenizer_path, data_folder, history_image)
@@ -268,7 +269,7 @@ def main():
     samples = train_module.load_data_from_folder(str(data_folder), use_cache=True)
     encoder_input, _ = train_module.build_encoder_input(samples)
 
-    model = load_v36_model_with_fallback(model_path, train_module, encoder_input, tokenizer)
+    model = load_v388_model_with_fallback(model_path, train_module, encoder_input, tokenizer)
 
     all_refs = [train_module.normalize_text(s.get("gloss", "")) for s in samples]
     if args.split_source == "training":
@@ -289,7 +290,8 @@ def main():
     print(f"Max decode length  : {args.max_decode_len}")
     print("Running translations ...")
 
-    for rank, idx in enumerate(test_indices, start=1):
+    from tqdm import tqdm
+    for rank, idx in enumerate(tqdm(test_indices, desc="Evaluating", unit="sample"), start=1):
         pred = train_module.greedy_decode(
             model,
             encoder_input[idx],
@@ -321,6 +323,22 @@ def main():
     sorted_best = sorted(entries, key=lambda e: e["similarity"], reverse=True)
     sorted_worst = sorted(entries, key=lambda e: e["similarity"])
     middle = choose_middle(entries, max(1, int(args.show_n)))
+
+    # Save all translations sorted from perfect to extremely wrong
+    out_file = resolve_path(repo_root, args.output_file)
+    print(f"\nSaving all {len(sorted_best)} evaluated translations to {out_file} ...")
+    with out_file.open("w", encoding="utf-8") as f:
+        f.write("=" * 88 + "\n")
+        f.write("ALL SENTENCES (Sorted from Perfect to Extremely Wrong)\n")
+        f.write("=" * 88 + "\n")
+        for i, row in enumerate(sorted_best, start=1):
+            f.write(
+                f"[{i}] idx={row['idx']} | WER={row['wer']:.3f} | Similarity={row['similarity']:.3f} | exact={row['exact_match']}\n"
+            )
+            f.write(f"    file : {row['source_file']}\n")
+            f.write(f"    ref  : {row['reference']}\n")
+            f.write(f"    pred : {row['prediction']}\n")
+            f.write("-" * 88 + "\n")
 
     print_metrics_summary(entries)
 

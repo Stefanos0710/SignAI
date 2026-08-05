@@ -171,7 +171,7 @@ def _get_layer_by_candidates(model, candidates):
                 return layer
     return None
 
-
+# NOTE: add here the new model inference for model v 38_8 epoch 227
 def build_inference_models(training_model, vocab_size=None):
     """
     Build encoder and decoder inference models from a trained model.
@@ -478,7 +478,6 @@ def decode_sequence(encoder_input_data, encoder_model, decoder_model, tokenizer)
     return predicted_word, all_probabilities
 
 def greedy_decode(encoder_input_data, encoder_model, decoder_model, tokenizer, max_len=15):
-
     # Encoder
     enc_outs = encoder_model.predict(encoder_input_data, verbose=0)
     # Erwartet: [encoder_outputs, state_h, state_c]

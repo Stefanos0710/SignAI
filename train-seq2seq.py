@@ -1572,15 +1572,15 @@ if __name__ == "__main__":
             "input_sequence_length": 300,
             "embedding_dim": 512,
             "hidden_dim": 1024,  
-            "dropout_rate": 0.25,
+            "dropout_rate": 0.4,
             "l1_reg": 0.0001,
             "augment_train_each_epoch": True,
-            "augment_factor": 3,
+            "augment_factor": 4,
             "architecture": "multi_attention", # currently only "multi_attention" is supported
-            "metrics_sample_size": 256,
-            "resume_enabled": False,
-            "resume_from_checkpoint": "models/checkpoint_v387_epoch_44.keras",
-            "resume_from_epoch": 44,
+            "metrics_sample_size": 128,
+            "resume_enabled": True,
+            "resume_from_checkpoint": "models/checkpoint_v3892_epoch_37.keras",
+            "resume_from_epoch": 37,
         }
 
          # starting training
