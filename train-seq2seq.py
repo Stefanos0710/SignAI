@@ -14,6 +14,7 @@ import csv
 import json
 import logging
 import inspect
+from datetime import datetime
 import numpy as np
 import tensorflow as tf
 import pandas as pd
@@ -35,6 +36,10 @@ from augemantations import Augmentation
 # NOTE: Set random seeds for reproducibility
 import keras
 keras.utils.set_random_seed(42)
+
+# enable mixed precision for faster training on compatible GPUs
+from tensorflow.keras import mixed_precision
+mixed_precision.set_global_policy('mixed_float16')
 
 # logging configuration
 logging.basicConfig(
@@ -899,7 +904,8 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
             seed: Optional[int] = 42,
             augmenter: Optional[Augmentation] = None,
             augment_each_epoch: bool = False,
-            augment_factor: int = 1,
+                augment_factor: Optional[int] = None,
+                keep_original: Optional[bool] = None,
     ):
         self.base_indices = np.asarray(indices, dtype=np.int64)
 
@@ -914,7 +920,8 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
         self.rng = np.random.default_rng(seed)
         self.augmenter = augmenter
         self.augment_each_epoch = bool(augment_each_epoch)
-        self.augment_factor = max(0, int(augment_factor))
+        self.augment_factor = None if augment_factor is None else max(0, int(augment_factor))
+        self.keep_original = None if keep_original is None else bool(keep_original)
         self.epoch_encoder = None
         self.epoch_decoder = None
         self.epoch_target = None
@@ -966,14 +973,22 @@ class Seq2SeqBatchSequence(tf.keras.utils.Sequence):
         base_dec = self.base_decoder
         base_tgt = self.base_target
 
-        if self.augment_each_epoch and self.augmenter is not None and self.augment_factor > 0:
-            epoch_enc, epoch_dec, epoch_tgt = self.augmenter.augment_training_split(
-                base_enc,
-                base_dec,
-                base_tgt,
-                augment_factor=self.augment_factor,
-                keep_original=True,
+        if self.augment_each_epoch and self.augmenter is not None:
+            effective_factor = (
+                self.augment_factor
+                if self.augment_factor is not None
+                else max(0, int(getattr(self.augmenter, "augment_factor", 0)))
             )
+            if effective_factor > 0:
+                epoch_enc, epoch_dec, epoch_tgt = self.augmenter.augment_training_split(
+                    base_enc,
+                    base_dec,
+                    base_tgt,
+                    augment_factor=self.augment_factor,
+                    keep_original=self.keep_original,
+                )
+            else:
+                epoch_enc, epoch_dec, epoch_tgt = base_enc, base_dec, base_tgt
         else:
             epoch_enc, epoch_dec, epoch_tgt = base_enc, base_dec, base_tgt
 
@@ -1009,7 +1024,8 @@ def build_seq2seq_model_multi_attention(
         decoder_units=1024,
         dropout_rate=0.3,
         recurrent_dropout_rate=0.1,
-    l1_reg=0.0,
+        l1_reg=0.0,
+        l2_reg=1e-4,
         use_layer_norm=True,
         num_attention_heads=8,
         use_cnn=True
@@ -1024,8 +1040,12 @@ def build_seq2seq_model_multi_attention(
     4. Deeper feedforward network after attention
     5. Dropout after feedforward layers
     """
+    dense_kernel_regularizer = tf.keras.regularizers.l2(l2_reg) if l2_reg and l2_reg > 0 else None
+    kernel_regularizer = dense_kernel_regularizer
+
     # ===== ENCODER =====
     encoder_inputs = Input(shape=(None, num_features), name="encoder_inputs")
+    encoder_masked_inputs = Masking(mask_value=0.0, name="encoder_masking")(encoder_inputs)
 
     # define masking
     lstm_mask = Lambda(
@@ -1033,16 +1053,8 @@ def build_seq2seq_model_multi_attention(
         name="encoder_mask"
     )(encoder_inputs)
 
-    l1_value = float(l1_reg)
-    kernel_regularizer = tf.keras.regularizers.l1(l1_value) if l1_value > 0.0 else None
-
     # Spatial projection: helps model focus on important keypoint relationships
-    x = Dense(
-        encoder_units * 2,
-        activation="relu",
-        kernel_regularizer=kernel_regularizer,
-        name="encoder_projection",
-    )(encoder_inputs)
+    x = Dense(encoder_units * 2, activation="relu", name="encoder_projection")(encoder_inputs)
     if use_layer_norm:
         x = LayerNormalization(name="encoder_norm1")(x)
     x = Dropout(dropout_rate, name="encoder_dropout1")(x)
@@ -1058,6 +1070,8 @@ def build_seq2seq_model_multi_attention(
             encoder_units,
             return_sequences=True,
             return_state=True,
+            activation="tanh",
+            recurrent_activation="sigmoid",
             dropout=dropout_rate,
             recurrent_dropout=recurrent_dropout_rate,
             kernel_regularizer=kernel_regularizer,
@@ -1104,6 +1118,8 @@ def build_seq2seq_model_multi_attention(
         decoder_units,
         return_sequences=True,
         return_state=True,
+        activation="tanh",
+        recurrent_activation="sigmoid",
         dropout=dropout_rate,
         recurrent_dropout=recurrent_dropout_rate,
         kernel_regularizer=kernel_regularizer,
@@ -1114,7 +1130,7 @@ def build_seq2seq_model_multi_attention(
     decoder_outputs, _, _ = decoder_lstm(
         decoder_embedding,
         initial_state=[state_h, state_c],
-        mask=decoder_mask  # Pass mask to LSTM
+        mask=decoder_mask,  # Pass mask to LSTM
     )
     
     if use_layer_norm:
@@ -1163,7 +1179,7 @@ def build_seq2seq_model_multi_attention(
     decoder_combined = Dense(
         decoder_units,
         activation="relu",
-        kernel_regularizer=kernel_regularizer,
+        kernel_regularizer=dense_kernel_regularizer,
         name="decoder_ff1",
     )(decoder_combined)
     decoder_combined = Dropout(dropout_rate, name="decoder_dropout")(decoder_combined)
@@ -1174,7 +1190,7 @@ def build_seq2seq_model_multi_attention(
     decoder_dense = Dense(
         vocab_size,
         activation="softmax",
-        kernel_regularizer=kernel_regularizer,
+        kernel_regularizer=dense_kernel_regularizer,
         name="decoder_dense",
     )
     final_outputs = decoder_dense(decoder_combined)
@@ -1191,7 +1207,8 @@ def build_seq2seq_model(
         decoder_units=512,
         dropout_rate=0.5,
         recurrent_dropout_rate=0.1,
-    l1_reg=0.0,
+        l1_reg=0.0,
+        l2_reg=1e-4,
         architecture="multi_attention",
         use_layer_norm=True,
         use_multi_head_attention=True,
@@ -1222,6 +1239,7 @@ def build_seq2seq_model(
         dropout_rate=dropout_rate,
         recurrent_dropout_rate=recurrent_dropout_rate,
         l1_reg=l1_reg,
+        l2_reg=l2_reg,
         use_layer_norm=use_layer_norm,
         num_attention_heads=num_attention_heads,
     )
@@ -1231,13 +1249,14 @@ def train_main(
         train_data_folder,
         version_model=31,
         epochs=10,
-        batch_size=16,
+        batch_size=64,
         validation_split=0.1,
         input_sequence_length=None,
         embedding_dim=512,
         hidden_dim=1024,
-        dropout_rate=0.3,
+        dropout_rate=0.4,
         l1_reg=0.001,
+        l2_reg=1e-4,
         augment_train_each_epoch=True,
         augment_factor=1,
         architecture="multi_attention",  # currently only "multi_attention" is implemented
@@ -1332,9 +1351,10 @@ def train_main(
             batch_size=batch_size,
             shuffle=True,
             seed=42,
-            augmenter=Augmentation(),
+            augmenter=Augmentation(seed=42),
             augment_each_epoch=augment_train_each_epoch,
-            augment_factor=augment_factor,
+            augment_factor=None,
+            keep_original=None,
         )
         val_sequence = Seq2SeqBatchSequence(
             encoder_data=encoder_input_data,
@@ -1365,7 +1385,6 @@ def train_main(
             decoder_units=hidden_dim,
             dropout_rate=dropout_rate,
             recurrent_dropout_rate=0.1,
-            l1_reg=l1_reg,
             architecture=architecture,
             use_layer_norm=True,
             use_multi_head_attention=True,
@@ -1424,25 +1443,23 @@ def train_main(
             raise ValueError(f"Model output vocab size ({model_output_vocab_dim}) does not match tokenizer size ({target_vocab_size}).\n" \
                              f"This often indicates an issue in tokenizer building or the 'vocab_size' passed to model builder.")
 
-        initial_learning_rate = 0.00012
+        initial_learning_rate = 0.0001 # adjusted learning rate for more stable training; old was 0.001
         lr_schedule = tf.keras.optimizers.schedules.CosineDecayRestarts(
             initial_learning_rate,
-            first_decay_steps=20000,
+            first_decay_steps=1000,
             t_mul=2.0,
-            m_mul=0.95,
-            alpha=0.000001
+            m_mul=0.9,
+            alpha=0.0001
         )
         logging.info("Using CosineDecayRestarts LR schedule")
 
         # Optimizer
-        optimizer = tf.keras.optimizers.AdamW(
-            learning_rate=lr_schedule,
-            weight_decay=0.001,
+        optimizer = tf.keras.optimizers.Adam(
+            learning_rate=5e-4,
             clipnorm=1.0,
             epsilon=1e-7,
-            beta_1=0.9,
-            beta_2=0.98  # Higher beta2 for more stable updates
         )
+        logging.info("Using Adam optimizer with initial learning rate 5e-4")
 
         # compile model
         logging.info(f"Target vocabulary size (including padding/oov/special): {target_vocab_size}")
@@ -1483,6 +1500,14 @@ def train_main(
         # show model summary
         model.summary()
 
+        # Create per-run log directory structure based on datetime.
+        run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_log_dir = os.path.join("logs", f"model_v{version_model}", run_timestamp)
+        tensorboard_log_dir = os.path.join(run_log_dir, "tensorboard")
+        metrics_log_dir = os.path.join(run_log_dir, "metrics")
+        os.makedirs(tensorboard_log_dir, exist_ok=True)
+        os.makedirs(metrics_log_dir, exist_ok=True)
+
         # callbacks
         text_eval_callback = SignLanguageEvaluationCallback(
             val_encoder=encoder_input_data[val_idx],
@@ -1500,11 +1525,10 @@ def train_main(
             # Must run before ModelCheckpoint so logs contain val_wer/val_bleu keys.
             text_eval_callback,
             tf.keras.callbacks.EarlyStopping(
-                monitor='val_wer',
-                mode='min',
-                patience=25,
+                monitor='val_loss',
+                patience=20,
                 restore_best_weights=True,
-                min_delta=0.001
+                min_delta=0.0005
             ),
             # NOTE: ReduceLROnPlateau removed - conflicts with CosineDecayRestarts schedule
             # The lr_schedule already handles learning rate adjustments
@@ -1516,10 +1540,19 @@ def train_main(
                 verbose=1
             ),
             tf.keras.callbacks.TensorBoard(
-                log_dir=f'./logs/model_v{version_model}',
+                log_dir=tensorboard_log_dir,
                 histogram_freq=1,
                 write_graph=True,
                 update_freq='epoch'
+            ),
+            SignLanguageEvaluationCallback(
+                val_encoder=encoder_input_data[val_idx],
+                val_references=val_gloss_refs,
+                tokenizer=tokenizer,
+                max_len=decoder_target_data.shape[1],
+                sample_size=metrics_sample_size,
+                seed=42,
+                log_file_path=f'./logs/model_v{version_model}/training_logs.txt'
             ),
         ]
         # training
@@ -1565,22 +1598,20 @@ if __name__ == "__main__":
 
         config = {
             "train_data_folder": "data/train_data",
-            "version_model": 38_9_2,
-            "epochs": 220,
-            "batch_size": 64,
+            "version_model": 37,
+            "epochs": 150,
+            "batch_size": 8,
             "validation_split": 0.1,
             "input_sequence_length": 300,
             "embedding_dim": 512,
             "hidden_dim": 1024,  
             "dropout_rate": 0.4,
             "l1_reg": 0.0001,
+            "l2_reg": 1e-4,
             "augment_train_each_epoch": True,
-            "augment_factor": 4,
-            "architecture": "multi_attention", # currently only "multi_attention" is supported
-            "metrics_sample_size": 128,
-            "resume_enabled": True,
-            "resume_from_checkpoint": "models/checkpoint_v3892_epoch_37.keras",
-            "resume_from_epoch": 37,
+            "augment_factor": 1,
+            "architecture": "multi_attention", # Either baseline or multi_attention or transformer
+            "metrics_sample_size": 64,
         }
 
          # starting training
