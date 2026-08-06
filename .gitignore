@@ -23,6 +23,11 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# Node (unrelated to the Python project, kept locally if present)
+node_modules/
+package.json
+package-lock.json
+
 # Virtual Environment
 venv/
 env/
