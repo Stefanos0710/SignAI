@@ -8,6 +8,15 @@ import string
 import numpy as np
 import cv2
 
+
+"""
+TODOs:
+- show keypoints as reference, when clicked on the example panals
+
+"""
+
+
+
 # Force CPU for TensorFlow to avoid conflicts/hangs
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -759,7 +768,7 @@ def predict():
                 'mediapipe_static_image_mode': MP_STATIC_IMAGE_MODE,
                 'scale': f"{extra_info['scale_factor']:.4f}",
                 'input_shape': str(extra_info['input_shape']),
-                'model_version': model_version,
+                'model_version': model_version, 
                 'model_path': model_path,
             }
 

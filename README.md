@@ -34,18 +34,26 @@ Primary languages: Python (core, app), CSS/HTML/JavaScript (product website).
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
-- [Requirements](#requirements)
-- [Models & Training](#models--training)
-- [Preprocessing](#preprocessing)
-- [Architecture](#architecture)
-- [Desktop App](#desktop-app-pyside6)
-- [Build & Deploy](#build--deploy)
-- [Known Issues](#known-issues)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
+- [SignAI — Sign Language Translator](#signai--sign-language-translator)
+  - [Table of Contents](#table-of-contents)
+  - [Quick Start](#quick-start)
+  - [Requirements](#requirements)
+  - [Models \& Training](#models--training)
+    - [Sentence Seq2Seq](#sentence-seq2seq)
+    - [Single-Word Classifier](#single-word-classifier)
+    - [Letter Classification (Fingerspelling)](#letter-classification-fingerspelling)
+    - [Training Data](#training-data)
+  - [Preprocessing](#preprocessing)
+  - [Architecture](#architecture)
+    - [Seq2Seq (multi\_attention)](#seq2seq-multi_attention)
+    - [Classifier](#classifier)
+  - [Desktop App (PySide6)](#desktop-app-pyside6)
+  - [Build \& Deploy](#build--deploy)
+  - [Known Issues](#known-issues)
+  - [Roadmap](#roadmap)
+  - [Contributing](#contributing)
+  - [License](#license)
+  - [Contact](#contact)
 
 ---
 
@@ -58,6 +66,7 @@ Primary languages: Python (core, app), CSS/HTML/JavaScript (product website).
 | Flask API (port 5000) | `python -m api.signai_api` |
 | API client (background server + upload) | `python -c "import request; request.start('video.mp4')"` |
 | Product website | `cd product_webside && python main.py` |
+| Letter classification website | `cd signai/letter_classification/website && python app.py` |
 
 ```
 pip install -r requirements.txt
@@ -82,16 +91,16 @@ pip install -r requirements.txt
 Primary translation model — BiLSTM encoder + LSTM decoder with 8-head MultiHeadAttention.
 
 ```
-python train-seq2seq.py
+python signai/sentence_classification/train.py
 ```
 
-Configuration is at the bottom of `train-seq2seq.py` (defaults: version 38.4, 200 epochs, batch 64, `multi_attention`).
+Configuration is at the bottom of `signai/sentence_classification/train.py` (defaults: version 38.4, 200 epochs, batch 64, `multi_attention`).
 
 **Key features:**
 - Mixed precision training (`mixed_float16` global policy)
 - Per-epoch WER, BLEU-1..4, ROUGE-1/2/L evaluation
-- Epoch-wise augmentation (temporal: stretch/warp/freeze/dropout; spatial: shift/scale/rotate/noise)
-- Transformer architecture also available in `utils_experimental_train.py`
+- Epoch-wise augmentation (temporal: stretch/warp/freeze/dropout; spatial: shift/scale/rotate/noise), implemented in `signai/sentence_classification/augmentation.py`
+- Transformer architecture also available in `signai/sentence_classification/experimental_transformer.py`
 
 **Latest trained models:**
 
@@ -111,7 +120,7 @@ Configuration is at the bottom of `train-seq2seq.py` (defaults: version 38.4, 20
 BiLSTM classifier using 150 features (pose + hands only, no face).
 
 ```
-python train.py
+python signai/word_classification/train.py
 ```
 
 Supports `--rebuild-cache` to force re-parsing of training CSVs.
@@ -124,9 +133,19 @@ Supports `--rebuild-cache` to force re-parsing of training CSVs.
 
 *Trained on a compressed subset of PHOENIX-Weather-2014T. Performance improves significantly with the full dataset.*
 
+### Letter Classification (Fingerspelling)
+
+An independent fingerspelling-alphabet classifier under `signai/letter_classification/` (previously the standalone `SignAlphaSet` sub-project). Has its own dataset, models, and a small Flask demo site — does not share code or training data with the sentence/word classifiers above.
+
+```
+python signai/letter_classification/train.py
+```
+
+Dataset download and preprocessing: `signai/letter_classification/download.py`, `preprocess_v2.py`/`preprocess_v3.py`. All scripts in this subtree must be run from the repo root — their data/model paths are hardcoded relative to it (e.g. `signai/letter_classification/data/...`).
+
 ### Training Data
 
-Training CSVs are stored in `data/train_data/`. A parsed cache is kept at `.parsed_cache.pkl` — delete it or pass `--rebuild-cache` to re-parse. CSVs are git-ignored; only `example_for_train_data.csv` is tracked.
+Training CSVs (for sentence/word classification) are stored in `data/train_data/`. A parsed cache is kept at `.parsed_cache.pkl` — delete it or pass `--rebuild-cache` to re-parse. CSVs are git-ignored; only `example_for_train_data.csv` is tracked.
 
 ---
 
@@ -136,7 +155,7 @@ MediaPipe Holistic is used for keypoint extraction.
 
 | Script | Purpose | Features | Landmarks |
 |---|---|---|---|
-| `preprocessing_train_data.py` | Training data | 426 (×3 xyz) | 7 pose + 42 hand + 93 face |
+| `signai/preprocessing/train_data.py` | Training data (sentence + word classification) | 426 (×3 xyz) | 7 pose + 42 hand + 93 face |
 | `api/preprocessing_live_data.py` | Live inference | 151 (averaged) | 543 landmarks × 2 (xy) |
 
 **Normalization pipeline:**

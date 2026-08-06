@@ -31,7 +31,7 @@ import warnings
 import pickle
 import jiwer
 from sacrebleu.metrics import BLEU
-from augemantations import Augmentation
+from augmentation import Augmentation
 
 # NOTE: Set random seeds for reproducibility
 import keras
@@ -47,7 +47,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# expected number of features per frame from preprocessing_train_data.py
+# expected number of features per frame from signai/preprocessing/train_data.py
 # pose(7*3=21) + left_hand(21*3=63) + right_hand(21*3=63) + face(93*3=279) = 426
 EXPECTED_FEATURES = 426
 # minimal accepted numeric values in a parsed frame (rows below this are likely malformed)

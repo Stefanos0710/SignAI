@@ -17,7 +17,7 @@ logging.basicConfig(
 # ----------------------------
 # Setup folder for dataset (must be BEFORE the banner)
 # ----------------------------
-dataset_folder = "SignAlphaSet/data/dataset"
+dataset_folder = "signai/letter_classification/data/dataset"
 os.makedirs(dataset_folder, exist_ok=True)
 
 # URL to download the dataset
@@ -44,7 +44,7 @@ print("  - Ensure you have a stable internet connection for the download")
 print("="*70 + "\n")
 
 def download_file(url, out):
-    if not os.path.exists("SignAlphaSet/data/SignAlphaSet/SignAlphaSet/A") and not os.path.exists("SignAlphaSet/data/ASL_dynamic/ASL_dynamic/A"):
+    if not os.path.exists("signai/letter_classification/data/SignAlphaSet/SignAlphaSet/A") and not os.path.exists("signai/letter_classification/data/ASL_dynamic/ASL_dynamic/A"):
         start_time = time.time()
 
         logging.info("Download started ...")
@@ -107,7 +107,7 @@ def extract_zip(file_path):
 
     start_time = time.time()
 
-    base_folder = "SignAlphaSet/data"
+    base_folder = "signai/letter_classification/data"
     os.makedirs(base_folder, exist_ok=True)
 
     dynamic_folder = os.path.join(base_folder, "ASL_dynamic")
@@ -116,7 +116,7 @@ def extract_zip(file_path):
     os.makedirs(dynamic_folder, exist_ok=True)
     os.makedirs(signalpha_folder, exist_ok=True)
 
-    if os.path.exists("SignAlphaSet/data/SignAlphaSet/ASL_dynamic.zip") and os.path.exists("SignAlphaSet/data/SignAlphaSet/SignAlphaSet.zip"):
+    if os.path.exists("signai/letter_classification/data/SignAlphaSet/ASL_dynamic.zip") and os.path.exists("signai/letter_classification/data/SignAlphaSet/SignAlphaSet.zip"):
 
         # ----------------------------
         # 1) Extract main archive
@@ -127,8 +127,8 @@ def extract_zip(file_path):
             zip_ref.extractall(base_folder)
 
         # paths of known inner zips
-        dynamic_zip = "SignAlphaSet/data/SignAlphaSet/ASL_dynamic.zip"
-        signalpha_zip = "SignAlphaSet/data/SignAlphaSet/SignAlphaSet.zip"
+        dynamic_zip = "signai/letter_classification/data/SignAlphaSet/ASL_dynamic.zip"
+        signalpha_zip = "signai/letter_classification/data/SignAlphaSet/SignAlphaSet.zip"
 
 
         # ----------------------------
@@ -159,7 +159,7 @@ def extract_zip(file_path):
         duration = time.time() - start_time
         logging.info(f"Extraction finished in {duration:.1f} seconds")
 
-    elif os.path.exists("SignAlphaSet/data/SignAlphaSet/SignAlphaSet/A") and os.path.exists("SignAlphaSet/data/ASL_dynamic/ASL_dynamic/A"):
+    elif os.path.exists("signai/letter_classification/data/SignAlphaSet/SignAlphaSet/A") and os.path.exists("signai/letter_classification/data/ASL_dynamic/ASL_dynamic/A"):
         logging.warning("Inner zip files have already been extracted. Skipping extraction step.")
 
     else:
@@ -187,7 +187,7 @@ if __name__ == "__main__":
         return total / (1024 * 1024)
 
 
-    data_root = "SignAlphaSet/data"
+    data_root = "signai/letter_classification/data"
     dataset_size = get_folder_size_mb(data_root)
     num_files = sum(len(files) for _, _, files in os.walk(data_root))
 

@@ -129,8 +129,14 @@ app/build/
 app/dist/
 app/final/
 
-SignAlphaSet/data/*
+signai/letter_classification/data/*
 
 models/*
 
-SignAlphaSet/data/ASL_dynamic/
+signai/letter_classification/data/ASL_dynamic/
+
+# Claude Code / agent files (kept locally, not tracked)
+CLAUDE.md
+AGENTS.md
+.claude/
+local/

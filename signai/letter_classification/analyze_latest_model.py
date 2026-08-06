@@ -15,8 +15,8 @@ BASE_KEYPOINT_FEATURES = NUM_LANDMARKS * COORD_DIMS
 # =========================
 # CONFIG
 # =========================
-MODEL_DIR = "SignAlphaSet/models"
-TEST_DATA_PATH = "SignAlphaSet/data/processed_dataset/test_data.npz"
+MODEL_DIR = "signai/letter_classification/models"
+TEST_DATA_PATH = "signai/letter_classification/data/processed_dataset/test_data.npz"
 
 
 def parse_args():

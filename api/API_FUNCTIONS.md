@@ -735,8 +735,8 @@ else:
 ## Additional Resources
 
 - **Main Project README:** See root directory
-- **Training Documentation:** See `train.py`
-- **Model Architecture:** See `model.py`
+- **Training Documentation:** See `signai/sentence_classification/train.py` and `signai/word_classification/train.py`
+- **Model Architecture:** See `build_seq2seq_model_multi_attention()` in `signai/sentence_classification/train.py`
 - **Desktop App:** See `app/app.py`
 
 ---
