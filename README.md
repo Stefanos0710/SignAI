@@ -9,7 +9,7 @@
 <br>
 
 
-[![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.10–3.12](https://img.shields.io/badge/Python-3.10%E2%80%933.12-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![TensorFlow 2.16](https://img.shields.io/badge/TensorFlow-2.16-orange?logo=tensorflow&logoColor=white)](https://www.tensorflow.org/)
 [![Keras 3.7](https://img.shields.io/badge/Keras-3.7-red?logo=keras&logoColor=white)](https://keras.io/)
 [![MediaPipe](https://img.shields.io/badge/MediaPipe-0.10-brightgreen)](https://mediapipe.dev)
@@ -36,8 +36,12 @@ Primary languages: Python (core, app), CSS/HTML/JavaScript (product website).
 
 - [SignAI — Sign Language Translator](#signai--sign-language-translator)
   - [Table of Contents](#table-of-contents)
-  - [Quick Start](#quick-start)
-  - [Requirements](#requirements)
+  - [How It Works](#how-it-works)
+  - [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+    - [Running the Components](#running-the-components)
+    - [Environment Variables](#environment-variables)
   - [Models \& Training](#models--training)
     - [Sentence Seq2Seq](#sentence-seq2seq)
     - [Single-Word Classifier](#single-word-classifier)
@@ -57,30 +61,111 @@ Primary languages: Python (core, app), CSS/HTML/JavaScript (product website).
 
 ---
 
-## Quick Start
+## How It Works
 
-| Component | Command |
-|---|---|
-| Desktop app | `cd app && python app.py` |
-| Web API (Flask + SocketIO, port 8000) | `python main.py` |
-| Flask API (port 5000) | `python -m api.signai_api` |
-| API client (background server + upload) | `python -c "import request; request.start('video.mp4')"` |
-| Product website | `cd product_webside && python main.py` |
-| Letter classification website | `cd signai/letter_classification/website && python app.py` |
+SignAI turns a short clip of someone signing into text. The desktop app is the
+usual front door, but the same request-level flow applies wherever a video
+reaches the inference API:
+
+1. **Capture** — `app/camera.py` records webcam video in the desktop app.
+   Pressing Record starts capture; pressing it again stops and hands the clip
+   off for translation.
+2. **Upload** — `app/api_call.py` sends the video to the local Flask API
+   (`POST /api/upload` on `http://127.0.0.1:5000`).
+3. **Preprocess** — `api/signai_api.py` saves the upload to
+   `data/live/video/`, then `api/preprocessing_live_data.py` runs MediaPipe
+   Holistic over every frame and writes the extracted keypoints to
+   `data/live/live_dataset.csv`.
+4. **Infer** — `api/inference.py` loads the trained `.keras` model (see
+   [Environment Variables](#environment-variables) for how the model path is
+   chosen) together with the gloss tokenizer, and predicts a translation
+   with a confidence score.
+5. **Display** — the API returns JSON to the app, which renders the result
+   in the main window.
 
 ```
-pip install -r requirements.txt
+Webcam ──▶ camera.py ──▶ api_call.py ──▶ signai_api.py ──▶ preprocessing_live_data.py
+                                                                    │
+                                                                    ▼
+                                              app UI  ◀── inference.py + gloss_tokenizer.json
 ```
+
+The model itself — a BiLSTM encoder feeding an LSTM decoder with multi-head
+attention — is trained separately ahead of time; see
+[Models & Training](#models--training) and [Architecture](#architecture) for
+how that training happens and what the network looks like.
 
 ---
 
-## Requirements
+## Getting Started
 
-- **OS:** Windows (primary). macOS/Linux support in development.
-- **Hardware:** Webcam for live recognition. GPU recommended; CPU-only supported but slower.
-- **Disk:** 5 GB minimum (models and caches require more).
-- **Python:** 3.8+
-- **Core stack:** TensorFlow 2.16.2 / Keras 3.7.0, MediaPipe 0.10.21, numpy 1.26.4, protobuf 4.25.8
+### Prerequisites
+
+- **OS:** Windows (primary target). macOS/Linux support is in development
+  and not yet verified end-to-end.
+- **Python:** no version is pinned in `requirements.txt`, but the desktop
+  build tooling (`app/builds/README.md`) documents and is tested against
+  **Python 3.10–3.12**; that's the range to use unless you're prepared to
+  debug version issues yourself.
+- **Hardware:** a webcam for live recognition. A GPU is recommended for
+  training and speeds up inference; CPU-only works but is slower.
+- **Disk:** at least 5 GB free — trained models, caches, and MediaPipe
+  assets add up quickly.
+
+### Installation
+
+```
+git clone https://github.com/Stefanos0710/SignAI.git
+cd SignAI
+python -m venv venv
+venv\Scripts\activate        # macOS/Linux: source venv/bin/activate
+pip install -r requirements.txt
+```
+
+`requirements.txt` pins the versions that are actually load-bearing here —
+notably `tensorflow==2.16.2`, `keras==3.7.0`, `mediapipe==0.10.21`,
+`protobuf==4.25.8`, and `numpy==1.26.4`. These aren't arbitrary: newer
+protobuf or numpy releases break MediaPipe or TensorFlow compatibility, so
+avoid upgrading them individually.
+
+### Running the Components
+
+Every command below assumes the virtual environment from the previous step
+is active. The **cwd** column matters — several scripts resolve paths (like
+`data/train_data`) relative to the current working directory, not to their
+own location.
+
+| Component | Command | Run from | Port |
+|---|---|---|---|
+| Desktop app | `python app.py` | `app/` | — (talks to the API internally) |
+| Flask inference API | `python -m api.signai_api` | repo root | 5000 |
+| Web API (Flask + SocketIO) | `python main.py` | repo root | 8000 (override with `PORT`) |
+| Product website | `python main.py` | `product_webside/` | 5000, bound to `0.0.0.0` |
+| Letter classification demo site | `python app.py` | `signai/letter_classification/website/` | 5000 |
+
+Note that the Flask inference API and both demo websites default to the
+same port (5000) — don't try to run more than one of them at a time without
+changing the port in code, or you'll get a bind conflict.
+
+The desktop app doesn't launch the API as a separate process you start
+yourself; it imports and drives `api/signai_api.py` directly through
+`app/api_call.py`. Running `python -m api.signai_api` by hand is mainly
+useful for testing the API in isolation (e.g. with `curl` or Postman)
+outside the desktop UI.
+
+### Environment Variables
+
+| Variable | Effect | Default |
+|---|---|---|
+| `SIGNAI_MODEL_PATH` / `SIGNAI_MODEL` | Overrides which `.keras` model the API loads | newest `models/trained_model_v*.keras` |
+| `SIGNAI_DISABLE_SITE_CLEANUP` | Set to `1` to stop the app/API from stripping user site-packages off `sys.path` at startup | cleanup enabled |
+| `PORT` | Port for the `main.py` Flask-SocketIO server | `8000` |
+
+The site-packages cleanup exists because a system-wide protobuf install can
+silently shadow the pinned `protobuf==4.25.8` from the venv and break
+MediaPipe — disable it only if you're sure your environment doesn't have
+that conflict. Desktop packaging has its own separate set of build-only
+environment variables, documented in `app/builds/README.md`.
 
 ---
 
@@ -202,7 +287,8 @@ Input(150) → Masking → BiLSTM(64) → Dropout(0.2) → BiLSTM(32) → Dropou
 
 - **PyInstaller spec:** `app/SignAI - Desktop.spec` — bundles models, tokenizers, UI, icons (pathex set to repo root)
 - **Updater:** `app/start_updater.py`, spec at `app/SignAI - Updater.spec`
-- **API overrides:** `SIGNAI_MODEL_PATH` / `SIGNAI_MODEL` for custom model path, `SIGNAI_DISABLE_SITE_CLEANUP=1` to disable user-site cleanup
+- **Build scripts:** `app/builds/build-exe.py` (`--onefile`, `--include-models`, `--clean`, `--dry-run`), `build-updater-exe.py`, `build-final-app.py`, `build-zip.py` — see `app/builds/README.md` for the full release sequence and its own build-only environment variables
+- **Runtime API overrides:** see [Environment Variables](#environment-variables)
 
 ---
 
