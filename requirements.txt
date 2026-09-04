@@ -92,3 +92,5 @@ PyInstaller==6.16.0
 # Other
 networkx>=3.0.0
 h11>=0.14.0
+tqdm>=4.66.0
+pympi-ling>=1.71
