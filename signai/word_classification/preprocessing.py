@@ -24,9 +24,10 @@ Pipeline (mirrors signai/letter_classification/preprocess_v3.py, but per video i
     4) Extract left-hand/right-hand/mouth RGB crops per frame from the same MediaPipe landmarks
        (face mesh mouth points, sliced out of extract_face_keypoints's output), carrying the last
        valid crop forward across frames where that hand/mouth wasn't detected.
-    5) Resample / zero-pad every clip (both the keypoint sequence and the three crop sequences,
+    5) Applying Shades-of-Gray Coloring to the crops to reduce skin tone bias
+    6) Resample / zero-pad every clip (both the keypoint sequence and the three crop sequences,
        using the same frame indices) to MAX_FRAMES frames.
-    6) Drop classes with fewer than MIN_SAMPLES_PER_CLASS clips, then split per class (stratified).
+    7) Drop classes with fewer than MIN_SAMPLES_PER_CLASS clips, then split per class (stratified).
 
 Run from the repo root:  python signai/word_classification/preprocessing.py [--rebuild-cache]
 """
@@ -94,6 +95,7 @@ N_FACE_LANDMARKS = len(train_data.FACE_LANDMARKS)  # 93; MOUTH_SLICE below depen
 MOUTH_SLICE = slice(49, 89)  # mouth landmarks' position within extract_face_keypoints()'s
                               # per-frame output (eyebrows 20 + eyes 24 + nose 5 precede it,
                               # mouth is the next 40, cheeks 4 follow)
+MINKOWSKI_EXPONENT = 6 #  # for Shades-of-Gray color constancy (see apply_shades_of_gray() below)
 
 
 def load_labels():
@@ -215,6 +217,24 @@ def decode_image_sequence(jpeg_bytes_list):
     ]
     return np.stack(frames)
 
+def apply_shades_of_gray(crops, p=MINKOWSKI_EXPONENT):
+    """Shades-of-Gray color constancy: per-channel illuminant estimate via the p-th
+    Minkowski norm (p=1 is plain gray-world; higher p weights bright pixels more), then
+    rescale channels so that estimate is neutral. Cuts skin-tone-driven color differences
+    between signers before crops reach the model. Black (unpadded) crops pass through
+    unchanged.
+    """
+    corrected_crops = []
+    for crop in crops:
+        crop_f64 = crop.astype(np.float64)
+        illum = np.power(np.mean(np.power(crop_f64, p), axis=(0, 1)), 1.0 / p)
+        if not illum.any():
+            corrected_crops.append(crop)
+            continue
+        scale = illum.mean() / illum
+        corrected_crops.append(np.clip(crop_f64 * scale, 0, 255).astype(np.uint8))
+    return corrected_crops
+
 
 def extract_clip(job):
     """Worker: one clip -> (clip_id, clip_name, label, keypoints, images, failure_reason).
@@ -259,6 +279,7 @@ def extract_clip(job):
     images = {}
     for name, points in (("left_hand", left_points), ("right_hand", right_points), ("mouth", mouth_points)):
         crops = build_crop_sequence(frames, points)
+        crops = apply_shades_of_gray(crops)
         crops = resample_or_pad_frames(crops)
         images[name] = encode_crops(crops)
 
@@ -405,6 +426,19 @@ def demo():
     crops = build_crop_sequence([frame] * 4, point_seq)
     assert np.array_equal(crops[0], BLACK_CROP) and np.array_equal(crops[1], BLACK_CROP)
     assert np.array_equal(crops[3], crops[2]), "undetected frame after a hit carries it forward"
+
+    # apply_shades_of_gray: black padding crops pass through untouched, colored crops get
+    # their channel means pulled together
+    assert all(np.array_equal(c, BLACK_CROP) for c in apply_shades_of_gray([BLACK_CROP]))
+    tinted = np.zeros((4, 4, 3), dtype=np.uint8)
+    tinted[..., 0] = 200  # strong red cast
+    tinted[..., 1] = 50
+    tinted[..., 2] = 50
+    corrected = apply_shades_of_gray([tinted])[0]
+    means = corrected.astype(np.float64).mean(axis=(0, 1))
+    assert means.max() - means.min() < tinted.astype(np.float64).mean(axis=(0, 1)).ptp(), (
+        "shades-of-gray should narrow the channel-mean spread, not widen it"
+    )
 
     # encode/decode round-trip
     encoded = encode_crops([crop_and_resize(frame, (0, 0, 50, 50))])
