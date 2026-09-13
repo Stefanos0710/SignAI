@@ -5,8 +5,10 @@ Input:
     dataset/word_clips/    -- <eaf_stem>_<participant>_<index:04d>.mp4, cut from those rows
 
 Output:
-    dataset/processed/{train,val,test}_data.npz    -- X (N, MAX_FRAMES, 147) float32, y (N,) int64,
-                                                        clip_ids (N,) int64, classes (C,) label strings
+    dataset/processed/{train,val,test}_data.npz    -- X (N, MAX_FRAMES, N_LANDMARKS, HEATMAP_RESOLUTION,
+                                                        HEATMAP_RESOLUTION) float32 -- a per-landmark
+                                                        Gaussian heatmap instead of raw (x, y, z), y (N,)
+                                                        int64, clip_ids (N,) int64, classes (C,) label strings
     dataset/processed/{train,val,test}_images.npz  -- clip_ids (N,) int64 (matches *_data.npz row
                                                         for row, so the two files can be verified
                                                         aligned instead of assumed aligned), plus
@@ -27,7 +29,9 @@ Pipeline (mirrors signai/letter_classification/preprocess_v3.py, but per video i
     5) Applying Shades-of-Gray Coloring to the crops to reduce skin tone bias
     6) Resample / zero-pad every clip (both the keypoint sequence and the three crop sequences,
        using the same frame indices) to MAX_FRAMES frames.
-    7) Drop classes with fewer than MIN_SAMPLES_PER_CLASS clips, then split per class (stratified).
+    7) Render each frame's (x, y) per landmark as a Gaussian heatmap (see generate_heatmap) instead
+       of storing the raw coordinate -- z is dropped, heatmaps are 2D.
+    8) Drop classes with fewer than MIN_SAMPLES_PER_CLASS clips, then split per class (stratified).
 
 Run from the repo root:  python signai/word_classification/preprocessing.py [--rebuild-cache]
 """
@@ -76,11 +80,16 @@ CACHE_FILE = OUT_DIR / ".keypoint_cache.npz"
 N_POSE = len(POSE_LANDMARKS)
 N_HAND = 21
 N_LANDMARKS = N_POSE + 2 * N_HAND          # 7 pose + 42 hand = 49
-N_FEATURES = N_LANDMARKS * 3               # 147 per frame (no face -- words are hand/arm shapes)
+N_FEATURES = N_LANDMARKS * 3               # 147 per frame (no face -- words are hand/arm shapes),
+                                            # the intermediate representation before heatmap rendering
 MAX_FRAMES = 32                            # ~99th percentile of the segment durations at 50 fps
 MIN_SAMPLES_PER_CLASS = 5
 NUM_WORKERS = 16
 SEED = 42
+
+# --- per-landmark heatmap rendering ---------------------------------------------------------
+HEATMAP_RESOLUTION = 96     # heatmap is HEATMAP_RESOLUTION x HEATMAP_RESOLUTION per landmark, per frame
+HEATMAP_SIGMA = 1.5         # Gaussian spread, in heatmap pixels
 
 # --- hand/mouth crop extraction -------------------------------------------------------------
 CROP_SIZE = 224          # output crop resolution (square)
@@ -96,6 +105,86 @@ MOUTH_SLICE = slice(49, 89)  # mouth landmarks' position within extract_face_key
                               # per-frame output (eyebrows 20 + eyes 24 + nose 5 precede it,
                               # mouth is the next 40, cheeks 4 follow)
 MINKOWSKI_EXPONENT = 6 #  # for Shades-of-Gray color constancy (see apply_shades_of_gray() below)
+
+
+def fix_missing_hand_detections(sequence, left_detected, right_detected):
+    """(T, N_LANDMARKS, 3) -> same shape. A hand MediaPipe never detected in a
+    frame is filled with raw (0, 0, 0) (see extract_clip); once center_keypoints/
+    normalize_keypoints have run, that's no longer exactly (0, 0, 0), it's shifted
+    to some fixed off-body point instead -- so interpolate_missing_keypoints's
+    exact-zero check (which runs after normalization) doesn't catch it, and a
+    hand can visibly teleport in from that fixed point once real tracking picks
+    up. left_detected/right_detected are the true per-frame detection flags
+    (from before normalization), so this catches what that check misses.
+
+    Linearly interpolates each hand's landmarks across its undetected frames
+    from the nearest frames where it actually was detected.
+    """
+    sequence = np.asarray(sequence, dtype=np.float64).copy()
+    frame_idx = np.arange(sequence.shape[0])
+    for detected, lo, hi in (
+        (left_detected, N_POSE, N_POSE + N_HAND),
+        (right_detected, N_POSE + N_HAND, N_POSE + 2 * N_HAND),
+    ):
+        detected = np.asarray(detected, dtype=bool)
+        valid = np.where(detected)[0]
+        if len(valid) == 0 or len(valid) == len(detected):
+            continue  # never detected at all, or always detected -- nothing to fix
+        for j in range(lo, hi):
+            for k in range(3):
+                sequence[:, j, k] = np.interp(frame_idx, valid, sequence[valid, j, k])
+    return sequence
+
+
+def anchor_hands_to_wrist(sequence):
+    """(T, N_LANDMARKS, 3) -> same shape. Pose and hands are two independently
+    run MediaPipe models (pose.process() / hands.process()) that don't always
+    agree on where the wrist is -- confirmed on real data the gap between the
+    pose model's wrist (POSE_LANDMARKS index 5/6) and the hand model's own
+    wrist (landmark 0 of each 21-point hand block) is often bigger than a
+    whole forearm. Left as-is, a hand keeps its correct shape but appears to
+    float away from the arm it's attached to.
+
+    Rigidly translates each hand's 21 landmarks so its own landmark 0 sits
+    exactly on the corresponding pose wrist -- keeps the hand model's finger
+    articulation, anchors its position to the much more stable pose skeleton.
+    """
+    sequence = np.asarray(sequence, dtype=np.float64).copy()
+    left_lo, left_hi = N_POSE, N_POSE + N_HAND
+    right_lo, right_hi = N_POSE + N_HAND, N_POSE + 2 * N_HAND
+    left_offset = sequence[:, 5, :] - sequence[:, left_lo, :]    # pose left wrist - hand's own wrist
+    right_offset = sequence[:, 6, :] - sequence[:, right_lo, :]  # pose right wrist - hand's own wrist
+    sequence[:, left_lo:left_hi, :] += left_offset[:, None, :]
+    sequence[:, right_lo:right_hi, :] += right_offset[:, None, :]
+    return sequence
+
+
+def generate_heatmap(resolution: int = HEATMAP_RESOLUTION, sigma: float = HEATMAP_SIGMA,
+                      x=0.0, y=0.0):
+    """Gaussian dot(s) centered at (x, y), normalized to [0, 1], rendered onto a resolution x
+    resolution canvas. x and y broadcast against each other, so a whole batch of points (any
+    leading shape, e.g. (n_frames, n_landmarks)) renders in one call -> (..., resolution,
+    resolution) -- one meshgrid-equivalent, not one per point. (x, y) outside [0, 1] is fine,
+    the peak just falls off the edge of the canvas.
+    """
+    grid = np.arange(resolution, dtype=np.float32)
+    x, y = np.asarray(x, dtype=np.float32), np.asarray(y, dtype=np.float32)
+    dx2 = (grid - x[..., None] * resolution) ** 2  # (..., resolution), squared dist per column
+    dy2 = (grid - y[..., None] * resolution) ** 2  # (..., resolution), squared dist per row
+    heatmap = np.exp(-(dy2[..., :, None] + dx2[..., None, :]) / (2 * sigma ** 2))
+    return heatmap.astype(np.float32)
+
+
+def keypoints_to_heatmaps(coords_xy, resolution=HEATMAP_RESOLUTION, sigma=HEATMAP_SIGMA):
+    """(..., 2) x/y -> (..., resolution, resolution) heatmaps, one per point, vectorized over
+    every leading dim (e.g. frames x landmarks) in a single generate_heatmap call. `coords_xy`
+    is shoulder-midpoint-centered, shoulder-distance-scaled (see center_keypoints/
+    normalize_keypoints) rather than raw [0, 1] image coordinates, so it's shifted by +0.5 to
+    put the shoulder midpoint at canvas center; landmarks that stray far from the torso (e.g.
+    a raised hand) land off-canvas the same way an off-frame point would.
+    """
+    coords = np.asarray(coords_xy, dtype=np.float32) + 0.5
+    return generate_heatmap(resolution, sigma, coords[..., 0], coords[..., 1])
 
 
 def load_labels():
@@ -237,11 +326,11 @@ def apply_shades_of_gray(crops, p=MINKOWSKI_EXPONENT):
 
 
 def extract_clip(job):
-    """Worker: one clip -> (clip_id, clip_name, label, keypoints, images, failure_reason).
+    """Worker: one clip -> (clip_id, clip_name, label, heatmaps, images, failure_reason).
 
-    `keypoints` is a (MAX_FRAMES, N_FEATURES) array, `images` a dict of
-    {"left_hand", "right_hand", "mouth"} -> list of MAX_FRAMES JPEG byte strings.
-    Both are None together on failure.
+    `heatmaps` is a (MAX_FRAMES, N_LANDMARKS, HEATMAP_RESOLUTION, HEATMAP_RESOLUTION) array,
+    `images` a dict of {"left_hand", "right_hand", "mouth"} -> list of MAX_FRAMES JPEG byte
+    strings. Both are None together on failure.
     """
     clip_id, clip_path, label = job
     frames = extract_frames(str(clip_path))
@@ -256,6 +345,7 @@ def extract_clip(job):
         return clip_id, clip_path.name, label, None, None, "no_pose"
 
     sequence = []
+    left_detected, right_detected = [], []
     left_points, right_points, mouth_points = [], [], []
     for (_, pose), (_, left, right), (_, face) in zip(pose_kp, hand_kp, face_kp):
         pose_arr = np.array(pose, dtype=float) if pose else np.zeros((N_POSE, 3))
@@ -268,13 +358,21 @@ def extract_clip(job):
             all_kp = normalize_keypoints(all_kp, avg_left, avg_right)
         sequence.append(all_kp)
 
+        left_detected.append(left is not None)
+        right_detected.append(right is not None)
         left_points.append(left)
         right_points.append(right)
         mouth_points.append(face[MOUTH_SLICE] if face else None)
 
     sequence = interpolate_missing_keypoints(sequence)
+    sequence = fix_missing_hand_detections(sequence, left_detected, right_detected)
+    sequence = anchor_hands_to_wrist(sequence)
     sequence = apply_temporal_savgol_smoothing(sequence, window_length=9, polyorder=2)
     flat = sequence.reshape(len(sequence), N_FEATURES)
+    flat = resample_or_pad(flat)  # (MAX_FRAMES, N_FEATURES), same frame selection as the crops below
+
+    xy = flat.reshape(MAX_FRAMES, N_LANDMARKS, 3)[:, :, :2]  # z dropped, heatmaps are 2D
+    heatmaps = keypoints_to_heatmaps(xy)  # (MAX_FRAMES, N_LANDMARKS, resolution, resolution), one call
 
     images = {}
     for name, points in (("left_hand", left_points), ("right_hand", right_points), ("mouth", mouth_points)):
@@ -283,7 +381,7 @@ def extract_clip(job):
         crops = resample_or_pad_frames(crops)
         images[name] = encode_crops(crops)
 
-    return clip_id, clip_path.name, label, resample_or_pad(flat), images, None
+    return clip_id, clip_path.name, label, heatmaps, images, None
 
 
 def init_worker():
@@ -294,23 +392,23 @@ def init_worker():
 def build_dataset(jobs, workers=NUM_WORKERS):
     """Extract every clip in parallel.
 
-    Returns clip_ids, X (N, MAX_FRAMES, N_FEATURES), labels, and a dict of
-    {"left_hand", "right_hand", "mouth"} -> list of N per-clip JPEG-byte-lists.
+    Returns clip_ids, X (N, MAX_FRAMES, N_LANDMARKS, HEATMAP_RESOLUTION, HEATMAP_RESOLUTION),
+    labels, and a dict of {"left_hand", "right_hand", "mouth"} -> list of N per-clip JPEG-byte-lists.
     """
     clip_ids, X, labels = [], [], []
     images = {"left_hand": [], "right_hand": [], "mouth": []}
     failed = Counter()
 
     with multiprocessing.Pool(processes=workers, initializer=init_worker) as pool:
-        for clip_id, name, label, features, crops, reason in tqdm(
+        for clip_id, name, label, heatmaps, crops, reason in tqdm(
             pool.imap_unordered(extract_clip, jobs, chunksize=8), total=len(jobs), desc="clips"
         ):
-            if features is None:
+            if heatmaps is None:
                 failed[reason] += 1
                 logging.debug(f"skipping {name}: {reason}")
                 continue
             clip_ids.append(clip_id)
-            X.append(features)
+            X.append(heatmaps)
             labels.append(label)
             for key in images:
                 images[key].append(crops[key])
@@ -373,8 +471,38 @@ def split_and_save(clip_ids, X, labels, images, output_folder=OUT_DIR, val_ratio
         )
         logging.info(f"{split_name}: {len(idx)} samples -> {output_folder / f'{split_name}_data.npz'}")
 
-    logging.info(f"Shape per sample: ({MAX_FRAMES}, {N_FEATURES}) | classes: {len(classes)}")
+    logging.info(
+        f"Shape per sample: ({MAX_FRAMES}, {N_LANDMARKS}, {HEATMAP_RESOLUTION}, {HEATMAP_RESOLUTION}) "
+        f"| classes: {len(classes)}"
+    )
 
+def test_display_heatmap_frame():
+    """Manual visual check: extract one random raw clip directly (not the processed
+    dataset -- that's the full 8080-clip run, way overkill for eyeballing one frame) and
+    plot all N_LANDMARKS heatmaps for a random frame stacked (max-projected) into one image.
+    Not run by demo() -- there's nothing to assert, it's just for looking at.
+    """
+    import matplotlib.pyplot as plt
+
+    clips = list(CLIPS_DIR.glob("*.mp4"))
+    if not clips:
+        print(f"no clips in {CLIPS_DIR}")
+        return
+
+    rng = np.random.default_rng()
+    clip_path = clips[rng.integers(len(clips))]
+    init_worker()  # loads the MediaPipe models this process needs
+    clip_id, name, label, heatmaps, images, reason = extract_clip((0, clip_path, "?"))
+    if heatmaps is None:
+        print(f"{name}: extraction failed ({reason}), try again")
+        return
+
+    frame_idx = rng.integers(MAX_FRAMES)
+    stacked = heatmaps[frame_idx].max(axis=0)  # (resolution, resolution), all 49 landmarks overlaid
+    plt.imshow(stacked, cmap="hot")
+    plt.title(f"{name} frame {frame_idx}")
+    plt.colorbar()
+    plt.show()
 
 def demo():
     """Self-check: python signai/word_classification/preprocessing.py --self-check"""
@@ -384,6 +512,29 @@ def demo():
     assert N_FACE_LANDMARKS == len(train_data.FACE_LANDMARKS) == 93, (
         "train_data.FACE_LANDMARKS changed length -- MOUTH_SLICE needs recomputing"
     )
+
+    # fix_missing_hand_detections: undetected-hand frames get interpolated from real ones,
+    # detected frames are untouched
+    seq = np.zeros((5, N_LANDMARKS, 3))
+    seq[:, N_POSE, :] = [[9, 9, 9], [1, 1, 1], [9, 9, 9], [9, 9, 9], [3, 3, 3]]  # left hand landmark 0
+    left_detected = [False, True, False, False, True]
+    right_detected = [True] * 5
+    fixed = fix_missing_hand_detections(seq, left_detected, right_detected)
+    assert np.allclose(fixed[1, N_POSE], [1, 1, 1]) and np.allclose(fixed[4, N_POSE], [3, 3, 3])
+    assert np.allclose(fixed[2, N_POSE], [1 + 2 / 3, 1 + 2 / 3, 1 + 2 / 3]), (
+        "interpolates linearly between the two real frames (frame 1 -> frame 4)"
+    )
+
+    # anchor_hands_to_wrist: each hand's own landmark 0 ends up exactly on the pose wrist,
+    # rest of the hand keeps its shape (same offset from landmark 0)
+    seq = np.zeros((1, N_LANDMARKS, 3))
+    seq[0, 5] = [1.0, 2.0, 0.0]   # pose left wrist
+    seq[0, 6] = [-1.0, 2.0, 0.0]  # pose right wrist
+    seq[0, N_POSE] = [0.0, 0.0, 0.0]              # left hand's own wrist, elsewhere
+    seq[0, N_POSE + 1] = [0.1, 0.1, 0.0]           # another left-hand landmark
+    anchored = anchor_hands_to_wrist(seq)
+    assert np.allclose(anchored[0, N_POSE], seq[0, 5]), "hand wrist must land on pose wrist"
+    assert np.allclose(anchored[0, N_POSE + 1] - anchored[0, N_POSE], [0.1, 0.1, 0.0]), "shape preserved"
 
     short = np.ones((5, N_FEATURES), dtype=np.float32)
     padded = resample_or_pad(short)
@@ -444,6 +595,26 @@ def demo():
     encoded = encode_crops([crop_and_resize(frame, (0, 0, 50, 50))])
     decoded = decode_image_sequence(encoded)
     assert decoded.shape == (1, CROP_SIZE, CROP_SIZE, 3) and decoded.dtype == np.uint8
+
+    # generate_heatmap: peak lands where (x, y) says, values stay in [0, 1]
+    hm = generate_heatmap(resolution=32, sigma=2.0, x=0.5, y=0.25)
+    assert hm.shape == (32, 32) and hm.dtype == np.float32
+    assert np.unravel_index(np.argmax(hm), hm.shape) == (8, 16), "row is y, col is x"
+    assert hm.max() == 1.0 and hm.min() >= 0.0
+
+    # keypoints_to_heatmaps: one heatmap per landmark, shoulder-midpoint (0, 0) -> canvas center
+    pts = np.array([[0.0, 0.0], [0.5, -0.5]])
+    stacked = keypoints_to_heatmaps(pts, resolution=32)
+    assert stacked.shape == (2, 32, 32)
+    assert np.unravel_index(np.argmax(stacked[0]), stacked[0].shape) == (16, 16)
+
+    # keypoints_to_heatmaps is vectorized over arbitrary leading dims (frames x landmarks) in
+    # one generate_heatmap call -- must match calling it one point at a time
+    batch = np.random.default_rng(0).uniform(-1, 1, size=(4, 5, 2))  # (frames, landmarks, 2)
+    vectorized = keypoints_to_heatmaps(batch)
+    looped = np.stack([[generate_heatmap(x=x + 0.5, y=y + 0.5) for x, y in frame] for frame in batch])
+    assert vectorized.shape == (4, 5, HEATMAP_RESOLUTION, HEATMAP_RESOLUTION)
+    assert np.allclose(vectorized, looped), "vectorized batch must match the per-point loop"
 
     labels = np.array(["A"] * 20 + ["B"] * 5 + ["C"] * 2)
     clip_ids = np.arange(len(labels))
