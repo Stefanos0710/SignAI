@@ -4,10 +4,16 @@ utilities they share. Not used by training or inference -- CLI only
 (keypoints_stream.py --visualize).
 """
 import os
+import sys
+from pathlib import Path
 
 import numpy as np
 
-from heatmap import HeatmapGenerator, HEATMAP_HEIGHT, HEATMAP_WIDTH, HEATMAP_SIGMA, COORD_EXTENT
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from signai.word_classification.models.heatmap import (  # noqa: E402
+    HeatmapGenerator, HEATMAP_HEIGHT, HEATMAP_WIDTH, HEATMAP_SIGMA, COORD_EXTENT,
+)
 
 DATASET_DIR = os.path.join(os.path.dirname(__file__), "..", "dataset", "processed")
 

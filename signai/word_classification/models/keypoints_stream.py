@@ -23,13 +23,21 @@ landmarks, 49 * 3 = 147 features):
     5=left wrist, 6=right wrist, 7..27=left hand, 28..48=right hand
 """
 import argparse
+import sys
+from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
 import keras
 
-from heatmap import HeatmapGenerator, HEATMAP_HEIGHT, HEATMAP_WIDTH, HEATMAP_SIGMA
-from visualization import KeypointsVisualizer, concat_real_clips, load_random_real_clip, real_frame_indices
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from signai.word_classification.models.heatmap import (  # noqa: E402
+    HeatmapGenerator, HEATMAP_HEIGHT, HEATMAP_WIDTH, HEATMAP_SIGMA,
+)
+from signai.word_classification.models.visualization import (  # noqa: E402
+    KeypointsVisualizer, concat_real_clips, load_random_real_clip, real_frame_indices,
+)
 
 PROJECTION_DIM = 384
 ENCODER_OUTPUT_DIM = 512
