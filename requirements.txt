@@ -52,6 +52,11 @@ matplotlib==3.9.0
 seaborn>=0.12.0
 
 # TensorFlow Extras
+# Hand stream (frozen DINOv3 encoder)
+torch>=2.2.0
+torchvision>=0.17.0         # required by AutoImageProcessor
+transformers>=4.56.0        # DINOv3 support
+
 absl-py>=2.0.0
 astunparse>=1.6.0
 flatbuffers>=23.0.0
