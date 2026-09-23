@@ -29,8 +29,9 @@ from signai.word_classification.models.hand_stream import (  # noqa: E402
     NUM_SAMPLED_FRAMES,
     sample_frame_indices,
 )
+from signai.word_classification.paths import PROCESSED_DIR  # noqa: E402
 
-DATASET_DIR = os.path.join(os.path.dirname(__file__), "..", "dataset", "processed")
+DATASET_DIR = str(PROCESSED_DIR)
 
 FACE_FEATURE_DIM = 384
 

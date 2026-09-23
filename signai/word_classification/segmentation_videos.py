@@ -32,6 +32,10 @@ from pathlib import Path
 import pympi
 from tqdm import tqdm
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from signai.word_classification.paths import DATASET_DIR  # noqa: E402
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 BATCH_SIZE = 150   # segments per ffmpeg call; keeps the command line under Windows' ~32K limit
@@ -211,7 +215,7 @@ def main():
 
 
 # set up paths of dataset and output files
-dataset_dir = Path(__file__).resolve().parent / "dataset"
+dataset_dir = DATASET_DIR
 eaf_dir = dataset_dir / "eaf"
 videos_dir = dataset_dir / "videos"
 clips_dir = dataset_dir / "word_clips"

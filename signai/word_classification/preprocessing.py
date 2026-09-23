@@ -64,6 +64,7 @@ from signai.preprocessing.train_data import (  # noqa: E402
     interpolate_missing_keypoints,
     normalize_keypoints,
 )
+from signai.word_classification.paths import DATASET_DIR, PROCESSED_DIR  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -71,10 +72,9 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-DATASET_DIR = Path(__file__).resolve().parent / "dataset"
 CLIPS_DIR = DATASET_DIR / "word_clips"
 SEGMENTS_CSV = DATASET_DIR / "segments.csv"
-OUT_DIR = DATASET_DIR / "processed"
+OUT_DIR = PROCESSED_DIR
 CACHE_FILE = OUT_DIR / ".keypoint_cache.npz"
 
 N_POSE = len(POSE_LANDMARKS)

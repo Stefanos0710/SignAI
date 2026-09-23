@@ -24,11 +24,17 @@ which you can open with any image viewer.
 
 import argparse
 import os
+import sys
+from pathlib import Path
 
 import cv2
 import numpy as np
 
-DATASET_DIR = os.path.join(os.path.dirname(__file__), "dataset", "processed")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from signai.word_classification.paths import PROCESSED_DIR  # noqa: E402
+
+DATASET_DIR = str(PROCESSED_DIR)
 PREVIEW_DIR = os.path.join(DATASET_DIR, "preview_images")
 SPLITS = ["train", "val", "test"]
 CROP_TYPES = ("left_hand", "right_hand", "mouth")

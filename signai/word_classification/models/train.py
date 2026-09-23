@@ -22,8 +22,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from signai.word_classification.models.model import WordClassifier  # noqa: E402
 from signai.word_classification.models.hand_stream import load_hand_features  # noqa: E402
 from signai.word_classification.models.face_stream import load_face_features  # noqa: E402
+from signai.word_classification.paths import PROCESSED_DIR  # noqa: E402
 
-DATASET_DIR = os.path.join(os.path.dirname(__file__), "..", "dataset", "processed")
+DATASET_DIR = str(PROCESSED_DIR)
 CHECKPOINT_DIR = os.path.join(os.path.dirname(__file__), "..", "checkpoints")
 
 SPLITS = ["train", "val", "test"]

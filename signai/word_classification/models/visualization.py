@@ -14,8 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from signai.word_classification.models.heatmap import (  # noqa: E402
     HeatmapGenerator, HEATMAP_HEIGHT, HEATMAP_WIDTH, HEATMAP_SIGMA, COORD_EXTENT,
 )
+from signai.word_classification.paths import PROCESSED_DIR  # noqa: E402
 
-DATASET_DIR = os.path.join(os.path.dirname(__file__), "..", "dataset", "processed")
+DATASET_DIR = str(PROCESSED_DIR)
 
 _POSE_LANDMARK_NAMES = [
     "nose", "L_shoulder", "R_shoulder", "L_elbow", "R_elbow", "L_wrist", "R_wrist",

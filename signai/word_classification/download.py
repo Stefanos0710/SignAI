@@ -17,14 +17,21 @@ See https://www.sign-lang.uni-hamburg.de/meinedgs/ling/license_en.html
 """
 
 import argparse
+import errno
 import logging
 import os
 import re
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 import requests
 from tqdm import tqdm
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from signai.word_classification.paths import DATASET_DIR
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,7 +41,7 @@ logging.basicConfig(
 
 BASE_URL = "https://www.sign-lang.uni-hamburg.de/meinedgs"
 INDEX_URL = f"{BASE_URL}/ling/start-name_en.html"
-DATASET_FOLDER = "signai/word_classification/dataset"
+DATASET_FOLDER = str(DATASET_DIR)
 
 # parts of the corpus that can be downloaded, with a rough per-file size so the
 # script can warn about the total before spending hours on it
@@ -129,6 +136,7 @@ def download_file(part, path, dataset_folder):
 
 def download_all(files, dataset_folder, workers):
     downloaded = failed = 0
+    storage_exhausted = False
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
@@ -144,7 +152,20 @@ def download_all(files, dataset_folder, workers):
                 except Exception as e:
                     failed += 1
                     logging.error(f"Failed {part}/{path}: {e}")
+                    if isinstance(e, OSError) and e.errno == errno.ENOSPC:
+                        logging.critical(
+                            "No space left on the target filesystem; stopping new downloads."
+                        )
+                        storage_exhausted = True
+                        for pending in futures:
+                            pending.cancel()
+                        break
                 bar.update(1)
+
+            if storage_exhausted:
+                logging.warning(
+                    "Free disk space and re-run the command to resume; completed files are skipped."
+                )
 
     return downloaded, failed
 
@@ -174,7 +195,15 @@ def main():
     if unknown:
         parser.error(f"unknown part(s): {', '.join(unknown)}. Choose from {', '.join(PARTS)}")
 
-    os.makedirs(args.out, exist_ok=True)
+    try:
+        os.makedirs(args.out, exist_ok=True)
+    except OSError as error:
+        if error.errno in (errno.EDQUOT, errno.ENOSPC):
+            parser.error(
+                f"cannot create output directory '{args.out}': storage quota or disk space "
+                "is exhausted. Free space, increase the quota, or use --out on a larger filesystem."
+            )
+        raise
 
     files = collect_files(fetch_index(args.out), parts, args.limit)
     estimate_gb = sum(PARTS[part] for part, _ in files) / 1024

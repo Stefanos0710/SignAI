@@ -29,8 +29,9 @@ import keras
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from signai.word_classification.preprocessing import decode_image_sequence  # noqa: E402
+from signai.word_classification.paths import PROCESSED_DIR  # noqa: E402
 
-DATASET_DIR = os.path.join(os.path.dirname(__file__), "..", "dataset", "processed")
+DATASET_DIR = str(PROCESSED_DIR)
 
 HAND_FEATURE_DIM = 384
 NUM_SAMPLED_FRAMES = 8

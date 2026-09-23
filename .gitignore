@@ -136,6 +136,7 @@ app/dist/
 app/final/
 
 signai/letter_classification/data/*
+SignAlphaSet/data/**
 
 models/*
 
@@ -146,3 +147,12 @@ CLAUDE.md
 AGENTS.md
 .claude/
 local/
+
+# Local dataset and recording artifacts
+data/PHOENIX-Weather-2014T-compressed/phoenix14t.pami0.dev.annotations_only.gzip
+data/PHOENIX-Weather-2014T-compressed/phoenix14t.pami0.test.annotations_only.gzip
+data/PHOENIX-Weather-2014T-compressed/phoenix14t.pami0.train.annotations_only.gzip
+data/live/live_dataset.csv
+data/live/video/recorded_video.mp4
+data/raw_data/read.txt
+data/train_data/example_for_train_data.csv
