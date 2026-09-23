@@ -50,7 +50,7 @@ Primary languages: Python (core, app), CSS/HTML/JavaScript (product website).
   - [Preprocessing](#preprocessing)
   - [Architecture](#architecture)
     - [Seq2Seq (multi\_attention)](#seq2seq-multi_attention)
-    - [Classifier](#classifier)
+    - [Single-Word Classifier (fusion)](#single-word-classifier-fusion)
   - [Desktop App (PySide6)](#desktop-app-pyside6)
   - [Build \& Deploy](#build--deploy)
   - [Known Issues](#known-issues)
@@ -202,21 +202,35 @@ Configuration is at the bottom of `signai/sentence_classification/train.py` (def
 
 ### Single-Word Classifier
 
-BiLSTM classifier using 150 features (pose + hands only, no face).
+Three-stream fusion model, `signai/word_classification/`. Own dataset/preprocessing/training — independent of the sentence pipeline.
+
+| Step | Script | Output |
+|---|---|---|
+| 1. Download | `download.py` | Public DGS Corpus (eaf + openpose) |
+| 2. Segment | `segmentation_videos.py` (needs `ffmpeg`) | per-word clips, `dataset/word_clips/` |
+| 3. Preprocess | `preprocessing.py` | `dataset/processed/{train,val,test}_{data,images}.npz` |
+| 4. Cache hand/face features | `models/hand_stream.py` / `models/face_stream.py --extract-features {split}` | `*_hand_features.npz` / `*_face_features.npz` |
+| 5. Train | `models/train.py` | `checkpoints/word_classifier_best.keras` |
+
+All run from the repo root.
+
+**preprocessing.py:** MediaPipe pose/hand keypoints → shoulder-center + shoulder-scale → Savitzky–Golay smooth → per-landmark Gaussian heatmap (x/y only, z dropped) + left-hand/right-hand/mouth RGB crops (Shades-of-Gray color correction) → resample/pad to 32 frames.
+
+**Model — `models/model.py::WordClassifier`:**
+
+| Stream | Input | Encoder | Output |
+|---|---|---|---|
+| Pose | (32, 49, 96, 96) heatmaps | SlowOnly-R50 3D CNN (ResNet-50, inflated) → Dense | 384-d |
+| Hands | 2×(8, 384) frozen DINOv3 ViT-S/16 (cached) | shared pre-LN transformer (2 blocks, 6 heads, CLS) | 768-d |
+| Mouth | (8, 384) frozen DINOv3 ViT-S/16 (cached) | own transformer head, same design | 384-d |
 
 ```
-python signai/word_classification/train.py
+Pose(384) + Hands(768) + Mouth(384) = concat(1536) → Dense(512, ReLU) → Dropout(0.3) → Dense(classes)
 ```
 
-Supports `--rebuild-cache` to force re-parsing of training CSVs.
+DINOv3 runs once offline into the cache; training only touches cached features + Keras layers, no `torch` needed at train time. `models/fusion.py` = same architecture, computes pose heatmaps on the fly instead of from cache.
 
-| Metric | Value |
-|---|---|
-| Training accuracy | 99.8% |
-| Validation accuracy | 98.7% |
-| Architecture | BiLSTM(64) → BiLSTM(32) → Dense(64) → Softmax |
-
-*Trained on a compressed subset of PHOENIX-Weather-2014T. Performance improves significantly with the full dataset.*
+*Dataset: DGS Corpus word clips. In progress — no published accuracy yet.*
 
 ### Letter Classification (Fingerspelling)
 
@@ -261,10 +275,12 @@ Encoder: Input(426) → Dense(1024) → LayerNorm → Dropout → DepthwiseConv1
 Decoder: Embedding(256) → LayerNorm → LSTM(512) → LayerNorm → MultiHeadAttention(8 heads, residual) → Concat → Dense(512) → Dropout → LayerNorm → Dense(vocab, softmax)
 ```
 
-### Classifier
+### Single-Word Classifier (fusion)
 
 ```
-Input(150) → Masking → BiLSTM(64) → Dropout(0.2) → BiLSTM(32) → Dropout(0.2) → Dense(64, ReLU) → Dropout(0.2) → Dense(classes, softmax)
+Pose heatmaps  (32,49,96,96) → SlowOnly-R50 3D CNN → Dense(384) ─┐
+Hand features  2×(8,384)     → shared transformer head → concat(768) ─┼─ concat(1536) → Dense(512, ReLU) → Dropout(0.3) → Dense(classes)
+Mouth features (8,384)       → transformer head → (384) ─────────┘
 ```
 
 ---
