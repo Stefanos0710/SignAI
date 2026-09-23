@@ -26,7 +26,7 @@
 
 </div>
 
-SignAI is a real-time sign language recognition and translation system for German Sign Language (DGS). It uses a sequence-to-sequence model with multi-head attention, trained on MediaPipe Holistic keypoint features. The project won 1st place at the Jugend forscht state competition and received coverage in SZ, BR, and other media outlets.
+SignAI is a real-time sign language recognition and translation system for German Sign Language (DGS). The production path is a BiLSTM+attention seq2seq model over MediaPipe Holistic keypoints (sentence-level gloss translation); in parallel, `signai/word_classification/` is developing a **3-stream fusion model** (pose heatmap CNN + hand DINOv3 transformer + mouth DINOv3 transformer) for single-word classification — see [Single-Word Classifier](#single-word-classifier). The project won 1st place at the Jugend forscht state competition and received coverage in SZ, BR, and other media outlets.
 
 Primary languages: Python (core, app), CSS/HTML/JavaScript (product website).
 
@@ -212,7 +212,7 @@ Three-stream fusion model, `signai/word_classification/`. Own dataset/preprocess
 | 4. Cache hand/face features | `models/hand_stream.py` / `models/face_stream.py --extract-features {split}` | `*_hand_features.npz` / `*_face_features.npz` |
 | 5. Train | `models/train.py` | `checkpoints/word_classifier_best.keras` |
 
-All run from the repo root.
+All run from the repo root. Step 4 needs `torch` + `transformers` and a Hugging Face token with the [DINOv3 ViT-S/16](https://huggingface.co/facebook/dinov3-vits16-pretrain-lvd1689m) license accepted (`huggingface-cli login` or `HF_TOKEN`) — steps 3 and 5 don't.
 
 **preprocessing.py:** MediaPipe pose/hand keypoints → shoulder-center + shoulder-scale → Savitzky–Golay smooth → per-landmark Gaussian heatmap (x/y only, z dropped) + left-hand/right-hand/mouth RGB crops (Shades-of-Gray color correction) → resample/pad to 32 frames.
 
@@ -244,18 +244,19 @@ Dataset download and preprocessing: `signai/letter_classification/download.py`, 
 
 ### Training Data
 
-Training CSVs (for sentence/word classification) are stored in `data/train_data/`. A parsed cache is kept at `.parsed_cache.pkl` — delete it or pass `--rebuild-cache` to re-parse. CSVs are git-ignored; only `example_for_train_data.csv` is tracked.
+Sentence classification's training CSVs live in `data/train_data/` (parsed cache `.parsed_cache.pkl`, delete or pass `--rebuild-cache` to re-parse; CSVs git-ignored, only `example_for_train_data.csv` tracked). The word classifier is separate — see its own dataset layout in [Single-Word Classifier](#single-word-classifier).
 
 ---
 
 ## Preprocessing
 
-MediaPipe Holistic is used for keypoint extraction.
+MediaPipe (Holistic and/or Face Mesh) is used for keypoint extraction, but each consumer has its own pipeline — none of these three are interchangeable.
 
-| Script | Purpose | Features | Landmarks |
+| Script | Purpose | Output | Landmarks |
 |---|---|---|---|
-| `signai/preprocessing/train_data.py` | Training data (sentence + word classification) | 426 (×3 xyz) | 7 pose + 42 hand + 93 face |
-| `api/preprocessing_live_data.py` | Live inference | 151 (averaged) | 543 landmarks × 2 (xy) |
+| `signai/preprocessing/train_data.py` | Sentence classification training data | 426 features/frame (×3 xyz) | 7 pose + 42 hand + 93 face |
+| `api/preprocessing_live_data.py` | Live inference | 151 features (frame-averaged) | 543 landmarks × 2 (xy) |
+| `signai/word_classification/preprocessing.py` | Word classifier training data (3-stream) | per-landmark Gaussian heatmaps (32,49,96,96) + hand/mouth RGB crops (32,224,224,3) | 7 pose + 21+21 hand |
 
 **Normalization pipeline:**
 
