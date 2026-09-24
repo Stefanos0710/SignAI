@@ -18,6 +18,11 @@ path, word, start_time, end_time, transcript, gloss
 individual per-word clips, cut out of the sentence videos with ffmpeg (must
 be on PATH), written to dataset/word_clips/<eaf_stem>_<participant>_<index>.mp4
 
+Run from the repository root:
+    source /loctmp/zzm01651/signai-venv/bin/activate
+    python -m pip install -r requirements.txt
+    python signai/word_classification/segmentation_videos.py
+
 """
 import csv
 import logging
@@ -40,6 +45,19 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 BATCH_SIZE = 150   # segments per ffmpeg call; keeps the command line under Windows' ~32K limit
 WORKERS = 4        # parallel ffmpeg processes (subprocess calls release the GIL)
+
+
+def find_ffmpeg():
+    """Return a usable ffmpeg executable from PATH or imageio-ffmpeg."""
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is not None:
+        return ffmpeg
+
+    try:
+        from imageio_ffmpeg import get_ffmpeg_exe
+    except ImportError:
+        return None
+    return get_ffmpeg_exe()
 
 
 def clean_trancript(transcript):
@@ -108,7 +126,7 @@ def load_segments(segments_csv):
     return groups
 
 
-def cut_batch(video_path, batch, out_dir, prefix):
+def cut_batch(video_path, batch, out_dir, prefix, ffmpeg):
     """Cut one batch of segments out of a single source video in one ffmpeg process.
 
     Chaining multiple `-ss/-t/output` triplets after a single `-i` lets ffmpeg
@@ -116,7 +134,7 @@ def cut_batch(video_path, batch, out_dir, prefix):
     per clip -- far cheaper than one ffmpeg process (or a Python decode loop)
     per segment.
     """
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(video_path)]
+    cmd = [ffmpeg, "-y", "-loglevel", "error", "-i", str(video_path)]
     for index, start_ms, end_ms in batch:
         out = out_dir / f"{prefix}_{index:04d}.mp4"
         cmd += [
@@ -135,8 +153,11 @@ def cutting_segments_from_videos(segments_csv, videos_dir, out_dir, workers=WORK
     Resumable: segments whose output file already exists are skipped, as are
     (eaf_file, participant) groups whose video hasn't been downloaded yet.
     """
-    if shutil.which("ffmpeg") is None:
-        raise RuntimeError("ffmpeg not found on PATH -- install it (e.g. `conda install ffmpeg`) first.")
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        raise RuntimeError(
+            "ffmpeg not found. Install it on PATH or install the Python fallback with `pip install imageio-ffmpeg`."
+        )
 
     out_dir.mkdir(parents=True, exist_ok=True)
     groups = load_segments(segments_csv)
@@ -167,7 +188,7 @@ def cutting_segments_from_videos(segments_csv, videos_dir, out_dir, workers=WORK
     failed = 0
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
-            pool.submit(cut_batch, video_path, batch, out_dir, prefix): prefix
+            pool.submit(cut_batch, video_path, batch, out_dir, prefix, ffmpeg): prefix
             for video_path, batch, prefix in jobs
         }
         for fut in tqdm(as_completed(futures), total=len(futures), desc="Cutting clips"):

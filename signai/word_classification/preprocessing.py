@@ -84,7 +84,7 @@ N_FEATURES = N_LANDMARKS * 3               # 147 per frame (no face -- words are
                                             # the intermediate representation before heatmap rendering
 MAX_FRAMES = 32                            # ~99th percentile of the segment durations at 50 fps
 MIN_SAMPLES_PER_CLASS = 5
-NUM_WORKERS = 16
+NUM_WORKERS = 20
 SEED = 42
 
 # --- per-landmark heatmap rendering ---------------------------------------------------------
@@ -424,8 +424,14 @@ def build_dataset(jobs, workers=NUM_WORKERS):
 
 
 def filter_rare_classes(clip_ids, X, labels, images, min_samples=MIN_SAMPLES_PER_CLASS):
+    if len(labels) == 0:
+        raise RuntimeError(
+            f"No usable word clips found in {CLIPS_DIR}. "
+            "Download the videos, run segmentation_videos.py, then rerun with --rebuild-cache."
+        )
+
     counts = Counter(labels)
-    keep = np.array([counts[l] >= min_samples for l in labels])
+    keep = np.array([counts[l] >= min_samples for l in labels], dtype=bool)
     dropped_classes = sum(1 for c in counts.values() if c < min_samples)
     logging.info(
         f"Dropped {dropped_classes} class(es) with < {min_samples} samples "
