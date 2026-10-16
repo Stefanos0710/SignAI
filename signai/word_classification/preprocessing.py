@@ -1,7 +1,7 @@
 """Turn the per-word clips cut by `segmentation_videos.py` into a train/val/test dataset.
 
 Input:
-    dataset/segments.csv   -- one row per segment: eaf_file, participant, index, ..., transcript
+    dataset/segments.csv   -- one row per segment: eaf_file, participant, signer, index, ..., transcript
     dataset/word_clips/    -- <eaf_stem>_<participant>_<index:04d>.mp4, cut from those rows
 
 Output:
@@ -9,7 +9,13 @@ Output:
                                                         keypoints (49 landmarks x (x, y, z), flattened per
                                                         frame -- the model renders the per-landmark heatmaps
                                                         on the GPU, see models/heatmap.py), y (N,) int64,
-                                                        clip_ids (N,) int64, classes (C,) label strings
+                                                        clip_ids (N,) int64, classes (C,) label strings,
+                                                        signers (N,) informant codes (e.g. "sh-03")
+    dataset/processed/excluded_{data,images}.npz   -- same layout, for the clips outside the train
+                                                        vocabulary (see assign_person_splits); never
+                                                        trained or scored, kept so a re-split
+                                                        (models/split_by_person.py) loses nothing
+    dataset/processed/split.json                   -- which signers ended up in which split
     dataset/processed/{train,val,test}_images.npz  -- clip_ids (N,) int64 (matches *_data.npz row
                                                         for row, so the two files can be verified
                                                         aligned instead of assumed aligned), plus
@@ -35,7 +41,9 @@ Pipeline (mirrors signai/letter_classification/preprocess_v3.py, but per video i
     5) Resample / zero-pad every clip (both the keypoint sequence and the three crop sequences,
        using the same frame indices) to MAX_FRAMES frames.
     6) Applying Shades-of-Gray Coloring to the crops to reduce skin tone bias
-    7) Drop classes with fewer than MIN_SAMPLES_PER_CLASS clips, then split per class (stratified).
+    7) Split by person (signer-independent, see assign_person_splits): every signer and their
+       recording partner land in exactly one of train/val/test, so val/test are unseen-signer
+       numbers. The vocabulary is the classes with >= MIN_SAMPLES_PER_CLASS train clips.
 
 Run from the repo root:
     python signai/word_classification/preprocessing.py                  # extract (resumes) + split
@@ -97,6 +105,7 @@ SEGMENTS_CSV = DATASET_DIR / "segments.csv"
 OUT_DIR = PROCESSED_DIR
 SHARD_DIR = OUT_DIR / "shards"
 PROGRESS_FILE = OUT_DIR / "progress.json"
+SPLIT_FILE = OUT_DIR / "split.json"
 LOG_FILE = OUT_DIR / "preprocessing.log"
 WORKER_LOG_FILE = OUT_DIR / "worker_stderr.log"
 
@@ -105,7 +114,11 @@ N_HAND = 21
 N_LANDMARKS = N_POSE + 2 * N_HAND          # 7 pose + 42 hand = 49
 N_FEATURES = N_LANDMARKS * 3               # 147 per frame (no face -- words are hand/arm shapes)
 MAX_FRAMES = 32                            # ~99th percentile of the segment durations at 50 fps
-MIN_SAMPLES_PER_CLASS = 5
+MIN_SAMPLES_PER_CLASS = 20                 # train clips a class needs to be in the vocabulary
+SPLIT_NAMES = ("train", "val", "test")
+EXCLUDED = "excluded"                      # clips outside the train vocabulary, see assign_person_splits
+VAL_RATIO = 0.1                            # share of the clips, cut along signer-pair boundaries
+TEST_RATIO = 0.1
 NUM_WORKERS = os.cpu_count()               # a MediaPipe worker keeps ~1.2 cores busy
 SHARD_SIZE = 2000                          # clips per checkpoint file
 PROGRESS_INTERVAL = 30                     # seconds between progress.json updates between checkpoints
@@ -185,6 +198,16 @@ def anchor_hands_to_wrist(sequence):
     return sequence
 
 
+def clip_name(row):
+    """segments.csv row -> the clip filename segmentation_videos.py cut it to."""
+    return f"{Path(row['eaf_file']).stem}_{row['participant']}_{int(row['index']):04d}.mp4"
+
+
+def transcript_of(name):
+    """Clip filename -> the transcript (recording) it was cut from, i.e. the eaf stem."""
+    return name.rsplit("_", 2)[0]
+
+
 def load_labels():
     """Map clip filename -> transcript, for the clips that actually exist on disk."""
     labels = {}
@@ -193,10 +216,19 @@ def load_labels():
             transcript = row["transcript"].strip()
             if not transcript:
                 continue
-            prefix = Path(row["eaf_file"]).stem
-            name = f"{prefix}_{row['participant']}_{int(row['index']):04d}.mp4"
-            labels[name] = transcript
+            labels[clip_name(row)] = transcript
     return labels
+
+
+def load_signers():
+    """Map clip filename -> signer: the corpus-wide informant code (e.g. "sh-03") that
+    segmentation_videos.py copies from the EAF tier into segments.csv. The participant column
+    (A/B) is only the seat within one recording, not a person."""
+    with open(SEGMENTS_CSV, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        if "signer" not in reader.fieldnames:
+            raise RuntimeError(f"{SEGMENTS_CSV} has no signer column -- rerun segmentation_videos.py")
+        return {clip_name(row): row["signer"] for row in reader}
 
 
 def average_shoulders(pose_keypoints):
@@ -600,61 +632,142 @@ def load_shards(jobs):
     )
 
 
-def filter_rare_classes(clip_ids, X, labels, images, min_samples=MIN_SAMPLES_PER_CLASS):
-    if len(labels) == 0:
-        raise RuntimeError(
-            f"No usable word clips found in {CLIPS_DIR}. "
-            "Download the videos, run segmentation_videos.py, then rerun with --rebuild-cache."
-        )
+def signer_groups(signers, transcripts):
+    """-> {signer: group id}. Signers who share a transcript (the two partners of a recording) are
+    one group, so a pair never straddles train/val/test: they share the room, lighting and camera
+    setup, and one partner in train would leak that into the other's val/test clips. A group's id
+    is its alphabetically first signer, so it doesn't depend on the order of the clips."""
+    parent = {s: s for s in set(signers)}
 
-    counts = Counter(labels)
-    keep = np.array([counts[l] >= min_samples for l in labels], dtype=bool)
-    dropped_classes = sum(1 for c in counts.values() if c < min_samples)
-    logging.info(
-        f"Dropped {dropped_classes} class(es) with < {min_samples} samples "
-        f"({(~keep).sum()} clips); {len(counts) - dropped_classes} classes left"
-    )
-    return clip_ids[keep], X[keep], labels[keep], {key: val[keep] for key, val in images.items()}
+    def find(s):
+        while parent[s] != s:
+            parent[s] = parent[parent[s]]
+            s = parent[s]
+        return s
+
+    first_signer = {}
+    for signer, transcript in zip(signers, transcripts):
+        parent[find(signer)] = find(first_signer.setdefault(transcript, signer))
+    group_id = {}
+    for s in sorted(parent):
+        group_id.setdefault(find(s), s)
+    return {s: group_id[find(s)] for s in parent}
 
 
-def split_and_save(clip_ids, X, labels, images, output_folder=OUT_DIR, val_ratio=0.1, test_ratio=0.1, seed=SEED):
-    """Stratified split -- every class keeps at least one val and one test sample.
+def assign_person_splits(signers, transcripts, labels, val_ratio=VAL_RATIO, test_ratio=TEST_RATIO,
+                         min_samples=MIN_SAMPLES_PER_CLASS, seed=SEED):
+    """Signer-independent split: every signer (together with their recording partner, see
+    signer_groups) lands in exactly one of train/val/test, so val/test measure how the model does
+    on people it has never seen -- a per-clip split puts the same signers in all three.
 
-    Writes {split}_data.npz (X, y, clip_ids, classes) and {split}_images.npz (clip_ids,
-    left_hand, right_hand, mouth), row-aligned by clip_ids in both files.
+    The groups are shuffled, interleaved round-robin by region (the informant code's prefix, e.g.
+    "sh" = Schleswig-Holstein) so test and val each cover as many dialect regions as possible, and
+    cut by cumulative clip count into test_ratio / val_ratio / the rest. The vocabulary is then
+    every class with >= min_samples *train* clips; a clip of any other class can be neither
+    learned nor scored by a closed-set classifier and goes to EXCLUDED, whichever split it's in.
+
+    -> (split (N,) str array of SPLIT_NAMES / EXCLUDED, {signer: "train"/"val"/"test"})
     """
-    classes = np.array(sorted(set(labels.tolist())))
-    class_to_idx = {c: i for i, c in enumerate(classes)}
-    y = np.array([class_to_idx[l] for l in labels], dtype=np.int64)
+    signers, labels = np.asarray(signers), np.asarray(labels)
+    group_of = signer_groups(signers.tolist(), list(transcripts))
+    clip_group = np.array([group_of[s] for s in signers.tolist()])
+    groups, sizes = np.unique(clip_group, return_counts=True)
+    if len(groups) < 3:
+        raise RuntimeError(f"only {len(groups)} signer group(s) -- a person split needs at least 3 "
+                           "(train, val, test); use more clips (a larger --limit)")
 
     rng = np.random.default_rng(seed)
-    train_idx, val_idx, test_idx = [], [], []
-    for cls in range(len(classes)):
-        idx = np.where(y == cls)[0]
-        rng.shuffle(idx)
-        n_test = max(1, int(round(test_ratio * len(idx))))
-        n_val = max(1, int(round(val_ratio * len(idx))))
-        test_idx += idx[:n_test].tolist()
-        val_idx += idx[n_test:n_test + n_val].tolist()
-        train_idx += idx[n_test + n_val:].tolist()
+    by_region = {}
+    for i in rng.permutation(len(groups)):
+        by_region.setdefault(groups[i].split("-")[0], []).append(i)
+    queues = list(by_region.values())
+    queues = [queues[i] for i in rng.permutation(len(queues))]
+    order = np.array([q[k] for k in range(max(map(len, queues))) for q in queues if k < len(q)])
 
-    output_folder.mkdir(parents=True, exist_ok=True)
-    for split_name, idx in (("train", train_idx), ("val", val_idx), ("test", test_idx)):
-        idx = np.array(idx)
+    # a group goes where the middle of its clip range falls; at least one group each in test and val
+    midpoint = (np.cumsum(sizes[order]) - sizes[order] / 2) / sizes.sum()
+    n_test = max(1, int((midpoint < test_ratio).sum()))
+    n_val = max(1, int((midpoint < test_ratio + val_ratio).sum()) - n_test)
+    group_split = {groups[i]: "test" if k < n_test else "val" if k < n_test + n_val else "train"
+                   for k, i in enumerate(order)}
+    split = np.array([group_split[g] for g in clip_group], dtype=object)
+
+    train_counts = Counter(labels[split == "train"].tolist())
+    split[np.array([train_counts[l] < min_samples for l in labels.tolist()])] = EXCLUDED
+    if not (split != EXCLUDED).any():
+        raise RuntimeError(f"no class has {min_samples}+ train clips -- use more clips")
+    return split.astype(str), {s: group_split[g] for s, g in group_of.items()}
+
+
+def split_rows(split, clip_ids, seed=SEED):
+    """-> {split name: row indices of that split, shuffled}, for SPLIT_NAMES and EXCLUDED. Sorted by
+    clip_id before shuffling, so the row order doesn't depend on the order the clips came in."""
+    rng = np.random.default_rng(seed)
+    rows = {}
+    for name in (*SPLIT_NAMES, EXCLUDED):
+        idx = np.where(split == name)[0]
+        idx = idx[np.argsort(clip_ids[idx], kind="stable")]
         rng.shuffle(idx)
+        rows[name] = idx
+    return rows
+
+
+def class_lists(labels, split):
+    """-> {split name: sorted class list}. train/val/test share the vocabulary (what
+    assign_person_splits didn't exclude); EXCLUDED's labels are outside it by definition, so that
+    file gets its own list."""
+    vocabulary = np.array(sorted(set(labels[split != EXCLUDED].tolist())))
+    excluded = np.array(sorted(set(labels[split == EXCLUDED].tolist())))
+    return {**{name: vocabulary for name in SPLIT_NAMES}, EXCLUDED: excluded}
+
+
+def write_split_info(split, signer_split, signers, num_classes, output_folder=OUT_DIR, seed=SEED):
+    """split.json: which signers ended up in which split (with their clip counts) and how many
+    clips were excluded, so the split can be checked without opening the npz files."""
+    kept = Counter(zip(split.tolist(), signers.tolist()))
+    info = {
+        "method": "person: every signer and their recording partner in exactly one split",
+        "seed": seed, "val_ratio": VAL_RATIO, "test_ratio": TEST_RATIO,
+        "min_train_samples_per_class": MIN_SAMPLES_PER_CLASS,
+        "classes": int(num_classes),
+    }
+    info["splits"] = {
+        name: {
+            "clips": int((split == name).sum()),
+            "signers": {s: kept[(name, s)] for s in sorted(signer_split) if signer_split[s] == name},
+        }
+        for name in SPLIT_NAMES
+    }
+    info["splits"][EXCLUDED] = {"clips": int((split == EXCLUDED).sum())}
+    output_folder.mkdir(parents=True, exist_ok=True)
+    (output_folder / SPLIT_FILE.name).write_text(json.dumps(info, indent=2))
+
+
+def split_and_save(clip_ids, X, labels, signers, images, split, signer_split, output_folder=OUT_DIR,
+                   seed=SEED):
+    """Writes {split}_data.npz (X, y, clip_ids, classes, signers) and {split}_images.npz (clip_ids,
+    left_hand, right_hand, mouth), row-aligned by clip_ids in both files, for SPLIT_NAMES and
+    EXCLUDED (split: assign_person_splits's per-clip assignment), plus split.json.
+    """
+    classes = class_lists(labels, split)
+    output_folder.mkdir(parents=True, exist_ok=True)
+    for name, idx in split_rows(split, clip_ids, seed).items():
         np.savez_compressed(
-            output_folder / f"{split_name}_data.npz",
-            X=X[idx], y=y[idx], clip_ids=clip_ids[idx], classes=classes,
+            output_folder / f"{name}_data.npz",
+            X=X[idx], y=np.searchsorted(classes[name], labels[idx]).astype(np.int64),
+            clip_ids=clip_ids[idx], classes=classes[name], signers=signers[idx],
         )
         # images are already JPEG-compressed -- plain savez skips paying zlib twice
         np.savez(
-            output_folder / f"{split_name}_images.npz",
+            output_folder / f"{name}_images.npz",
             clip_ids=clip_ids[idx],
             **{key: val[idx] for key, val in images.items()},
         )
-        logging.info(f"{split_name}: {len(idx)} samples -> {output_folder / f'{split_name}_data.npz'}")
+        logging.info(f"{name}: {len(idx)} samples, {len(set(signers[idx].tolist()))} signers "
+                     f"-> {output_folder / f'{name}_data.npz'}")
 
-    logging.info(f"Shape per sample: ({MAX_FRAMES}, {N_FEATURES}) | classes: {len(classes)}")
+    write_split_info(split, signer_split, signers, len(classes["train"]), output_folder, seed)
+    logging.info(f"Shape per sample: ({MAX_FRAMES}, {N_FEATURES}) | classes: {len(classes['train'])}")
 
 
 def demo():
@@ -758,18 +871,54 @@ def demo():
     assert format_duration(59) == "0m 59s" and format_duration(3 * 3600 + 120) == "3h 02m"
     assert format_duration(2 * 86400 + 3600) == "2d 1h 00m"
 
-    labels = np.array(["A"] * 20 + ["B"] * 5 + ["C"] * 2)
-    clip_ids = np.arange(len(labels))
-    X = np.zeros((len(labels), MAX_FRAMES, N_FEATURES), dtype=np.float32)
-    dummy_images = {k: np.array([[b"x"] * MAX_FRAMES] * len(labels), dtype=object) for k in CROP_TYPES}
-    ids_kept, X_kept, labels_kept, images_kept = filter_rare_classes(clip_ids, X, labels, dummy_images)
-    assert set(labels_kept.tolist()) == {"A", "B"} and len(X_kept) == 25
-    assert len(ids_kept) == 25 and all(len(v) == 25 for v in images_kept.values())
+    assert transcript_of("1418836-15524810-15550340_B_0042.mp4") == "1418836-15524810-15550340"
+
+    # assign_person_splits: 6 recording pairs over 2 regions; per signer 35 clips of a shared gloss
+    # and exactly MIN_SAMPLES_PER_CLASS of a gloss only that signer uses
+    signers, transcripts, labels = [], [], []
+    per_signer = 35 + MIN_SAMPLES_PER_CLASS
+    for region in ("aa", "bb"):
+        for pair in range(3):
+            for seat in range(2):
+                signer = f"{region}-{2 * pair + seat:02d}"
+                signers += [signer] * per_signer
+                transcripts += [f"{region}{pair}"] * per_signer
+                labels += ["SHARED"] * 35 + [f"ONLY-{signer}"] * MIN_SAMPLES_PER_CLASS
+    signers, labels = np.array(signers), np.array(labels)
+    split, signer_split = assign_person_splits(signers, transcripts, labels)
+    for signer in set(signers.tolist()):
+        mine = split[(signers == signer) & (split != EXCLUDED)]
+        assert set(mine.tolist()) == {signer_split[signer]}, "a signer's clips all go to one split"
+    for region in ("aa", "bb"):
+        for pair in range(3):
+            assert signer_split[f"{region}-{2 * pair:02d}"] == signer_split[f"{region}-{2 * pair + 1:02d}"], (
+                "recording partners stay together")
+    assert set(signer_split.values()) == set(SPLIT_NAMES), "train, val and test each get a pair"
+    for signer, name in signer_split.items():
+        only = split[labels == f"ONLY-{signer}"]
+        assert set(only.tolist()) == ({"train"} if name == "train" else {EXCLUDED}), (
+            "a gloss nobody in train signs is excluded, one with enough train clips is kept")
+    assert (split[labels == "SHARED"] != EXCLUDED).all()
+    shuffled = np.random.default_rng(1).permutation(len(split))
+    assert np.array_equal(split[shuffled], assign_person_splits(
+        signers[shuffled], [transcripts[i] for i in shuffled], labels[shuffled])[0]), "independent of clip order"
+    try:
+        assign_person_splits(signers[:2 * per_signer], transcripts[:2 * per_signer], labels[:2 * per_signer])
+        raise AssertionError("a single pair must not be split")
+    except RuntimeError:
+        pass
+
+    classes = class_lists(labels, split)
+    assert "SHARED" in classes["test"] and not set(classes["test"]) & set(classes[EXCLUDED])
+    rows = split_rows(split, np.arange(len(split)))
+    assert sorted(np.concatenate(list(rows.values())).tolist()) == list(range(len(split)))
 
     names = load_labels()
+    signer_of = load_signers()
     existing = [p.name for p in CLIPS_DIR.glob("*.mp4")][:50] if CLIPS_DIR.exists() else []
     for name in existing:
         assert name in names, f"clip {name} has no row in {SEGMENTS_CSV.name}"
+        assert signer_of.get(name), f"clip {name} has no signer in {SEGMENTS_CSV.name}"
     print(f"self-check passed ({len(existing)} real clip name(s) checked)")
 
 
@@ -811,8 +960,17 @@ def main(rebuild_cache=False, workers=NUM_WORKERS, limit=None):
 
     reporter.write(phase="merging + splitting")
     clip_ids, X, labels, images = load_shards(jobs)
-    clip_ids, X, labels, images = filter_rare_classes(clip_ids, X, labels, images)
-    split_and_save(clip_ids, X, labels, images)
+    if len(labels) == 0:
+        raise RuntimeError(
+            f"No usable word clips found in {CLIPS_DIR}. "
+            "Download the videos, run segmentation_videos.py, then rerun with --rebuild-cache."
+        )
+    names = [jobs[cid][0].name for cid in clip_ids]
+    signer_of = load_signers()
+    signers = np.array([signer_of[name] for name in names])
+    split, signer_split = assign_person_splits(signers, [transcript_of(n) for n in names], labels)
+    logging.info(f"{(split == EXCLUDED).sum():,} clip(s) outside the train vocabulary -> {EXCLUDED}")
+    split_and_save(clip_ids, X, labels, signers, images, split, signer_split)
     reporter.write(phase="done")
 
 

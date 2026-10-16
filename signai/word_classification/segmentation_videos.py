@@ -13,7 +13,7 @@ Output:
 
 csv file with all segments
 
-path, word, start_time, end_time, transcript, gloss
+eaf_file, participant (A/B), signer (corpus informant code, e.g. sh-03), index, start_ms, end_ms, transcript
 
 individual per-word clips, cut out of the sentence videos with ffmpeg (must
 be on PATH), written to dataset/word_clips/<eaf_stem>_<participant>_<index>.mp4
@@ -71,7 +71,7 @@ def clean_trancript(transcript):
 def create_csv_from_eaf(eaf_path, participants):
     with open(output_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["eaf_file", "participant", "index", "start_ms", "end_ms", "transcript"])
+        writer.writerow(["eaf_file", "participant", "signer", "index", "start_ms", "end_ms", "transcript"])
 
         for eaf_path in sorted(eaf_dir.glob("*.eaf")):
             eaf = pympi.Elan.Eaf(str(eaf_path))
@@ -84,9 +84,13 @@ def create_csv_from_eaf(eaf_path, participants):
                     continue
                 found_any = True
 
+                # A/B is only the seat in this recording; the tier's PARTICIPANT attribute is the
+                # corpus-wide informant code (e.g. "sh-03"), the same person across transcripts
+                signer = eaf.tiers[tier_name][2].get("PARTICIPANT", "")
+
                 annotations = eaf.get_annotation_data_for_tier(tier_name)
                 for i, (start, end, transcription) in enumerate(annotations, start=1):
-                    writer.writerow([eaf_path.name, participant, i, start, end, clean_trancript(transcription)])
+                    writer.writerow([eaf_path.name, participant, signer, i, start, end, clean_trancript(transcription)])
 
             if not found_any:
                 print(f"skipping {eaf_path.name}: no 'Lexem_Gebärde_r_A/B' tier")

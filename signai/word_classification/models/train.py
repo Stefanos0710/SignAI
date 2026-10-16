@@ -19,8 +19,11 @@ RESUME: every epoch writes checkpoints/word_classifier_latest.keras + state.json
 epochs, best val_accuracy so far). Rerunning the same command picks up from there -- Ctrl-C or a
 crash loses at most the epoch in progress, not the whole run. --restart ignores that state and
 starts a fresh run (the previous checkpoints are overwritten once the new run reaches their epoch).
+state.json also records split_fingerprint(); a checkpoint is never resumed on a different split
+(e.g. after split_by_person.py), since it would already have seen the new val clips.
 """
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -145,6 +148,17 @@ def create_dataset(split: str, batch_size: int = 8, shuffle: bool = False):
     return dataset, classes
 
 
+def split_fingerprint() -> str:
+    """sha1 of the class list and the train/val clip_ids -- changes whenever the data is re-split."""
+    digest = hashlib.sha1()
+    for split in ("train", "val"):
+        with np.load(os.path.join(DATASET_DIR, f"{split}_data.npz"), allow_pickle=True) as data:
+            digest.update(np.ascontiguousarray(data["clip_ids"], dtype=np.int64).tobytes())
+            if split == "train":
+                digest.update("\n".join(data["classes"].tolist()).encode())
+    return digest.hexdigest()
+
+
 def build_dataset(split: str, batch_size: int = BATCH_SIZE, shuffle: bool = False):
     """WordClassifier's actual input for a split: pose heatmaps (load_split) +
     cached hand/face DINOv3 features (load_hand_features/load_face_features) -> y.
@@ -170,10 +184,12 @@ class TrainingProgress(keras.callbacks.Callback):
     the dashboard has a live step/loss/accuracy/ETA during a long epoch, not just at its end.
     """
 
-    def __init__(self, total_epochs, steps_per_epoch, initial_best_val_accuracy=None, initial_best_epoch=None):
+    def __init__(self, total_epochs, steps_per_epoch, initial_best_val_accuracy=None, initial_best_epoch=None,
+                 fingerprint=None):
         super().__init__()
         self.total_epochs = total_epochs
         self.steps_per_epoch = steps_per_epoch
+        self.fingerprint = fingerprint
         self.best_val_accuracy = initial_best_val_accuracy
         self.best_epoch = initial_best_epoch
         self.started_at = datetime.now()
@@ -215,6 +231,7 @@ class TrainingProgress(keras.callbacks.Callback):
             "completed_epochs": self._epoch,
             "best_val_accuracy": self.best_val_accuracy,
             "best_epoch": self.best_epoch,
+            "split_fingerprint": self.fingerprint,
         }, indent=2))
         os.replace(tmp, STATE_FILE)
 
@@ -294,13 +311,21 @@ def train_main(epochs: int = EPOCHS, batch_size: int = BATCH_SIZE, learning_rate
         for f in (STATE_FILE, LATEST_CKPT, PROGRESS_FILE):
             f.unlink(missing_ok=True)
 
+    fingerprint = split_fingerprint()
+    state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() and LATEST_CKPT.exists() else None
+    if state is not None and state.get("split_fingerprint") != fingerprint:
+        raise SystemExit(
+            f"{LATEST_CKPT.name} was trained on a different train/val split than the one in "
+            f"{DATASET_DIR} (re-split since, e.g. by split_by_person.py) -- resuming would train on "
+            "clips it then validates on. Start over with --restart."
+        )
+
     train_ds, n_train, classes = build_dataset("train", batch_size, shuffle=True)
     val_ds, _, _ = build_dataset("val", batch_size)
     steps_per_epoch = -(-n_train // batch_size)  # ceil
 
     initial_epoch, best_val_accuracy, best_epoch = 0, None, None
-    if STATE_FILE.exists() and LATEST_CKPT.exists():
-        state = json.loads(STATE_FILE.read_text())
+    if state is not None:
         initial_epoch = state["completed_epochs"]
         best_val_accuracy = state.get("best_val_accuracy")
         best_epoch = state.get("best_epoch")
@@ -324,7 +349,7 @@ def train_main(epochs: int = EPOCHS, batch_size: int = BATCH_SIZE, learning_rate
         keras.callbacks.ModelCheckpoint(str(BEST_CKPT), monitor="val_accuracy", save_best_only=True,
                                          initial_value_threshold=best_val_accuracy),
         keras.callbacks.ModelCheckpoint(str(LATEST_CKPT), save_best_only=False),
-        TrainingProgress(epochs, steps_per_epoch, best_val_accuracy, best_epoch),
+        TrainingProgress(epochs, steps_per_epoch, best_val_accuracy, best_epoch, fingerprint),
     ]
 
     return model.fit(train_ds, validation_data=val_ds, epochs=epochs, initial_epoch=initial_epoch,

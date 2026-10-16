@@ -10,13 +10,14 @@ Run from the repo root:
     python signai/word_classification/models/evaluate.py --train-subset 30000   # + train-subset metrics
 
 Inference runs once per split/variant: the logits are cached in checkpoints/eval/<checkpoint>/
-(keyed by the checkpoint's mtime and size), so re-running only recomputes the metrics, not the
-model. Writes into that folder: report.md, metrics.json, per_class_<split>.csv,
-confusions_<split>.csv and the *.png plots.
+(keyed by the checkpoint's and the split file's mtime and size), so re-running only recomputes
+the metrics, not the model. Writes into that folder: report.md, metrics.json,
+per_class_<split>.csv, confusions_<split>.csv and the *.png plots.
 
-Note on the split: preprocessing.py splits stratified per class but *not* per signer, so the
-same signers/sessions occur in train and test -- the test numbers are within-signer numbers,
-an upper bound for unseen signers (the report quantifies the overlap).
+Note on the split: preprocessing.py / split_by_person.py split by person, so no test signer has
+clips in train and the test numbers are unseen-signer numbers. The report states the measured
+signer overlap (0% for a person split; for data from the older per-clip split it falls back to
+the session overlap, which shows how much leaked).
 """
 import argparse
 import csv
@@ -151,9 +152,11 @@ class LogitCache:
     def get(self, split: str, variant: str = "", indices=None, permute: str | None = None, seed: int = 0):
         """-> (logits (N, C) float32, y (N,), clip_ids (N,), classes (C,))"""
         path = self.out_dir / f"{split}{'_' + variant if variant else ''}_logits.npz"
+        # the split file is part of the key: after a re-split the cached logits are another split's
+        key = f"{self.key}|{checkpoint_key(PROCESSED_DIR / f'{split}_data.npz')}"
         if path.exists() and not self.recompute:
             with np.load(path, allow_pickle=True) as cached:
-                if str(cached["checkpoint_key"]) == self.key:
+                if str(cached["checkpoint_key"]) == key:
                     logging.info(f"using cached logits {path.name}")
                     return cached["logits"], cached["y"], cached["clip_ids"], cached["classes"]
 
@@ -167,7 +170,10 @@ class LogitCache:
         started = time.time()
         logits = predict_logits(self.model, inputs, self.batch_size)
         logging.info(f"done in {time.time() - started:.0f}s")
-        np.savez(path, logits=logits, y=y, clip_ids=clip_ids, classes=classes, checkpoint_key=self.key)
+        if logits.shape[1] != len(classes):
+            raise SystemExit(f"{self.checkpoint.name} predicts {logits.shape[1]} classes, the data has "
+                             f"{len(classes)} -- it was trained on another split; retrain (train.py --restart)")
+        np.savez(path, logits=logits, y=y, clip_ids=clip_ids, classes=classes, checkpoint_key=key)
         return logits, y, clip_ids, classes
 
 
@@ -725,7 +731,13 @@ def render_report(results, checkpoint: Path, history):
     ]
     if "by_duration" in results:
         lines += ["## Accuracy by clip duration (test)", "", *group_table(results["by_duration"], "duration"), ""]
-    if "session_overlap" in results:
+    if "signer_overlap" in results:
+        overlap = results["signer_overlap"]
+        lines += [f"Signer overlap: {pct(overlap)} of test clips are signed by someone who also has clips in train"
+                  + (" -- a person split, so these are unseen-signer numbers (signers per split: "
+                     "`processed/split.json`)." if overlap == 0 else ", so these are partly within-signer numbers."),
+                  ""]
+    elif "session_overlap" in results:
         lines += [f"Signer/session overlap: {pct(results['session_overlap'])} of test clips come from a "
                   "session+participant that also has clips in train (the split is per gloss, not per signer), "
                   "so these are within-signer numbers.", ""]
@@ -781,6 +793,8 @@ def main(checkpoint_name="best", splits=("val", "test"), batch_size=BATCH_SIZE, 
 
     with np.load(PROCESSED_DIR / "train_data.npz", allow_pickle=True) as train_data:
         train_y, classes, train_clip_ids = train_data["y"], train_data["classes"], train_data["clip_ids"]
+        # informant codes per clip; only in data written since the person split
+        train_signers = set(train_data["signers"].tolist()) if "signers" in train_data.files else None
     train_counts = np.bincount(train_y, minlength=len(classes))
     history = parse_train_log()
 
@@ -803,6 +817,9 @@ def main(checkpoint_name="best", splits=("val", "test"), batch_size=BATCH_SIZE, 
                      f"macro top-1 {metrics['macro_topk']['top1']:.4f}")
 
         if split == "test":
+            if train_signers is not None:
+                with np.load(PROCESSED_DIR / "test_data.npz", allow_pickle=True) as test_data:
+                    results["signer_overlap"] = float(np.isin(test_data["signers"], list(train_signers)).mean())
             by_duration, session_of = duration_metrics(clip_ids, curves["rank"], y, classes, len(classes))
             if by_duration is not None:
                 results["by_duration"] = by_duration

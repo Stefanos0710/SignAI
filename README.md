@@ -216,6 +216,8 @@ All run from the repo root. Step 4 needs `torch` + `transformers` and a Hugging 
 
 **preprocessing.py:** MediaPipe pose/hand keypoints → shoulder-center + shoulder-scale → Savitzky–Golay smooth → per-landmark Gaussian heatmap (x/y only, z dropped) + left-hand/right-hand/mouth RGB crops (Shades-of-Gray color correction) → resample/pad to 32 frames.
 
+**Split by person:** every signer (DGS-Korpus informant code, e.g. `sh-03`, from `segments.csv`'s `signer` column) and their recording partner are in exactly one of train/val/test (~80/10/10 of the clips, all 13 regions in each), so val/test are unseen-signer numbers. Vocabulary = glosses with ≥20 train clips; other clips go to `excluded_*.npz`. Signers per split: `dataset/processed/split.json`. `models/split_by_person.py` re-splits already processed data (incl. cached features) without re-extracting.
+
 **Model — `models/model.py::WordClassifier`:**
 
 | Stream | Input | Encoder | Output |
