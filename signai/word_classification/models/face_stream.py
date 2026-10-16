@@ -1,7 +1,7 @@
 """Face stream: frozen DINOv3 encoder (precomputed once, cached) -> trainable
 temporal transformer head -> 384-d face-stream feature.
 
-    mouth crops (32, 224, 224, 3) uint8, per clip
+    mouth crops (32, 112, 112, 3) uint8, per clip (preprocessing.CROP_SIZE)
     -> sample 8 frames (hand_stream.sample_frame_indices)
     -> DINOv3 ViT-S/16, frozen               (DinoFaceEncoder)
     -> cached (8, 384) float32               (dataset/processed/{split}_face_features.npz)
@@ -14,22 +14,31 @@ one feature out. Everything else (encoder, frame sampling, temporal head
 architecture) mirrors hand_stream.py; see that file for the shared rationale.
 """
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
 
-import numpy as np
-import keras
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from signai.word_classification.models.gpu_env import ensure_gpu_env  # noqa: E402
+ensure_gpu_env()  # must run before `import keras` -- see gpu_env.py and hand_stream.py's own note
+
+import numpy as np  # noqa: E402
+import keras  # noqa: E402
 
 from signai.word_classification.preprocessing import decode_image_sequence  # noqa: E402
 from signai.word_classification.models.hand_stream import (  # noqa: E402
+    CHECKPOINT_EVERY,
     DINOV3_CHECKPOINT,
     NUM_SAMPLED_FRAMES,
+    TransformerBlock,
     sample_frame_indices,
 )
+from signai.word_classification.models.progress import Progress  # noqa: E402
 from signai.word_classification.paths import PROCESSED_DIR  # noqa: E402
+
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 
 DATASET_DIR = str(PROCESSED_DIR)
 
@@ -105,11 +114,15 @@ class DinoFaceEncoder:
         cls_tokens = outputs.last_hidden_state[:, 0, :]  # (8, 384), one CLS token per frame
         return cls_tokens.cpu().numpy().astype(np.float32)
 
-    def precompute_split(self, split: str, log_every: int = 16):
+    def precompute_split(self, split: str):
         """Run this encoder once over every clip in `split` and cache the result
         to dataset/processed/{split}_face_features.npz -- since the encoder's
         weights never change, its output doesn't need recomputing every
         training run (or every epoch).
+
+        Resumable: checkpoints progress every CHECKPOINT_EVERY clips to a .partial.npz, so a
+        kill/crash loses at most that many clips' GPU time, not the whole split. Skips entirely
+        if the split's output already exists and matches the current clip_ids.
 
         Writes clip_ids (N,) int64, mouth (N, 8, 384) float32 -- clip_ids matches
         {split}_images.npz's, same alignment convention as train.py::load_split.
@@ -117,21 +130,49 @@ class DinoFaceEncoder:
         images = np.load(os.path.join(DATASET_DIR, f"{split}_images.npz"), allow_pickle=True)
         clip_ids = images["clip_ids"]
         n = len(clip_ids)
-
-        mouth = np.empty((n, NUM_SAMPLED_FRAMES, FACE_FEATURE_DIM), dtype=np.float32)
-
-        for i in range(n):
-            mouth[i] = self.extract(decode_image_sequence(images["mouth"][i]))
-            if (i + 1) % log_every == 0 or i + 1 == n:
-                print(f"{split}: {i + 1}/{n} clips", end="\r")
-        print()
-
         out_path = os.path.join(DATASET_DIR, f"{split}_face_features.npz")
+        checkpoint_path = os.path.join(DATASET_DIR, f"{split}_face_features.partial.npz")
+
+        if os.path.exists(out_path):
+            with np.load(out_path) as f:
+                if np.array_equal(f["clip_ids"], clip_ids):
+                    logging.info(f"{split}: {out_path} already up to date, skipping")
+                    return
+
+        start = 0
+        mouth = np.empty((n, NUM_SAMPLED_FRAMES, FACE_FEATURE_DIM), dtype=np.float32)
+        if os.path.exists(checkpoint_path):
+            with np.load(checkpoint_path) as f:
+                if np.array_equal(f["clip_ids"], clip_ids):
+                    start = int(f["next_index"])
+                    mouth[:start] = f["mouth"][:start]
+                    logging.info(f"{split}: resuming face features from clip {start:,}/{n:,}")
+
+        # loading this once up front is required, not just faster: images["mouth"]
+        # re-decompresses and re-unpickles the *entire* array from the npz archive on every
+        # access, so indexing it inside the per-clip loop would redo that (multi-GB)
+        # decompression every iteration
+        mouth_crops = images["mouth"]
+
+        progress = Progress(Path(checkpoint_path).with_suffix("").with_suffix(".progress.json"),
+                             total=n, done=start, unit="clip")
+        for i in range(start, n):
+            mouth[i] = self.extract(decode_image_sequence(mouth_crops[i]))
+            progress.update(1)
+            if (i + 1) % CHECKPOINT_EVERY == 0 or i + 1 == n:
+                np.savez(checkpoint_path, clip_ids=clip_ids, mouth=mouth, next_index=i + 1)
+                progress.write(phase=f"face features: {split}")
+            elif progress.due():
+                progress.write(phase=f"face features: {split}", log=False)
+
         np.savez(out_path, clip_ids=clip_ids, mouth=mouth)
-        print(f"wrote {out_path}")
+        if os.path.exists(checkpoint_path):
+            os.remove(checkpoint_path)
+        logging.info(f"wrote {out_path}")
 
 # --- trainable temporal head (Keras) ---------------------------------------------------------
 
+@keras.saving.register_keras_serializable(package="signai")
 class FaceTemporalHead(keras.layers.Layer):
     """Trainable pre-LN transformer over the mouth's (batch, 8, 384) DINOv3
     features: prepend a learned CLS token, add learned positional embeddings,
@@ -143,6 +184,9 @@ class FaceTemporalHead(keras.layers.Layer):
         super().__init__(**kwargs)
         self.num_frames = num_frames
         self.dim = dim
+        self.num_heads = num_heads
+        self.ffn_dim = ffn_dim
+        self.num_layers = num_layers
 
         self.cls_token = self.add_weight(
             name="cls_token", shape=(1, 1, dim), initializer="random_normal", trainable=True,
@@ -151,18 +195,7 @@ class FaceTemporalHead(keras.layers.Layer):
             name="pos_embedding", shape=(1, num_frames + 1, dim), initializer="random_normal",
             trainable=True,
         )
-
-        self.blocks = []
-        for i in range(num_layers):
-            self.blocks.append(dict(
-                norm1=keras.layers.LayerNormalization(name=f"block{i}_norm1"),
-                attn=keras.layers.MultiHeadAttention(
-                    num_heads=num_heads, key_dim=dim // num_heads, name=f"block{i}_attn"
-                ),
-                norm2=keras.layers.LayerNormalization(name=f"block{i}_norm2"),
-                ffn_up=keras.layers.Dense(ffn_dim, activation="gelu", name=f"block{i}_ffn_up"),
-                ffn_down=keras.layers.Dense(dim, name=f"block{i}_ffn_down"),
-            ))
+        self.blocks = [TransformerBlock(dim, num_heads, ffn_dim, name=f"block{i}") for i in range(num_layers)]
         self.final_norm = keras.layers.LayerNormalization(name="final_norm")
 
     def call(self, x):
@@ -173,15 +206,21 @@ class FaceTemporalHead(keras.layers.Layer):
         x = x + self.pos_embedding
 
         for block in self.blocks:
-            y = block["norm1"](x)
-            x = x + block["attn"](y, y)
-            y = block["norm2"](x)
-            x = x + block["ffn_down"](block["ffn_up"](y))
+            x = block(x)
 
         x = self.final_norm(x)
         return x[:, 0, :]  # CLS token -> (batch, 384)
 
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "num_frames": self.num_frames, "dim": self.dim, "num_heads": self.num_heads,
+            "ffn_dim": self.ffn_dim, "num_layers": self.num_layers,
+        })
+        return config
 
+
+@keras.saving.register_keras_serializable(package="signai")
 class FaceStream(keras.Model):
     """End-to-end face stream: cached mouth DINOv3 features -> 384-d face feature.
 
@@ -220,7 +259,18 @@ def demo():
     assert fused.shape == (4, FACE_FEATURE_DIM)
     assert np.all(np.isfinite(keras.ops.convert_to_numpy(fused)))
 
-    print("self-check passed (3/3 checks)")
+    # 4) get_config round-trip -- see hand_stream.py's equivalent check for why this matters
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path = f"{tmp_dir}/stream.keras"
+        stream.save(path)
+        reloaded = keras.models.load_model(path)
+        reloaded_fused = reloaded(dummy)
+        assert np.allclose(keras.ops.convert_to_numpy(fused), keras.ops.convert_to_numpy(reloaded_fused)), (
+            "reloaded FaceStream must produce identical output"
+        )
+
+    print("self-check passed (4/4 checks)")
 
 
 if __name__ == "__main__":

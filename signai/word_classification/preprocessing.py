@@ -5,17 +5,23 @@ Input:
     dataset/word_clips/    -- <eaf_stem>_<participant>_<index:04d>.mp4, cut from those rows
 
 Output:
-    dataset/processed/{train,val,test}_data.npz    -- X (N, MAX_FRAMES, N_LANDMARKS, HEATMAP_RESOLUTION,
-                                                        HEATMAP_RESOLUTION) float32 -- a per-landmark
-                                                        Gaussian heatmap instead of raw (x, y, z), y (N,)
-                                                        int64, clip_ids (N,) int64, classes (C,) label strings
+    dataset/processed/{train,val,test}_data.npz    -- X (N, MAX_FRAMES, N_FEATURES) float32 body-normalized
+                                                        keypoints (49 landmarks x (x, y, z), flattened per
+                                                        frame -- the model renders the per-landmark heatmaps
+                                                        on the GPU, see models/heatmap.py), y (N,) int64,
+                                                        clip_ids (N,) int64, classes (C,) label strings
     dataset/processed/{train,val,test}_images.npz  -- clip_ids (N,) int64 (matches *_data.npz row
                                                         for row, so the two files can be verified
                                                         aligned instead of assumed aligned), plus
-                                                        left_hand/right_hand/mouth (N,) object arrays,
-                                                        each element a list of MAX_FRAMES JPEG-encoded
-                                                        crops (see decode_image_sequence)
-    dataset/processed/.keypoint_cache.npz          -- extracted sequences + crops, so a re-split is free
+                                                        left_hand/right_hand/mouth (N, MAX_FRAMES) object
+                                                        arrays of JPEG-encoded crops (see
+                                                        decode_image_sequence)
+    dataset/processed/shards/shard_*.npz           -- checkpoints: every SHARD_SIZE extracted clips are saved
+                                                        as they finish, so an interrupted run resumes where it
+                                                        stopped and a re-split is free
+    dataset/processed/progress.json                -- done/total/percent/rate/ETA, rewritten every checkpoint
+    dataset/processed/preprocessing.log            -- the console's log lines, for `tail -f` outside tmux
+    dataset/processed/worker_stderr.log            -- MediaPipe's native log output from the workers
 
 Pipeline (mirrors signai/letter_classification/preprocess_v3.py, but per video instead of per image):
     1) Extract pose + hand keypoints per frame (MediaPipe, same settings as the shared trainer
@@ -26,27 +32,41 @@ Pipeline (mirrors signai/letter_classification/preprocess_v3.py, but per video i
     4) Extract left-hand/right-hand/mouth RGB crops per frame from the same MediaPipe landmarks
        (face mesh mouth points, sliced out of extract_face_keypoints's output), carrying the last
        valid crop forward across frames where that hand/mouth wasn't detected.
-    5) Applying Shades-of-Gray Coloring to the crops to reduce skin tone bias
-    6) Resample / zero-pad every clip (both the keypoint sequence and the three crop sequences,
+    5) Resample / zero-pad every clip (both the keypoint sequence and the three crop sequences,
        using the same frame indices) to MAX_FRAMES frames.
-    7) Render each frame's (x, y) per landmark as a Gaussian heatmap (see generate_heatmap) instead
-       of storing the raw coordinate -- z is dropped, heatmaps are 2D.
-    8) Drop classes with fewer than MIN_SAMPLES_PER_CLASS clips, then split per class (stratified).
+    6) Applying Shades-of-Gray Coloring to the crops to reduce skin tone bias
+    7) Drop classes with fewer than MIN_SAMPLES_PER_CLASS clips, then split per class (stratified).
 
-Run from the repo root:  python signai/word_classification/preprocessing.py [--rebuild-cache]
+Run from the repo root:
+    python signai/word_classification/preprocessing.py                  # extract (resumes) + split
+    python signai/word_classification/preprocessing_dashboard.py        # live progress/ETA dashboard
+    python signai/word_classification/preprocessing.py --status         # one dashboard snapshot
+    python signai/word_classification/preprocessing.py --limit 1000     # quick test on 1000 clips
+    python signai/word_classification/preprocessing.py --rebuild-cache  # drop shards/, start over
 """
 
 import argparse
+import concurrent.futures
 import csv
+import json
 import logging
-import multiprocessing
+import os
+import shutil
 import sys
+import time
 from collections import Counter
+from concurrent.futures.process import BrokenProcessPool
+from datetime import datetime, timedelta
 from pathlib import Path
 
-import cv2
-import numpy as np
-from tqdm import tqdm
+# read by MediaPipe/TensorFlow's C++ logging when they're imported (via train_data below)
+os.environ.setdefault("GLOG_minloglevel", "2")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
+from tqdm import tqdm  # noqa: E402
+from tqdm.contrib.logging import logging_redirect_tqdm  # noqa: E402
 
 # repo root on sys.path so the shared preprocessing helpers can be imported when this file is run
 # as a script (sys.path[0] is this folder, not the repo root)
@@ -75,28 +95,34 @@ logging.basicConfig(
 CLIPS_DIR = DATASET_DIR / "word_clips"
 SEGMENTS_CSV = DATASET_DIR / "segments.csv"
 OUT_DIR = PROCESSED_DIR
-CACHE_FILE = OUT_DIR / ".keypoint_cache.npz"
+SHARD_DIR = OUT_DIR / "shards"
+PROGRESS_FILE = OUT_DIR / "progress.json"
+LOG_FILE = OUT_DIR / "preprocessing.log"
+WORKER_LOG_FILE = OUT_DIR / "worker_stderr.log"
 
 N_POSE = len(POSE_LANDMARKS)
 N_HAND = 21
 N_LANDMARKS = N_POSE + 2 * N_HAND          # 7 pose + 42 hand = 49
-N_FEATURES = N_LANDMARKS * 3               # 147 per frame (no face -- words are hand/arm shapes),
-                                            # the intermediate representation before heatmap rendering
+N_FEATURES = N_LANDMARKS * 3               # 147 per frame (no face -- words are hand/arm shapes)
 MAX_FRAMES = 32                            # ~99th percentile of the segment durations at 50 fps
 MIN_SAMPLES_PER_CLASS = 5
-NUM_WORKERS = 20
+NUM_WORKERS = os.cpu_count()               # a MediaPipe worker keeps ~1.2 cores busy
+SHARD_SIZE = 2000                          # clips per checkpoint file
+PROGRESS_INTERVAL = 30                     # seconds between progress.json updates between checkpoints
+MAX_POOL_RESTARTS = 3
 SEED = 42
 
-# --- per-landmark heatmap rendering ---------------------------------------------------------
-HEATMAP_RESOLUTION = 96     # heatmap is HEATMAP_RESOLUTION x HEATMAP_RESOLUTION per landmark, per frame
-HEATMAP_SIGMA = 1.5         # Gaussian spread, in heatmap pixels
-
 # --- hand/mouth crop extraction -------------------------------------------------------------
-CROP_SIZE = 224          # output crop resolution (square)
+CROP_SIZE = 112          # output crop resolution (square). Hands are ~60-75 px and mouths ~25-30 px
+                         # in the source video, so a bigger crop only stores upscaled pixels; the
+                         # DINOv3 processor resizes to its own 224 input either way
 CROP_MARGIN = 0.3        # padding added on each side, as a fraction of the bbox size
 MIN_CROP_PX = 20         # floor on bbox size (pre-margin), guards degenerate/near-point landmark sets
 JPEG_QUALITY = 85
+CROP_TYPES = ("left_hand", "right_hand", "mouth")
 BLACK_CROP = np.zeros((CROP_SIZE, CROP_SIZE, 3), dtype=np.uint8)
+# one shared bytes object for every black crop, so pickle stores it once per file
+BLACK_JPEG = cv2.imencode(".jpg", BLACK_CROP, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])[1].tobytes()
 
 N_FACE_LANDMARKS = len(train_data.FACE_LANDMARKS)  # 93; MOUTH_SLICE below depends on this exact
                                                     # ordering -- see the demo() assertion that
@@ -157,34 +183,6 @@ def anchor_hands_to_wrist(sequence):
     sequence[:, left_lo:left_hi, :] += left_offset[:, None, :]
     sequence[:, right_lo:right_hi, :] += right_offset[:, None, :]
     return sequence
-
-
-def generate_heatmap(resolution: int = HEATMAP_RESOLUTION, sigma: float = HEATMAP_SIGMA,
-                      x=0.0, y=0.0):
-    """Gaussian dot(s) centered at (x, y), normalized to [0, 1], rendered onto a resolution x
-    resolution canvas. x and y broadcast against each other, so a whole batch of points (any
-    leading shape, e.g. (n_frames, n_landmarks)) renders in one call -> (..., resolution,
-    resolution) -- one meshgrid-equivalent, not one per point. (x, y) outside [0, 1] is fine,
-    the peak just falls off the edge of the canvas.
-    """
-    grid = np.arange(resolution, dtype=np.float32)
-    x, y = np.asarray(x, dtype=np.float32), np.asarray(y, dtype=np.float32)
-    dx2 = (grid - x[..., None] * resolution) ** 2  # (..., resolution), squared dist per column
-    dy2 = (grid - y[..., None] * resolution) ** 2  # (..., resolution), squared dist per row
-    heatmap = np.exp(-(dy2[..., :, None] + dx2[..., None, :]) / (2 * sigma ** 2))
-    return heatmap.astype(np.float32)
-
-
-def keypoints_to_heatmaps(coords_xy, resolution=HEATMAP_RESOLUTION, sigma=HEATMAP_SIGMA):
-    """(..., 2) x/y -> (..., resolution, resolution) heatmaps, one per point, vectorized over
-    every leading dim (e.g. frames x landmarks) in a single generate_heatmap call. `coords_xy`
-    is shoulder-midpoint-centered, shoulder-distance-scaled (see center_keypoints/
-    normalize_keypoints) rather than raw [0, 1] image coordinates, so it's shifted by +0.5 to
-    put the shoulder midpoint at canvas center; landmarks that stray far from the torso (e.g.
-    a raised hand) land off-canvas the same way an off-frame point would.
-    """
-    coords = np.asarray(coords_xy, dtype=np.float32) + 0.5
-    return generate_heatmap(resolution, sigma, coords[..., 0], coords[..., 1])
 
 
 def load_labels():
@@ -277,8 +275,8 @@ def crop_and_resize(frame_bgr, bbox):
 def build_crop_sequence(frames, point_seq):
     """Per-frame CROP_SIZE x CROP_SIZE x 3 crops around `point_seq` (a per-frame list of
     normalized (x, y[, z]) points, or None where nothing was detected that frame).
-    A None frame carries the last valid crop forward; frames before the first detection
-    are black.
+    A None frame carries the last valid crop forward (the same array object); frames
+    before the first detection are BLACK_CROP.
     """
     crops = []
     last_crop = None
@@ -290,14 +288,13 @@ def build_crop_sequence(frames, point_seq):
     return crops
 
 
-def encode_crops(crops):
-    """List of uint8 image arrays -> list of JPEG-encoded byte strings."""
-    encode_params = [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY]
-    return [cv2.imencode(".jpg", crop, encode_params)[1].tobytes() for crop in crops]
+def encode_crop(crop):
+    """uint8 image array -> JPEG-encoded byte string."""
+    return cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])[1].tobytes()
 
 
 def decode_image_sequence(jpeg_bytes_list):
-    """Inverse of encode_crops, for consumers: -> (len(jpeg_bytes_list), CROP_SIZE, CROP_SIZE, 3)
+    """Inverse of encode_crop, for consumers: -> (len(jpeg_bytes_list), CROP_SIZE, CROP_SIZE, 3)
     uint8 array in RGB order (storage is BGR, matching this codebase's cv2 convention elsewhere).
     """
     frames = [
@@ -306,43 +303,53 @@ def decode_image_sequence(jpeg_bytes_list):
     ]
     return np.stack(frames)
 
-def apply_shades_of_gray(crops, p=MINKOWSKI_EXPONENT):
+
+def apply_shades_of_gray(crop, p=MINKOWSKI_EXPONENT):
     """Shades-of-Gray color constancy: per-channel illuminant estimate via the p-th
     Minkowski norm (p=1 is plain gray-world; higher p weights bright pixels more), then
     rescale channels so that estimate is neutral. Cuts skin-tone-driven color differences
-    between signers before crops reach the model. Black (unpadded) crops pass through
-    unchanged.
+    between signers before crops reach the model. A black crop passes through unchanged.
     """
-    corrected_crops = []
+    crop_f64 = crop.astype(np.float64)
+    illum = np.power(np.mean(np.power(crop_f64, p), axis=(0, 1)), 1.0 / p)
+    if not illum.any():
+        return crop
+    scale = illum.mean() / illum
+    return np.clip(crop_f64 * scale, 0, 255).astype(np.uint8)
+
+
+def build_image_sequence(frames, point_seq):
+    """Crops -> MAX_FRAMES -> Shades-of-Gray -> JPEG, one list of MAX_FRAMES byte strings.
+
+    Resampling first means frames that get dropped are never color-corrected or encoded, and a
+    crop repeated by carry-forward or padding is only processed once -- the repeats share one
+    bytes object, which pickle (np.savez of an object array) then stores once.
+    """
+    crops = resample_or_pad_frames(build_crop_sequence(frames, point_seq))
+    encoded = {id(BLACK_CROP): BLACK_JPEG}
     for crop in crops:
-        crop_f64 = crop.astype(np.float64)
-        illum = np.power(np.mean(np.power(crop_f64, p), axis=(0, 1)), 1.0 / p)
-        if not illum.any():
-            corrected_crops.append(crop)
-            continue
-        scale = illum.mean() / illum
-        corrected_crops.append(np.clip(crop_f64 * scale, 0, 255).astype(np.uint8))
-    return corrected_crops
+        if id(crop) not in encoded:
+            encoded[id(crop)] = encode_crop(apply_shades_of_gray(crop))
+    return [encoded[id(crop)] for crop in crops]
 
 
 def extract_clip(job):
-    """Worker: one clip -> (clip_id, clip_name, label, heatmaps, images, failure_reason).
+    """Worker: one (clip_path, label) -> (clip_name, label, keypoints, images, failure_reason).
 
-    `heatmaps` is a (MAX_FRAMES, N_LANDMARKS, HEATMAP_RESOLUTION, HEATMAP_RESOLUTION) array,
-    `images` a dict of {"left_hand", "right_hand", "mouth"} -> list of MAX_FRAMES JPEG byte
-    strings. Both are None together on failure.
+    `keypoints` is a (MAX_FRAMES, N_FEATURES) float32 array, `images` a dict of
+    CROP_TYPES -> list of MAX_FRAMES JPEG byte strings. Both are None together on failure.
     """
-    clip_id, clip_path, label = job
+    clip_path, label = job
     frames = extract_frames(str(clip_path))
     if not frames:
-        return clip_id, clip_path.name, label, None, None, "read_failed"
+        return clip_path.name, label, None, None, "read_failed"
 
     pose_kp = extract_pose_keypoints(frames)
     hand_kp = extract_hand_keypoints(frames)
     face_kp = extract_face_keypoints(frames)
     avg_left, avg_right = average_shoulders(pose_kp)
     if avg_left is None:
-        return clip_id, clip_path.name, label, None, None, "no_pose"
+        return clip_path.name, label, None, None, "no_pose"
 
     sequence = []
     left_detected, right_detected = [], []
@@ -369,57 +376,227 @@ def extract_clip(job):
     sequence = anchor_hands_to_wrist(sequence)
     sequence = apply_temporal_savgol_smoothing(sequence, window_length=9, polyorder=2)
     flat = sequence.reshape(len(sequence), N_FEATURES)
-    flat = resample_or_pad(flat)  # (MAX_FRAMES, N_FEATURES), same frame selection as the crops below
+    keypoints = resample_or_pad(flat)  # (MAX_FRAMES, N_FEATURES), same frame selection as the crops
 
-    xy = flat.reshape(MAX_FRAMES, N_LANDMARKS, 3)[:, :, :2]  # z dropped, heatmaps are 2D
-    heatmaps = keypoints_to_heatmaps(xy)  # (MAX_FRAMES, N_LANDMARKS, resolution, resolution), one call
-
-    images = {}
-    for name, points in (("left_hand", left_points), ("right_hand", right_points), ("mouth", mouth_points)):
-        crops = build_crop_sequence(frames, points)
-        crops = apply_shades_of_gray(crops)
-        crops = resample_or_pad_frames(crops)
-        images[name] = encode_crops(crops)
-
-    return clip_id, clip_path.name, label, heatmaps, images, None
+    images = {
+        name: build_image_sequence(frames, points)
+        for name, points in zip(CROP_TYPES, (left_points, right_points, mouth_points))
+    }
+    return clip_path.name, label, keypoints, images, None
 
 
-def init_worker():
+def init_worker(stderr_path=None):
+    if stderr_path is not None:
+        # MediaPipe/TFLite print their init chatter straight to fd 2, which buries the progress
+        # bar; Python exceptions still reach the parent through the pool
+        fd = os.open(stderr_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        os.dup2(fd, 2)
+        os.close(fd)
     train_data.init_worker()
-    logging.getLogger().setLevel(logging.WARNING)  # one INFO line per clip is 9k lines of noise
+    logging.getLogger().setLevel(logging.WARNING)  # one INFO line per clip is pure noise
 
 
-def build_dataset(jobs, workers=NUM_WORKERS):
-    """Extract every clip in parallel.
+def ensure_mediapipe_models():
+    """Pose() downloads its model on first use, non-atomically, so workers starting together
+    race on the download and can leave a truncated .tflite that segfaults every later Pose().
+    Fetching it here, before any worker exists, avoids that race."""
+    from mediapipe.python.solutions.pose import _download_oss_pose_landmark_model
+    _download_oss_pose_landmark_model(0)  # model_complexity=0, as in train_data.init_worker
 
-    Returns clip_ids, X (N, MAX_FRAMES, N_LANDMARKS, HEATMAP_RESOLUTION, HEATMAP_RESOLUTION),
-    labels, and a dict of {"left_hand", "right_hand", "mouth"} -> list of N per-clip JPEG-byte-lists.
+
+def format_duration(seconds):
+    seconds = int(seconds)
+    days, rest = divmod(seconds, 86400)
+    hours, rest = divmod(rest, 3600)
+    minutes, seconds = divmod(rest, 60)
+    if days:
+        return f"{days}d {hours}h {minutes:02d}m"
+    if hours:
+        return f"{hours}h {minutes:02d}m"
+    return f"{minutes}m {seconds:02d}s"
+
+
+class ProgressReporter:
+    """Rewrites PROGRESS_FILE, and logs a progress line unless log=False. The rate (and so the
+    ETA) only counts this run's clips, so time spent before a resume doesn't skew it."""
+
+    def __init__(self, total, done, failed):
+        self.total = total
+        self.done = done
+        self.failed = failed
+        self.start_done = done
+        self.started = time.time()
+        self.started_at = datetime.now()
+        self.last_write = 0.0
+
+    def write(self, phase="extracting", log=True):
+        self.last_write = time.time()
+        now = datetime.now()
+        elapsed = time.time() - self.started
+        rate = (self.done - self.start_done) / elapsed if elapsed > 0 else 0.0
+        remaining = self.total - self.done
+        eta = remaining / rate if rate > 0 and remaining > 0 else None
+        finish = now + timedelta(seconds=eta) if eta is not None else None
+        status = {
+            "phase": phase,
+            "done": self.done,
+            "total": self.total,
+            "percent": round(100 * self.done / self.total, 2),
+            "failed": self.failed,
+            "clips_per_sec": round(rate, 2),
+            "eta": format_duration(eta) if eta is not None else None,
+            "eta_finish": finish.isoformat(timespec="minutes") if finish else None,
+            "started": self.started_at.isoformat(timespec="seconds"),
+            "updated": now.isoformat(timespec="seconds"),
+            "pid": os.getpid(),
+        }
+        tmp = PROGRESS_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(status, indent=2))
+        os.replace(tmp, PROGRESS_FILE)
+
+        if not log:
+            return
+        if phase != "extracting":
+            logging.info(f"phase: {phase}")
+        elif eta is not None:
+            logging.info(
+                f"checkpoint: {self.done:,}/{self.total:,} clips ({status['percent']:.1f}%), "
+                f"{self.failed:,} failed | {rate:.1f} clips/s | ETA {status['eta']} "
+                f"(~{finish:%a %d.%m. %H:%M})"
+            )
+        else:
+            logging.info(f"checkpoint: {self.done:,}/{self.total:,} clips ({status['percent']:.1f}%)")
+
+
+def load_done_names():
+    """-> (names extracted OK, names that failed) across all checkpoint shards."""
+    ok, failed = set(), set()
+    for shard in SHARD_DIR.glob("shard_*.npz"):
+        with np.load(shard) as f:
+            ok.update(f["names"].tolist())
+            failed.update(f["failed_names"].tolist())
+    return ok, failed
+
+
+def save_shard(rows, failed):
+    """rows: [(name, label, keypoints, images)], failed: [(name, reason)] -> next shard file,
+    written to a temp name first so a kill mid-write never leaves a half-written shard."""
+    SHARD_DIR.mkdir(parents=True, exist_ok=True)
+    index = max((int(p.stem.split("_")[1]) for p in SHARD_DIR.glob("shard_*.npz")), default=-1) + 1
+    path = SHARD_DIR / f"shard_{index:05d}.npz"
+    tmp = path.with_suffix(".tmp")
+    with open(tmp, "wb") as f:
+        np.savez(
+            f,
+            names=np.array([r[0] for r in rows], dtype=str),
+            labels=np.array([r[1] for r in rows], dtype=str),
+            X=np.array([r[2] for r in rows], dtype=np.float32).reshape(len(rows), MAX_FRAMES, N_FEATURES),
+            failed_names=np.array([name for name, _ in failed], dtype=str),
+            failed_reasons=np.array([reason for _, reason in failed], dtype=str),
+            # images are already JPEG-compressed -- plain savez skips paying zlib twice
+            **{
+                key: np.array([r[3][key] for r in rows], dtype=object).reshape(len(rows), MAX_FRAMES)
+                for key in CROP_TYPES
+            },
+        )
+    os.replace(tmp, path)
+
+
+def extract_pending(jobs, workers, reporter):
+    """Extract every clip in `jobs` that isn't in a shard yet, checkpointing every SHARD_SIZE.
+
+    ProcessPoolExecutor rather than multiprocessing.Pool: when a worker dies (segfault, OOM
+    kill), Pool silently starts a replacement and waits forever for the lost task, while this
+    raises BrokenProcessPool.
     """
-    clip_ids, X, labels = [], [], []
-    images = {"left_hand": [], "right_hand": [], "mouth": []}
-    failed = Counter()
+    ok, failed_before = load_done_names()
+    pending = [job for job in jobs if job[0].name not in ok and job[0].name not in failed_before]
+    if not pending:
+        return
+    logging.info(
+        f"{len(jobs) - len(pending):,} clips already checkpointed, extracting {len(pending):,} "
+        f"with {workers} workers"
+    )
 
-    with multiprocessing.Pool(processes=workers, initializer=init_worker) as pool:
-        for clip_id, name, label, heatmaps, crops, reason in tqdm(
-            pool.imap_unordered(extract_clip, jobs, chunksize=8), total=len(jobs), desc="clips"
-        ):
-            if heatmaps is None:
-                failed[reason] += 1
-                logging.debug(f"skipping {name}: {reason}")
-                continue
-            clip_ids.append(clip_id)
-            X.append(heatmaps)
-            labels.append(label)
-            for key in images:
-                images[key].append(crops[key])
+    rows, failed = [], []
+
+    def checkpoint():
+        save_shard(rows, failed)
+        rows.clear()
+        failed.clear()
+        reporter.write()
+
+    pool = concurrent.futures.ProcessPoolExecutor(
+        max_workers=workers, initializer=init_worker, initargs=(str(WORKER_LOG_FILE),)
+    )
+    try:
+        with tqdm(total=reporter.total, initial=reporter.done, desc="clips", unit="clip",
+                  smoothing=0.05, dynamic_ncols=True) as bar:
+            for name, label, keypoints, images, reason in pool.map(extract_clip, pending, chunksize=4):
+                if reason is None:
+                    rows.append((name, label, keypoints, images))
+                else:
+                    failed.append((name, reason))
+                    reporter.failed += 1
+                reporter.done += 1
+                bar.update(1)
+                if len(rows) + len(failed) >= SHARD_SIZE:
+                    checkpoint()
+                elif time.time() - reporter.last_write >= PROGRESS_INTERVAL:
+                    reporter.write(log=False)
+    finally:
+        if rows or failed:
+            checkpoint()
+        pool.shutdown(wait=False, cancel_futures=True)
+
+
+def extract_all(jobs, workers, reporter):
+    for attempt in range(MAX_POOL_RESTARTS + 1):
+        try:
+            extract_pending(jobs, workers, reporter)
+            return
+        except BrokenProcessPool:
+            if attempt == MAX_POOL_RESTARTS:
+                raise RuntimeError(
+                    f"worker processes crashed {attempt + 1} times (see {WORKER_LOG_FILE}). Everything "
+                    f"finished so far is saved in {SHARD_DIR}, rerun to resume. If workers crash before "
+                    "finishing any clip, a MediaPipe model file is likely corrupt (e.g. a truncated "
+                    "mediapipe/modules/pose_landmark/pose_landmark_lite.tflite -- delete it to re-download)."
+                ) from None
+            logging.error(
+                f"a worker process crashed -- finished clips are saved, restarting the pool "
+                f"({attempt + 1}/{MAX_POOL_RESTARTS})"
+            )
+
+
+def load_shards(jobs):
+    """Merge the checkpoint shards into one dataset, keeping only clips that are in `jobs` (so a
+    --limit run or a changed segments.csv never pulls in stale clips). clip_id is the clip's
+    position in `jobs`, which is sorted by filename, so it's stable across runs.
+    """
+    index = {path.name: i for i, (path, _) in enumerate(jobs)}
+    labels_by_name = {path.name: label for path, label in jobs}
+    clip_ids, X, labels = [], [], []
+    images = {key: [] for key in CROP_TYPES}
+    failed = Counter()
+    for shard in tqdm(sorted(SHARD_DIR.glob("shard_*.npz")), desc="merging shards", unit="shard"):
+        with np.load(shard, allow_pickle=True) as f:
+            names = f["names"]
+            keep = np.array([name in index for name in names], dtype=bool)
+            clip_ids.append(np.array([index[name] for name in names[keep]], dtype=np.int64))
+            labels.append(np.array([labels_by_name[name] for name in names[keep]], dtype=str))
+            X.append(f["X"][keep])
+            for key in CROP_TYPES:
+                images[key].append(f[key][keep])
+            failed.update(r for name, r in zip(f["failed_names"], f["failed_reasons"]) if name in index)
 
     for reason, count in failed.items():
         logging.info(f"Failed ({reason}): {count} ({count / len(jobs) * 100:.2f}%)")
     return (
-        np.array(clip_ids, dtype=np.int64),
-        np.array(X, dtype=np.float32),
-        np.array(labels),
-        {key: np.array(val, dtype=object) for key, val in images.items()},
+        np.concatenate(clip_ids),
+        np.concatenate(X),
+        np.concatenate(labels),
+        {key: np.concatenate(val) for key, val in images.items()},
     )
 
 
@@ -477,38 +654,8 @@ def split_and_save(clip_ids, X, labels, images, output_folder=OUT_DIR, val_ratio
         )
         logging.info(f"{split_name}: {len(idx)} samples -> {output_folder / f'{split_name}_data.npz'}")
 
-    logging.info(
-        f"Shape per sample: ({MAX_FRAMES}, {N_LANDMARKS}, {HEATMAP_RESOLUTION}, {HEATMAP_RESOLUTION}) "
-        f"| classes: {len(classes)}"
-    )
+    logging.info(f"Shape per sample: ({MAX_FRAMES}, {N_FEATURES}) | classes: {len(classes)}")
 
-def test_display_heatmap_frame():
-    """Manual visual check: extract one random raw clip directly (not the processed
-    dataset -- that's the full 8080-clip run, way overkill for eyeballing one frame) and
-    plot all N_LANDMARKS heatmaps for a random frame stacked (max-projected) into one image.
-    Not run by demo() -- there's nothing to assert, it's just for looking at.
-    """
-    import matplotlib.pyplot as plt
-
-    clips = list(CLIPS_DIR.glob("*.mp4"))
-    if not clips:
-        print(f"no clips in {CLIPS_DIR}")
-        return
-
-    rng = np.random.default_rng()
-    clip_path = clips[rng.integers(len(clips))]
-    init_worker()  # loads the MediaPipe models this process needs
-    clip_id, name, label, heatmaps, images, reason = extract_clip((0, clip_path, "?"))
-    if heatmaps is None:
-        print(f"{name}: extraction failed ({reason}), try again")
-        return
-
-    frame_idx = rng.integers(MAX_FRAMES)
-    stacked = heatmaps[frame_idx].max(axis=0)  # (resolution, resolution), all 49 landmarks overlaid
-    plt.imshow(stacked, cmap="hot")
-    plt.title(f"{name} frame {frame_idx}")
-    plt.colorbar()
-    plt.show()
 
 def demo():
     """Self-check: python signai/word_classification/preprocessing.py --self-check"""
@@ -586,47 +733,35 @@ def demo():
 
     # apply_shades_of_gray: black padding crops pass through untouched, colored crops get
     # their channel means pulled together
-    assert all(np.array_equal(c, BLACK_CROP) for c in apply_shades_of_gray([BLACK_CROP]))
+    assert np.array_equal(apply_shades_of_gray(BLACK_CROP), BLACK_CROP)
     tinted = np.zeros((4, 4, 3), dtype=np.uint8)
     tinted[..., 0] = 200  # strong red cast
     tinted[..., 1] = 50
     tinted[..., 2] = 50
-    corrected = apply_shades_of_gray([tinted])[0]
+    corrected = apply_shades_of_gray(tinted)
     means = corrected.astype(np.float64).mean(axis=(0, 1))
     assert means.max() - means.min() < tinted.astype(np.float64).mean(axis=(0, 1)).ptp(), (
         "shades-of-gray should narrow the channel-mean spread, not widen it"
     )
 
+    # build_image_sequence: always MAX_FRAMES JPEGs, repeated crops share one bytes object
+    jpegs = build_image_sequence([frame] * 4, point_seq)
+    assert len(jpegs) == MAX_FRAMES
+    assert jpegs[0] is BLACK_JPEG and jpegs[-1] is BLACK_JPEG, "leading black + padding share BLACK_JPEG"
+    assert jpegs[3] is jpegs[2], "carried-forward crop is encoded once"
+    assert decode_image_sequence(jpegs).shape == (MAX_FRAMES, CROP_SIZE, CROP_SIZE, 3)
+
     # encode/decode round-trip
-    encoded = encode_crops([crop_and_resize(frame, (0, 0, 50, 50))])
-    decoded = decode_image_sequence(encoded)
+    decoded = decode_image_sequence([encode_crop(crop_and_resize(frame, (0, 0, 50, 50)))])
     assert decoded.shape == (1, CROP_SIZE, CROP_SIZE, 3) and decoded.dtype == np.uint8
 
-    # generate_heatmap: peak lands where (x, y) says, values stay in [0, 1]
-    hm = generate_heatmap(resolution=32, sigma=2.0, x=0.5, y=0.25)
-    assert hm.shape == (32, 32) and hm.dtype == np.float32
-    assert np.unravel_index(np.argmax(hm), hm.shape) == (8, 16), "row is y, col is x"
-    assert hm.max() == 1.0 and hm.min() >= 0.0
-
-    # keypoints_to_heatmaps: one heatmap per landmark, shoulder-midpoint (0, 0) -> canvas center
-    pts = np.array([[0.0, 0.0], [0.5, -0.5]])
-    stacked = keypoints_to_heatmaps(pts, resolution=32)
-    assert stacked.shape == (2, 32, 32)
-    assert np.unravel_index(np.argmax(stacked[0]), stacked[0].shape) == (16, 16)
-
-    # keypoints_to_heatmaps is vectorized over arbitrary leading dims (frames x landmarks) in
-    # one generate_heatmap call -- must match calling it one point at a time
-    batch = np.random.default_rng(0).uniform(-1, 1, size=(4, 5, 2))  # (frames, landmarks, 2)
-    vectorized = keypoints_to_heatmaps(batch)
-    looped = np.stack([[generate_heatmap(x=x + 0.5, y=y + 0.5) for x, y in frame] for frame in batch])
-    assert vectorized.shape == (4, 5, HEATMAP_RESOLUTION, HEATMAP_RESOLUTION)
-    assert np.allclose(vectorized, looped), "vectorized batch must match the per-point loop"
+    assert format_duration(59) == "0m 59s" and format_duration(3 * 3600 + 120) == "3h 02m"
+    assert format_duration(2 * 86400 + 3600) == "2d 1h 00m"
 
     labels = np.array(["A"] * 20 + ["B"] * 5 + ["C"] * 2)
     clip_ids = np.arange(len(labels))
     X = np.zeros((len(labels), MAX_FRAMES, N_FEATURES), dtype=np.float32)
-    dummy_images = {k: np.array([[b"x"] * MAX_FRAMES] * len(labels), dtype=object) for k in
-                     ("left_hand", "right_hand", "mouth")}
+    dummy_images = {k: np.array([[b"x"] * MAX_FRAMES] * len(labels), dtype=object) for k in CROP_TYPES}
     ids_kept, X_kept, labels_kept, images_kept = filter_rare_classes(clip_ids, X, labels, dummy_images)
     assert set(labels_kept.tolist()) == {"A", "B"} and len(X_kept) == 25
     assert len(ids_kept) == 25 and all(len(v) == 25 for v in images_kept.values())
@@ -638,38 +773,62 @@ def demo():
     print(f"self-check passed ({len(existing)} real clip name(s) checked)")
 
 
-def main(rebuild_cache=False):
-    if CACHE_FILE.exists() and not rebuild_cache:
-        logging.info(f"Loading cached keypoints from {CACHE_FILE} (--rebuild-cache to re-extract)")
-        cached = np.load(CACHE_FILE, allow_pickle=True)
-        clip_ids, X, labels = cached["clip_ids"], cached["X"], cached["labels"]
-        images = {key: cached[key] for key in ("left_hand", "right_hand", "mouth")}
-    else:
-        names = load_labels()
-        clips = [p for p in sorted(CLIPS_DIR.glob("*.mp4")) if p.name in names]
-        jobs = [(clip_id, p, names[p.name]) for clip_id, p in enumerate(clips)]
-        missing = len(list(CLIPS_DIR.glob("*.mp4"))) - len(jobs)
-        if missing:
-            logging.warning(f"{missing} clip(s) without a segments.csv row -- skipped")
-        logging.info(f"Extracting keypoints from {len(jobs)} clips with {NUM_WORKERS} workers...")
+def list_jobs():
+    """-> [(clip_path, label)] sorted by filename, for every clip with a segments.csv row."""
+    names = load_labels()
+    clips = sorted(CLIPS_DIR.glob("*.mp4"))
+    jobs = [(p, names[p.name]) for p in clips if p.name in names]
+    if len(clips) > len(jobs):
+        logging.warning(f"{len(clips) - len(jobs)} clip(s) without a segments.csv row -- skipped")
+    return jobs
 
-        clip_ids, X, labels, images = build_dataset(jobs)
-        OUT_DIR.mkdir(parents=True, exist_ok=True)
-        # images are already JPEG-compressed -- plain savez skips paying zlib twice
-        np.savez(CACHE_FILE, clip_ids=clip_ids, X=X, labels=labels, **images)
-        logging.info(f"Cached {len(X)} extracted clips in {CACHE_FILE}")
 
+def main(rebuild_cache=False, workers=NUM_WORKERS, limit=None):
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    file_handler = logging.FileHandler(LOG_FILE)
+    file_handler.setFormatter(logging.getLogger().handlers[0].formatter)
+    logging.getLogger().addHandler(file_handler)
+
+    if rebuild_cache and SHARD_DIR.exists():
+        logging.info(f"--rebuild-cache: removing {SHARD_DIR}")
+        shutil.rmtree(SHARD_DIR)
+
+    jobs = list_jobs()[:limit]
+    if not jobs:
+        raise RuntimeError(f"No word clips found in {CLIPS_DIR} -- run segmentation_videos.py first.")
+
+    ok, failed = load_done_names()
+    reporter = ProgressReporter(
+        total=len(jobs),
+        done=sum(p.name in ok or p.name in failed for p, _ in jobs),
+        failed=sum(p.name in failed for p, _ in jobs),
+    )
+    reporter.write()
+
+    ensure_mediapipe_models()
+    with logging_redirect_tqdm():
+        extract_all(jobs, workers, reporter)
+
+    reporter.write(phase="merging + splitting")
+    clip_ids, X, labels, images = load_shards(jobs)
     clip_ids, X, labels, images = filter_rare_classes(clip_ids, X, labels, images)
     split_and_save(clip_ids, X, labels, images)
+    reporter.write(phase="done")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--rebuild-cache", action="store_true", help="re-extract keypoints")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--rebuild-cache", action="store_true", help="delete the checkpoint shards and re-extract")
+    parser.add_argument("--status", action="store_true", help="print a snapshot of the progress dashboard")
+    parser.add_argument("--workers", type=int, default=NUM_WORKERS, help=f"worker processes (default {NUM_WORKERS})")
+    parser.add_argument("--limit", type=int, help="only use the first N clips, for a quick end-to-end test")
     parser.add_argument("--self-check", action="store_true", help="run the self-check and exit")
     args = parser.parse_args()
 
     if args.self_check:
         demo()
+    elif args.status:
+        from signai.word_classification.preprocessing_dashboard import show
+        show(once=True)
     else:
-        main(rebuild_cache=args.rebuild_cache)
+        main(rebuild_cache=args.rebuild_cache, workers=args.workers, limit=args.limit)

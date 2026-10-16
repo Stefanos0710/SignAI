@@ -57,7 +57,7 @@ class HeatmapGenerator:
     def _render(self, px, py):
         """px, py: (...,) pixel coordinates. Returns (..., height, width), vectorized --
         broadcasts a 1D grid against the leading (...) dims, no loop over points, frames,
-        or batch. Same technique as preprocessing.py::generate_heatmap.
+        or batch.
         """
         grid_y = tf.range(self.height, dtype=tf.float32)  # (H,)
         grid_x = tf.range(self.width, dtype=tf.float32)   # (W,)

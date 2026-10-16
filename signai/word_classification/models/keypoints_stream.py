@@ -26,11 +26,14 @@ import argparse
 import sys
 from pathlib import Path
 
-import numpy as np
-import tensorflow as tf
-import keras
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from signai.word_classification.models.gpu_env import ensure_gpu_env  # noqa: E402
+ensure_gpu_env()  # must run before `import tensorflow`/`import keras` -- see gpu_env.py
+
+import numpy as np  # noqa: E402
+import tensorflow as tf  # noqa: E402
+import keras  # noqa: E402
 
 from signai.word_classification.models.heatmap import (  # noqa: E402
     HeatmapGenerator, HEATMAP_HEIGHT, HEATMAP_WIDTH, HEATMAP_SIGMA,
@@ -163,6 +166,7 @@ def build_pose_encoder(num_landmarks: int, height: int = HEATMAP_HEIGHT, width: 
     return keras.Model(inputs, outputs, name="pose_encoder")
 
 
+@keras.saving.register_keras_serializable(package="signai")
 class PoseFeatureProjection(keras.layers.Layer):
     """(batch, 512) -> (batch, 384). Aligns the pose encoder's output with the
     planned DINOv3-based hand/face stream feature dimension (future work)."""

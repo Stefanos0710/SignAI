@@ -1,7 +1,7 @@
 """Hand stream: frozen DINOv3 encoder (precomputed once, cached) -> trainable
 temporal transformer head -> 768-d hand-stream feature.
 
-    left/right crops (32, 224, 224, 3) uint8, per clip
+    left/right crops (32, 112, 112, 3) uint8, per clip (preprocessing.CROP_SIZE)
     -> sample 8 frames (sample_frame_indices)
     -> DINOv3 ViT-S/16, frozen               (DinoHandEncoder)
     -> cached (8, 384) float32 per hand      (dataset/processed/{split}_hand_features.npz)
@@ -19,19 +19,29 @@ pieces (HandTemporalHead, HandStream) never need torch installed, they only
 consume the cached float32 features.
 """
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
 
-import numpy as np
-import keras
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from signai.word_classification.models.gpu_env import ensure_gpu_env  # noqa: E402
+ensure_gpu_env()  # must run before `import keras` -- see gpu_env.py. Safe even for
+# --extract-features (torch, not keras): the cuDNN 8 dir it adds to LD_LIBRARY_PATH only
+# contains .so.8 files, so it can't shadow torch's own cuDNN 9 (.so.9) lookup.
+
+import numpy as np  # noqa: E402
+import keras  # noqa: E402
 
 from signai.word_classification.preprocessing import decode_image_sequence  # noqa: E402
 from signai.word_classification.paths import PROCESSED_DIR  # noqa: E402
+from signai.word_classification.models.progress import Progress  # noqa: E402
+
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 
 DATASET_DIR = str(PROCESSED_DIR)
+CHECKPOINT_EVERY = 2000  # clips between resumable checkpoints during precompute_split
 
 HAND_FEATURE_DIM = 384
 NUM_SAMPLED_FRAMES = 8
@@ -119,11 +129,15 @@ class DinoHandEncoder:
         cls_tokens = outputs.last_hidden_state[:, 0, :]  # (8, 384), one CLS token per frame
         return cls_tokens.cpu().numpy().astype(np.float32)
 
-    def precompute_split(self, split: str, log_every: int = 16):
+    def precompute_split(self, split: str):
         """Run this encoder once over every clip in `split` and cache the result
         to dataset/processed/{split}_hand_features.npz -- since the encoder's
         weights never change, its output doesn't need recomputing every
         training run (or every epoch).
+
+        Resumable: checkpoints progress every CHECKPOINT_EVERY clips to a .partial.npz, so a
+        kill/crash loses at most that many clips' GPU time, not the whole split. Skips entirely
+        if the split's output already exists and matches the current clip_ids.
 
         Writes clip_ids (N,) int64, left_hand (N, 8, 384) float32, right_hand
         (N, 8, 384) float32 -- clip_ids matches {split}_images.npz's, same
@@ -132,23 +146,87 @@ class DinoHandEncoder:
         images = np.load(os.path.join(DATASET_DIR, f"{split}_images.npz"), allow_pickle=True)
         clip_ids = images["clip_ids"]
         n = len(clip_ids)
+        out_path = os.path.join(DATASET_DIR, f"{split}_hand_features.npz")
+        checkpoint_path = os.path.join(DATASET_DIR, f"{split}_hand_features.partial.npz")
 
+        if os.path.exists(out_path):
+            with np.load(out_path) as f:
+                if np.array_equal(f["clip_ids"], clip_ids):
+                    logging.info(f"{split}: {out_path} already up to date, skipping")
+                    return
+
+        start = 0
         left_hand = np.empty((n, NUM_SAMPLED_FRAMES, HAND_FEATURE_DIM), dtype=np.float32)
         right_hand = np.empty((n, NUM_SAMPLED_FRAMES, HAND_FEATURE_DIM), dtype=np.float32)
+        if os.path.exists(checkpoint_path):
+            with np.load(checkpoint_path) as f:
+                if np.array_equal(f["clip_ids"], clip_ids):
+                    start = int(f["next_index"])
+                    left_hand[:start] = f["left_hand"][:start]
+                    right_hand[:start] = f["right_hand"][:start]
+                    logging.info(f"{split}: resuming hand features from clip {start:,}/{n:,}")
 
-        for i in range(n):
-            left_hand[i] = self.extract(decode_image_sequence(images["left_hand"][i]))
-            right_hand[i] = self.extract(decode_image_sequence(images["right_hand"][i]))
-            if (i + 1) % log_every == 0 or i + 1 == n:
-                print(f"{split}: {i + 1}/{n} clips", end="\r")
-        print()
+        # loading these once up front is required, not just faster: images[key] re-decompresses
+        # and re-unpickles the *entire* array from the npz archive on every access, so indexing
+        # it inside the per-clip loop would redo that (multi-GB) decompression every iteration
+        left_crops = images["left_hand"]
+        right_crops = images["right_hand"]
 
-        out_path = os.path.join(DATASET_DIR, f"{split}_hand_features.npz")
+        progress = Progress(Path(checkpoint_path).with_suffix("").with_suffix(".progress.json"),
+                             total=n, done=start, unit="clip")
+        for i in range(start, n):
+            left_hand[i] = self.extract(decode_image_sequence(left_crops[i]))
+            right_hand[i] = self.extract(decode_image_sequence(right_crops[i]))
+            progress.update(1)
+            if (i + 1) % CHECKPOINT_EVERY == 0 or i + 1 == n:
+                np.savez(checkpoint_path, clip_ids=clip_ids, left_hand=left_hand, right_hand=right_hand,
+                         next_index=i + 1)
+                progress.write(phase=f"hand features: {split}")
+            elif progress.due():
+                progress.write(phase=f"hand features: {split}", log=False)
+
         np.savez(out_path, clip_ids=clip_ids, left_hand=left_hand, right_hand=right_hand)
-        print(f"wrote {out_path}")
+        if os.path.exists(checkpoint_path):
+            os.remove(checkpoint_path)
+        logging.info(f"wrote {out_path}")
 
 # --- trainable temporal head (Keras) ---------------------------------------------------------
 
+@keras.saving.register_keras_serializable(package="signai")
+class TransformerBlock(keras.layers.Layer):
+    """One pre-LN transformer block (self-attention + FFN, both with residual connections).
+    Shared by HandTemporalHead and FaceTemporalHead.
+
+    Each block is its own Layer instance (not a plain dict of layers) specifically so a list of
+    them is a list of tracked Layer objects -- Keras's .keras v3 save format silently fails to
+    restore weights nested inside a list-of-dicts-of-layers (reloads with fresh random weights,
+    no error raised), confirmed empirically; a list of real Layer subclasses round-trips correctly.
+    """
+
+    def __init__(self, dim: int, num_heads: int = 6, ffn_dim: int = 1536, **kwargs):
+        super().__init__(**kwargs)
+        self.dim = dim
+        self.num_heads = num_heads
+        self.ffn_dim = ffn_dim
+        self.norm1 = keras.layers.LayerNormalization()
+        self.attn = keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=dim // num_heads)
+        self.norm2 = keras.layers.LayerNormalization()
+        self.ffn_up = keras.layers.Dense(ffn_dim, activation="gelu")
+        self.ffn_down = keras.layers.Dense(dim)
+
+    def call(self, x):
+        y = self.norm1(x)
+        x = x + self.attn(y, y)
+        y = self.norm2(x)
+        return x + self.ffn_down(self.ffn_up(y))
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"dim": self.dim, "num_heads": self.num_heads, "ffn_dim": self.ffn_dim})
+        return config
+
+
+@keras.saving.register_keras_serializable(package="signai")
 class HandTemporalHead(keras.layers.Layer):
     """Trainable pre-LN transformer over one hand's (batch, 8, 384) DINOv3
     features: prepend a learned CLS token, add learned positional embeddings,
@@ -163,6 +241,9 @@ class HandTemporalHead(keras.layers.Layer):
         super().__init__(**kwargs)
         self.num_frames = num_frames
         self.dim = dim
+        self.num_heads = num_heads
+        self.ffn_dim = ffn_dim
+        self.num_layers = num_layers
 
         self.cls_token = self.add_weight(
             name="cls_token", shape=(1, 1, dim), initializer="random_normal", trainable=True,
@@ -171,18 +252,7 @@ class HandTemporalHead(keras.layers.Layer):
             name="pos_embedding", shape=(1, num_frames + 1, dim), initializer="random_normal",
             trainable=True,
         )
-
-        self.blocks = []
-        for i in range(num_layers):
-            self.blocks.append(dict(
-                norm1=keras.layers.LayerNormalization(name=f"block{i}_norm1"),
-                attn=keras.layers.MultiHeadAttention(
-                    num_heads=num_heads, key_dim=dim // num_heads, name=f"block{i}_attn"
-                ),
-                norm2=keras.layers.LayerNormalization(name=f"block{i}_norm2"),
-                ffn_up=keras.layers.Dense(ffn_dim, activation="gelu", name=f"block{i}_ffn_up"),
-                ffn_down=keras.layers.Dense(dim, name=f"block{i}_ffn_down"),
-            ))
+        self.blocks = [TransformerBlock(dim, num_heads, ffn_dim, name=f"block{i}") for i in range(num_layers)]
         self.final_norm = keras.layers.LayerNormalization(name="final_norm")
 
     def call(self, x):
@@ -193,15 +263,21 @@ class HandTemporalHead(keras.layers.Layer):
         x = x + self.pos_embedding
 
         for block in self.blocks:
-            y = block["norm1"](x)
-            x = x + block["attn"](y, y)
-            y = block["norm2"](x)
-            x = x + block["ffn_down"](block["ffn_up"](y))
+            x = block(x)
 
         x = self.final_norm(x)
         return x[:, 0, :]  # CLS token -> (batch, 384)
 
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "num_frames": self.num_frames, "dim": self.dim, "num_heads": self.num_heads,
+            "ffn_dim": self.ffn_dim, "num_layers": self.num_layers,
+        })
+        return config
 
+
+@keras.saving.register_keras_serializable(package="signai")
 class HandStream(keras.Model):
     """End-to-end hand stream: cached per-hand DINOv3 features -> 768-d hand
     feature.
@@ -254,7 +330,21 @@ def demo():
     assert fused.shape == (4, 2 * HAND_FEATURE_DIM)
     assert np.all(np.isfinite(keras.ops.convert_to_numpy(fused)))
 
-    print("self-check passed (4/4 checks)")
+    # 5) get_config round-trip: train.py's WordClassifier embeds a HandStream, and resuming
+    # training depends on keras.models.load_model reconstructing it correctly -- TransformerBlock
+    # being a real Layer subclass (not a plain dict of layers) is what makes this work, see its
+    # docstring
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path = f"{tmp_dir}/stream.keras"
+        stream.save(path)
+        reloaded = keras.models.load_model(path)
+        reloaded_fused = reloaded([left_dummy, right_dummy])
+        assert np.allclose(keras.ops.convert_to_numpy(fused), keras.ops.convert_to_numpy(reloaded_fused)), (
+            "reloaded HandStream must produce identical output"
+        )
+
+    print("self-check passed (5/5 checks)")
 
 
 if __name__ == "__main__":

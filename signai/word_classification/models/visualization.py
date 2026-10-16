@@ -28,7 +28,7 @@ _POSE_BONES = [(0, 1), (0, 2), (1, 2), (1, 3), (3, 5), (2, 4), (4, 6)]
 
 class KeypointsVisualizer:
     """Renders normalized (T, J, 3) pose keypoint clips as heatmap+skeleton
-    views, static or animated. Mirrors preprocessing.py::test_display_heatmap_frame().
+    views, static or animated.
 
     viz = KeypointsVisualizer()
     viz.visualize_heatmaps(keypoints)          # single frame, static
