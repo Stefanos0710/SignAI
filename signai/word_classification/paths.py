@@ -1,4 +1,4 @@
-"""Configurable storage paths for the word-classification dataset."""
+"""Configurable storage paths for the word-classification dataset and model checkpoints."""
 
 import os
 from pathlib import Path
@@ -25,3 +25,9 @@ DATASET_DIR = Path(os.getenv("SIGNAI_WORD_DATASET_DIR", DEFAULT_DATASET_DIR)).ex
 PROCESSED_DIR = Path(
     os.getenv("SIGNAI_WORD_PROCESSED_DIR", DATASET_DIR / "processed")
 ).expanduser()
+
+# Every trained model gets its own checkpoints/v<N>/ (checkpoints, state.json, progress.json,
+# train.log, eval/) -- bump this for each new training run. v40: per-clip split; v41: first
+# person split (split_by_person.py). SIGNAI_WORD_MODEL_VERSION=40 points the scripts at an older one.
+MODEL_VERSION = int(os.getenv("SIGNAI_WORD_MODEL_VERSION", "41"))
+CHECKPOINT_DIR = Path(__file__).resolve().parent / "checkpoints" / f"v{MODEL_VERSION}"

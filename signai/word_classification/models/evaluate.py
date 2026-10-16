@@ -1,7 +1,8 @@
 """Evaluate a trained WordClassifier checkpoint on val/test: top-k accuracy, class-balanced
 (macro) metrics, calibration, accuracy by class frequency / gloss category / clip duration,
-most-confused gloss pairs, and optionally a per-stream permutation ablation and a train-subset
-pass (generalization gap).
+most-confused gloss pairs, a "tolerant" accuracy that counts context-dependent glosses as equal
+(EQUIVALENT_GLOSSES -- reported in addition to top-k, never instead), and optionally a per-stream
+permutation ablation and a train-subset pass (generalization gap).
 
 Run from the repo root:
     python signai/word_classification/models/evaluate.py                        # best ckpt, val + test
@@ -9,7 +10,7 @@ Run from the repo root:
     python signai/word_classification/models/evaluate.py --ablation             # + shuffle each stream (test)
     python signai/word_classification/models/evaluate.py --train-subset 30000   # + train-subset metrics
 
-Inference runs once per split/variant: the logits are cached in checkpoints/eval/<checkpoint>/
+Inference runs once per split/variant: the logits are cached in checkpoints/v<N>/eval/<checkpoint>/
 (keyed by the checkpoint's and the split file's mtime and size), so re-running only recomputes
 the metrics, not the model. Writes into that folder: report.md, metrics.json,
 per_class_<split>.csv, confusions_<split>.csv and the *.png plots.
@@ -61,6 +62,17 @@ CONFIDENCE_THRESHOLDS = (0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 FREQUENCY_BUCKETS = ((0, 10), (10, 20), (20, 50), (50, 100), (100, 500), (500, 1000), (1000, None))
 DURATION_BUCKETS_MS = ((0, 100), (100, 160), (160, 240), (240, 360), (360, 640), (640, None))
 MIN_SUPPORT_FOR_RANKING = 10  # best/worst class lists only consider classes with this many samples
+# Glosses that differ by context, not by the movement: pointing at a person (DU), a place (DORT) or
+# something in general (INDEX) is practically the same hand movement; which one is meant only shows
+# in the sentence. The tolerant metrics count a prediction within the true gloss's group as a hit.
+# Fixed up front from the first evaluation's confusion table (DU -> INDEX 64 %, DORT -> INDEX 58 %,
+# GEST -> GEST-OFF 43 %, MEIN -> ICH 23 %), not chosen by what improves the numbers -- keep it small
+# and justified. Evaluation only: the model still learns every gloss on its own.
+EQUIVALENT_GLOSSES = (
+    ("DU", "INDEX", "DORT"),
+    ("MEIN", "ICH"),
+    ("GEST", "GEST-OFF"),
+)
 # model input name -> streams it belongs to, for the permutation ablation (left/right share one
 # permutation so the "hands" ablation keeps each clip's two hands together)
 STREAMS = {"pose": ("keypoints",), "hands": ("left_hand", "right_hand"), "mouth": ("mouth",)}
@@ -190,6 +202,19 @@ def true_class_rank(logits, y):
     return (logits > true_logit).sum(axis=1)
 
 
+def tolerant_rank(logits, y, classes):
+    """true_class_rank of the best-scoring gloss in the true gloss's EQUIVALENT_GLOSSES group, so
+    rank < k means one of the top k predictions is in that group (0 == tolerant top-1 hit). For a
+    gloss outside every group it's exactly true_class_rank."""
+    best = logits[np.arange(len(y)), y].copy()
+    for group in EQUIVALENT_GLOSSES:
+        members = np.where(np.isin(classes, group))[0]
+        rows = np.isin(y, members)
+        if len(members) > 1 and rows.any():
+            best[rows] = logits[np.ix_(rows, members)].max(axis=1)
+    return (logits > best[:, None]).sum(axis=1)
+
+
 def expected_calibration_error(confidence, correct, n_bins: int = ECE_BINS):
     edges = np.linspace(0, 1, n_bins + 1)
     bins = np.clip(np.digitize(confidence, edges[1:-1]), 0, n_bins - 1)
@@ -311,6 +336,27 @@ def compute_metrics(logits, y, classes, train_counts, temperature=None):
         "recall": float((recall * support).sum() / n),
         "f1": float((f1 * support).sum() / n),
     }
+
+    # tolerant: a prediction in the true gloss's EQUIVALENT_GLOSSES group counts as a hit
+    t_rank = tolerant_rank(logits, y, classes)
+    t_hits = np.bincount(y, weights=(t_rank == 0), minlength=num_classes)
+    wrong = rank > 0
+    metrics["tolerant"] = {
+        "topk": {f"top{k}": float((t_rank < k).mean()) for k in (1, 5)},
+        "macro_top1": float((t_hits[present] / support[present]).mean()),
+        # how much of the top-1 error rate is only a within-group mix-up
+        "share_of_top1_errors_within_group": float((wrong & (t_rank == 0)).sum() / max(wrong.sum(), 1)),
+        "by_group": {},
+    }
+    vocabulary = set(classes.tolist())
+    for group in EQUIVALENT_GLOSSES:
+        mask = np.isin(classes[y], group)
+        metrics["tolerant"]["by_group"]["/".join(group)] = {
+            "missing_from_vocabulary": [g for g in group if g not in vocabulary],
+            "samples": int(mask.sum()),
+            "top1": float((rank[mask] == 0).mean()) if mask.any() else None,
+            "tolerant_top1": float((t_rank[mask] == 0).mean()) if mask.any() else None,
+        }
 
     # prediction behaviour
     top10 = prior_order[:10]
@@ -687,6 +733,30 @@ def render_report(results, checkpoint: Path, history):
     test = results["test"]["metrics"]
     lines += ["![top-k](topk_test.png)", ""]
 
+    lines += ["## Tolerant accuracy (in addition to the numbers above, not instead)", "",
+              "Some glosses differ by context, not by the movement: pointing at a person (DU), a place (DORT) "
+              "or something in general (INDEX) is practically the same hand movement, and which one is meant "
+              "only shows in the sentence. Here a prediction also counts if it is in the same group as the "
+              "true gloss. The groups are fixed in `EQUIVALENT_GLOSSES` (from the first evaluation's confusion "
+              "table, not tuned on these numbers) and used for evaluation only, not for training: "
+              + ", ".join(f"`{name}`" for name in test["tolerant"]["by_group"]) + ".", "",
+              "| metric | " + " | ".join(splits) + " |", "|---|" + "---:|" * len(splits)]
+    row("top-1 → tolerant top-1", lambda m: f"{pct(m['topk']['top1'], 2)} → {pct(m['tolerant']['topk']['top1'], 2)}")
+    row("top-5 → tolerant top-5", lambda m: f"{pct(m['topk']['top5'], 2)} → {pct(m['tolerant']['topk']['top5'], 2)}")
+    row("macro top-1 → tolerant", lambda m: f"{pct(m['macro_topk']['top1'], 2)} → {pct(m['tolerant']['macro_top1'], 2)}")
+    row("top-1 errors that are within-group mix-ups",
+        lambda m: pct(m["tolerant"]["share_of_top1_errors_within_group"]))
+    lines += ["", "| group (test) | clips | top-1 | tolerant top-1 |", "|---|---:|---:|---:|"]
+    for name, g in test["tolerant"]["by_group"].items():
+        if g["samples"]:
+            lines.append(f"| {name} | {g['samples']:,} | {pct(g['top1'])} | {pct(g['tolerant_top1'])} |")
+    missing = {name: g["missing_from_vocabulary"] for name, g in test["tolerant"]["by_group"].items()
+               if g["missing_from_vocabulary"]}
+    if missing:
+        lines += ["", "Not in the vocabulary (so not part of their group): "
+                  + "; ".join(f"{', '.join(gs)} ({name})" for name, gs in missing.items()) + "."]
+    lines.append("")
+
     if "ablation" in results:
         lines += ["## Stream importance (test, permutation ablation)", "",
                   "Each stream's inputs are shuffled across clips (same distribution, wrong clip), "
@@ -814,7 +884,8 @@ def main(checkpoint_name="best", splits=("val", "test"), batch_size=BATCH_SIZE, 
         write_csv(out_dir / f"confusions_{split}.csv", confusions)
         make_plots(out_dir, split, metrics, curves, classes, y, train_counts, history)
         logging.info(f"{split}: top-1 {metrics['topk']['top1']:.4f}  top-5 {metrics['topk']['top5']:.4f}  "
-                     f"macro top-1 {metrics['macro_topk']['top1']:.4f}")
+                     f"macro top-1 {metrics['macro_topk']['top1']:.4f}  "
+                     f"(tolerant top-1 {metrics['tolerant']['topk']['top1']:.4f})")
 
         if split == "test":
             if train_signers is not None:

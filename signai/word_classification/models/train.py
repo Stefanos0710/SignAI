@@ -15,7 +15,7 @@ Run from the repo root:
     python signai/word_classification/models/training_dashboard.py    # live progress/ETA dashboard
     python signai/word_classification/models/train.py --status        # one dashboard snapshot
 
-RESUME: every epoch writes checkpoints/word_classifier_latest.keras + state.json (completed
+RESUME: every epoch writes checkpoints/v<N>/word_classifier_latest.keras + state.json (completed
 epochs, best val_accuracy so far). Rerunning the same command picks up from there -- Ctrl-C or a
 crash loses at most the epoch in progress, not the whole run. --restart ignores that state and
 starts a fresh run (the previous checkpoints are overwritten once the new run reaches their epoch).
@@ -45,12 +45,11 @@ from signai.word_classification.models.model import WordClassifier  # noqa: E402
 from signai.word_classification.models.hand_stream import load_hand_features  # noqa: E402
 from signai.word_classification.models.face_stream import load_face_features  # noqa: E402
 from signai.word_classification.models.progress import format_duration  # noqa: E402
-from signai.word_classification.paths import PROCESSED_DIR  # noqa: E402
+from signai.word_classification.paths import CHECKPOINT_DIR, MODEL_VERSION, PROCESSED_DIR  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 
 DATASET_DIR = str(PROCESSED_DIR)
-CHECKPOINT_DIR = Path(__file__).resolve().parents[1] / "checkpoints"
 LATEST_CKPT = CHECKPOINT_DIR / "word_classifier_latest.keras"
 BEST_CKPT = CHECKPOINT_DIR / "word_classifier_best.keras"
 STATE_FILE = CHECKPOINT_DIR / "state.json"
@@ -296,8 +295,8 @@ class TrainingProgress(keras.callbacks.Callback):
 def train_main(epochs: int = EPOCHS, batch_size: int = BATCH_SIZE, learning_rate: float = LEARNING_RATE,
                 restart: bool = False):
     """Compile and fit WordClassifier on train/val, saving a checkpoint every epoch
-    (checkpoints/word_classifier_latest.keras) and the best one by val_accuracy
-    (checkpoints/word_classifier_best.keras). Resumes from the latest checkpoint unless
+    (checkpoints/v<N>/word_classifier_latest.keras, N = paths.MODEL_VERSION) and the best one by val_accuracy
+    (.../word_classifier_best.keras). Resumes from the latest checkpoint unless
     restart=True or no checkpoint exists yet.
     """
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
@@ -310,6 +309,7 @@ def train_main(epochs: int = EPOCHS, batch_size: int = BATCH_SIZE, learning_rate
     if restart:
         for f in (STATE_FILE, LATEST_CKPT, PROGRESS_FILE):
             f.unlink(missing_ok=True)
+    logging.info(f"word classifier v{MODEL_VERSION} -> {CHECKPOINT_DIR}")
 
     fingerprint = split_fingerprint()
     state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() and LATEST_CKPT.exists() else None

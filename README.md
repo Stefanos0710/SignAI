@@ -210,7 +210,7 @@ Three-stream fusion model, `signai/word_classification/`. Own dataset/preprocess
 | 2. Segment | `segmentation_videos.py` (needs `ffmpeg`) | per-word clips, `dataset/word_clips/` |
 | 3. Preprocess | `preprocessing.py` | `dataset/processed/{train,val,test}_{data,images}.npz` |
 | 4. Cache hand/face features | `models/hand_stream.py` / `models/face_stream.py --extract-features {split}` | `*_hand_features.npz` / `*_face_features.npz` |
-| 5. Train | `models/train.py` | `checkpoints/word_classifier_best.keras` |
+| 5. Train | `models/train.py` | `checkpoints/v<N>/word_classifier_best.keras` (N = `paths.MODEL_VERSION`) |
 
 All run from the repo root. Step 4 needs `torch` + `transformers` and a Hugging Face token with the [DINOv3 ViT-S/16](https://huggingface.co/facebook/dinov3-vits16-pretrain-lvd1689m) license accepted (`huggingface-cli login` or `HF_TOKEN`) — steps 3 and 5 don't.
 

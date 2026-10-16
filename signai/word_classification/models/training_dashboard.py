@@ -3,7 +3,7 @@
     python signai/word_classification/models/training_dashboard.py          # live view, Ctrl-C to close
     python signai/word_classification/models/training_dashboard.py --once   # print one snapshot
 
-Only reads what train.py writes (checkpoints/progress.json, state.json, the *.keras files), so it
+Only reads what train.py writes (checkpoints/v<N>/progress.json, state.json, the *.keras files), so it
 can run in any terminal or a second tmux window, start and stop at will, and never affects training.
 """
 import argparse
@@ -25,15 +25,15 @@ from rich.text import Text
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from signai.word_classification.models.progress import format_duration  # noqa: E402
+# from paths.py, not train.py: that would pull in all of TF/keras and the GPU-env re-exec, heavy
+# for a dashboard that should start instantly
+from signai.word_classification.paths import CHECKPOINT_DIR, MODEL_VERSION  # noqa: E402
 
-# not imported from train.py: that would pull in all of TF/keras and the GPU-env re-exec, heavy
-# for a dashboard that should start instantly -- must match train.py's CHECKPOINT_DIR exactly
-CHECKPOINT_DIR = Path(__file__).resolve().parents[1] / "checkpoints"
 PROGRESS_FILE = CHECKPOINT_DIR / "progress.json"
 BEST_CKPT = CHECKPOINT_DIR / "word_classifier_best.keras"
 LATEST_CKPT = CHECKPOINT_DIR / "word_classifier_latest.keras"
 STALE_AFTER = 120
-TITLE = "[bold]SignAI[/] · word classifier training"
+TITLE = f"[bold]SignAI[/] · word classifier v{MODEL_VERSION} training"
 RUN_COMMAND = "python signai/word_classification/models/train.py"
 
 
