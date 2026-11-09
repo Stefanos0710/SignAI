@@ -27,6 +27,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sys
 import time
 from datetime import datetime, timedelta
@@ -199,6 +200,29 @@ class TrainingProgress(keras.callbacks.Callback):
         self._epoch = 0
         self._step = 0
         self._logs = {}
+        self.last_epoch = self._last_epoch_from_log()  # train+val metrics of the last finished epoch
+        self.prior_epoch_seconds = self._prior_epoch_seconds()  # until this run has its own epoch timing
+
+    @staticmethod
+    def _last_epoch_from_log():
+        """Train/val metrics of the last completed epoch, from train.log, so they show right after a resume."""
+        pattern = re.compile(r"epoch (\d+)/\d+ done .*? loss ([\d.]+) acc ([\d.]+) \| val_loss ([\d.]+) val_acc ([\d.]+)")
+        try:
+            matches = pattern.findall(LOG_FILE.read_text())
+        except OSError:
+            return {}
+        if not matches:
+            return {}
+        epoch, loss, acc, val_loss, val_acc = matches[-1]
+        return {"epoch": int(epoch), "loss": float(loss), "accuracy": float(acc),
+                "val_loss": float(val_loss), "val_accuracy": float(val_acc)}
+
+    @staticmethod
+    def _prior_epoch_seconds():
+        try:
+            return json.loads(PROGRESS_FILE.read_text()).get("avg_epoch_seconds")
+        except (OSError, ValueError):
+            return None
 
     def on_epoch_begin(self, epoch, logs=None):
         self._epoch = epoch + 1  # 1-indexed for humans
@@ -216,6 +240,9 @@ class TrainingProgress(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
         self._logs = logs
+        if logs.get("val_loss") is not None:
+            self.last_epoch = {"epoch": self._epoch, **{k: logs.get(k) for k in
+                               ("loss", "accuracy", "val_loss", "val_accuracy")}}
         epoch_seconds = time.time() - self._epoch_start
         self.epoch_history.append(epoch_seconds)
 
@@ -254,11 +281,16 @@ class TrainingProgress(keras.callbacks.Callback):
         step_rate = self._step / epoch_elapsed if epoch_elapsed > 0 else 0.0
 
         avg_epoch = sum(self.epoch_history) / len(self.epoch_history) if self.epoch_history else None
-        remaining_epochs = self.total_epochs - self._epoch
+        remaining_epochs = max(self.total_epochs - self._epoch, 0)
         eta_epoch = (self.steps_per_epoch - self._step) / step_rate if step_rate > 0 else None
+        # time for one full epoch: this run's average, else the previous run's, else extrapolated from step speed
+        epoch_estimate = avg_epoch or self.prior_epoch_seconds or (
+            self.steps_per_epoch / step_rate if step_rate > 0 else None)
         eta_total = (
-            (eta_epoch or 0) + max(remaining_epochs, 0) * avg_epoch if avg_epoch is not None else eta_epoch
+            (eta_epoch or 0) + remaining_epochs * epoch_estimate if epoch_estimate is not None else eta_epoch
         )
+        if phase == "done":
+            eta_epoch = eta_total = 0.0
 
         status = {
             "phase": phase,
@@ -270,6 +302,7 @@ class TrainingProgress(keras.callbacks.Callback):
             "accuracy": self._logs.get("accuracy"),
             "val_loss": self._logs.get("val_loss"),
             "val_accuracy": self._logs.get("val_accuracy"),
+            "last_epoch": self.last_epoch,
             "best_val_accuracy": self.best_val_accuracy,
             "best_epoch": self.best_epoch,
             "steps_per_sec": round(step_rate, 3),

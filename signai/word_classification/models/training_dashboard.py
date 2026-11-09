@@ -149,8 +149,12 @@ def render():
         if s.get("steps_per_sec"):
             table.add_row("Speed", f"{s['steps_per_sec']:.2f} steps/s")
 
-    table.add_row("Loss / acc", f"{fmt(s.get('loss'))} / {fmt(s.get('accuracy'))}")
-    table.add_row("Val loss/acc", f"{fmt(s.get('val_loss'))} / {fmt(s.get('val_accuracy'))}")
+    last = s.get("last_epoch") or {}
+    last_tag = f"  (epoch {last['epoch']})" if last.get("epoch") else ""
+    if s["phase"] != "done":
+        table.add_row("Train now", f"loss {fmt(s.get('loss'))} · acc {fmt(s.get('accuracy'))}  (epoch {epoch}, running)")
+    table.add_row("Train", f"loss {fmt(last.get('loss'))} · acc {fmt(last.get('accuracy'))}{last_tag}")
+    table.add_row("Val", f"loss {fmt(last.get('val_loss'))} · acc {fmt(last.get('val_accuracy'))}{last_tag}")
     if s.get("best_val_accuracy") is not None:
         table.add_row("Best val_acc", Text(f"{s['best_val_accuracy']:.4f} @ epoch {s['best_epoch']}", style="bold"))
 
@@ -160,9 +164,10 @@ def render():
         if s.get("avg_epoch_seconds"):
             table.add_row("Avg epoch", format_duration(s["avg_epoch_seconds"]))
         if s.get("eta_epoch"):
-            table.add_row("This epoch", f"ETA {s['eta_epoch']}")
+            table.add_row("This epoch", f"{s['eta_epoch']} left")
         if s.get("eta_total"):
-            table.add_row("Remaining", Text(f"{s['eta_total']}  (~{s['eta_total_finish']})", style="bold"))
+            finish = datetime.fromisoformat(s["eta_total_finish"]).strftime("%a %d.%m. %H:%M")
+            table.add_row("Remaining", Text(f"{s['eta_total']}  (all {s['epochs_total'] - epoch + 1} remaining epochs, done ~{finish})", style="bold"))
     else:
         table.add_row("Stopped", f"{format_duration(update_age)} ago (last update {updated:%H:%M:%S})")
 
