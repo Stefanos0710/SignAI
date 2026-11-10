@@ -231,6 +231,27 @@ def expected_calibration_error(confidence, correct, n_bins: int = ECE_BINS):
     return float(ece), float(mce), rows
 
 
+def brier_score(probs, y):
+    """Multiclass Brier score: mean over clips of sum_c (p_c - 1[c == y])^2 (0 = perfect, 2 = worst)."""
+    sq = (probs ** 2).sum(axis=1)
+    return float((sq - 2 * probs[np.arange(len(y)), y] + 1).mean())
+
+
+def macro_auroc(probs, y):
+    """One-vs-rest AUROC averaged over the glosses present in the split (rank-based, ties averaged).
+    Returns None if fewer than 2 glosses have both positives and negatives."""
+    from scipy.stats import rankdata
+    n, scores = len(y), []
+    for c in np.unique(y):
+        n_pos = int((y == c).sum())
+        n_neg = n - n_pos
+        if n_pos == 0 or n_neg == 0:
+            continue
+        ranks = rankdata(probs[:, c])
+        scores.append((ranks[y == c].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
+    return float(np.mean(scores)) if len(scores) > 1 else None
+
+
 def fit_temperature(logits, y, lo: float = 0.05, hi: float = 10.0, iters: int = 60):
     """Temperature T minimizing mean NLL of softmax(logits / T) -- golden-section search over
     log T (the NLL is unimodal in T)."""
@@ -373,6 +394,9 @@ def compute_metrics(logits, y, classes, train_counts, temperature=None):
     metrics["calibration"] = {
         "mean_confidence": float(confidence.mean()),
         "accuracy": float(correct.mean()),
+        "nll": float(-log_probs[np.arange(n), y].mean()),
+        "brier": brier_score(probs, y),
+        "auroc_macro_ovr": macro_auroc(probs, y),
         "ece": ece,
         "mce": mce,
         "mean_confidence_correct": float(confidence[correct].mean()),
@@ -385,6 +409,8 @@ def compute_metrics(logits, y, classes, train_counts, temperature=None):
         ece_t, mce_t, reliability_scaled = expected_calibration_error(scaled_conf, correct)
         metrics["calibration"]["temperature"] = temperature
         metrics["calibration"]["loss_after_temperature"] = float(-scaled_log_probs[np.arange(n), y].mean())
+        metrics["calibration"]["brier_after_temperature"] = brier_score(np.exp(scaled_log_probs), y)
+        metrics["calibration"]["auroc_macro_ovr_after_temperature"] = macro_auroc(np.exp(scaled_log_probs), y)
         metrics["calibration"]["ece_after_temperature"] = ece_t
         metrics["calibration"]["mce_after_temperature"] = mce_t
 
@@ -726,6 +752,9 @@ def render_report(results, checkpoint: Path, history):
     row("mean rank of true gloss", lambda m: f"{m['mean_true_rank']:.1f}")
     row("cross-entropy", lambda m: f"{m['loss']:.4f}")
     row("ECE", lambda m: f"{m['calibration']['ece']:.4f}")
+    row("Brier score", lambda m: f"{m['calibration']['brier']:.4f}")
+    row("macro AUROC (one-vs-rest)",
+        lambda m: "n/a" if m['calibration']['auroc_macro_ovr'] is None else f"{m['calibration']['auroc_macro_ovr']:.4f}")
     row("baseline top-1 (always most frequent)", lambda m: pct(m["prior_baseline_topk"]["top1"], 2))
     row("baseline top-5 (5 most frequent)", lambda m: pct(m["prior_baseline_topk"]["top5"], 2))
     lines.append("")
@@ -886,6 +915,14 @@ def main(checkpoint_name="best", splits=("val", "test"), batch_size=BATCH_SIZE, 
         logging.info(f"{split}: top-1 {metrics['topk']['top1']:.4f}  top-5 {metrics['topk']['top5']:.4f}  "
                      f"macro top-1 {metrics['macro_topk']['top1']:.4f}  "
                      f"(tolerant top-1 {metrics['tolerant']['topk']['top1']:.4f})")
+        cal = metrics["calibration"]
+        msg = f"{split} calibration: NLL {cal['nll']:.4f}  Brier {cal['brier']:.4f}  ECE {cal['ece']:.4f}"
+        if cal["auroc_macro_ovr"] is not None:
+            msg += f"  AUROC {cal['auroc_macro_ovr']:.4f}"
+        if "temperature" in cal:
+            msg += (f"  | T={cal['temperature']:.3f}: NLL {cal['loss_after_temperature']:.4f}  "
+                    f"Brier {cal['brier_after_temperature']:.4f}  ECE {cal['ece_after_temperature']:.4f}")
+        logging.info(msg)
 
         if split == "test":
             if train_signers is not None:
